@@ -1,5 +1,7 @@
 # Corellia Design System
 
+> **Status (2026-10-28):** documents the visual language of the existing v1 frontend (control-plane UI). The visual language for the personal agent workspace ([`../VISION.md`](../VISION.md)) is not decided; treat this as reference, not a mandate.
+
 > **Mission Control × Deep Space — for agent fleets**
 > Corellia's design language: a Kamino-family sister product with its own
 > identity rooted in technical retro-futurism, systems-engineering visual
@@ -213,7 +215,7 @@ the family. Corellia's distinctness comes from **what colors mean** and
 2. **Page motifs** — see §33; Catalog reads as spec sheets, Fleet as
    radar/status matrix, Spawn flow as RPG character creation
 3. **Background atmospherics** — Corellia leans on **starfield + nebula
-   drift** (consistent with vision.md's "operators of complex systems"
+   drift** (consistent with archive/vision.md's "operators of complex systems"
    framing); Catalog and Spawn flow may layer faint **schematic grid
    overlays** as ambient texture
 4. **Status vocabulary** — see §35; agent lifecycle states have specific

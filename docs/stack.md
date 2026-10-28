@@ -1,21 +1,21 @@
 # Corellia — Implementation Stack (v1)
 
+> **Status (2026-10-28):** describes the v1 control-plane implementation that is still in the tree.
+> Under the new direction ([`VISION.md`](VISION.md)) these picks are **defaults, not decisions**:
+> Go backend, TypeScript frontend, Connect-go + protobuf contract, `go.work` monorepo.
+> Fly.io deploy, Supabase auth and the fleet/spawn domain are legacy and may be dropped.
+
 Concrete engineering picks for v1. Companion docs:
 
-- `vision.md` — the product vision
-- `blueprint.md` — *what* we're building and the architecture rules (esp. §11)
-- `stack.md` (this doc) — *how* we're building it: tools, layout, pipelines,
-  deploy. The "why these picks" reference.
-- `archive/backend-scaffolding.md` — historical step-by-step recipe for
-  creating `backend/`, with starter file contents (archival; live code is
-  now authoritative)
-- `frontend-scaffolding.md` — step-by-step recipe for creating `frontend/`,
-  with starter file contents
+- [`VISION.md`](VISION.md) - current product direction
+- [`archive/vision.md`](archive/vision.md) - the superseded control-plane vision
+- [`archive/blueprint.md`](archive/blueprint.md) - control-plane architecture and the architecture rules (esp. §11)
+- `stack.md` (this doc) - *how* v1 was built: tools, layout, pipelines, deploy.
+- The original backend/frontend scaffolding recipes are no longer in the tree
+  (recoverable from git history). Live code is authoritative.
 
-When picks change, update this document. Blueprint rules (especially §11)
-still win when any rule in this doc conflicts with them. The scaffolding
-docs are recipes; once scaffolding is complete, the live code is
-authoritative.
+When picks change, update this document. Where `archive/blueprint.md` §11 and
+this doc conflict, the blueprint rule wins (for the legacy control-plane code).
 
 ---
 

@@ -3,13 +3,14 @@
 
   <h1>Corellia</h1>
 
-  <p><b>A vendor-neutral control plane for AI agents.</b><br/>
-  Spawn, deploy, govern, and manage agents across any model, any provider, any framework.</p>
+  <p><b>A personal agent workspace.</b><br/>
+  An always-on screen with a 3D agent you talk to by voice or keyboard, and answers built from live UI components.</p>
 
   <p>
-    <a href="docs/vision.md">Vision</a> ·
-    <a href="docs/blueprint.md">Blueprint</a> ·
+    <a href="docs/VISION.md">Vision</a> ·
+    <a href="docs/README.md">Docs</a> ·
     <a href="docs/stack.md">Stack</a> ·
+    <a href="docs/archive/README.md">Archive</a> ·
     <a href="docs/changelog.md">Changelog</a>
   </p>
 </div>
@@ -24,6 +25,10 @@
   <video src="VIDEO_URL" autoplay loop muted playsinline width="900" />
 </div>
 -->
+
+---
+
+> **Direction change (2026-10-28).** Corellia is being repurposed from a vendor-neutral agent control plane into a personal agent workspace: a 24/7 screen in the office with a 3D agent, voice and keyboard input, and generated UI. See [`docs/VISION.md`](docs/VISION.md). The sections below describe the **v1 control-plane implementation still in this repo** (spawn, fleet, chat, Fly deploy). It is legacy, and its docs are in [`docs/archive/`](docs/archive/README.md).
 
 ---
 
@@ -170,7 +175,7 @@ corellia/
 │   └── hermes/           CORELLIA_* → Hermes-native env-var shim + chat sidecar
 │
 ├── shared/proto/         Proto IDL — the ONLY FE↔BE contract surface
-├── docs/                 vision, blueprint, stack, changelog
+├── docs/                 VISION.md (current), stack, changelog, archive/ (old direction)
 ├── Procfile              `overmind start` boots FE + BE together
 └── go.work               Go workspace
 ```
@@ -274,7 +279,7 @@ These are **blocking** — breaking them is treated as a defect:
 9. Connect handlers are <30 lines: parse → call domain → marshal.
 10. Frontend uses Supabase *only* for auth — app data flows through Connect RPCs.
 
-Full rationale in [`docs/blueprint.md §11`](docs/blueprint.md) and [`docs/stack.md §11`](docs/stack.md).
+Full rationale in [`docs/archive/blueprint.md §11`](docs/archive/blueprint.md) and [`docs/stack.md §11`](docs/stack.md).
 
 ---
 

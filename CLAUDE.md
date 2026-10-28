@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Direction change (2026-10-28):** Corellia is now a personal agent workspace (always-on screen, 3D agent, voice + keyboard, generated UI). Read [`docs/VISION.md`](docs/VISION.md) first. The control-plane material below (and the code it describes: fleet, spawn, Fly deploy, tools governance) is the legacy v1 implementation. Its docs moved to [`docs/archive/`](docs/archive/README.md); see the old-to-new path map there. Treat everything below as a description of the existing code, not of where the project is going.
+
 ## What this repo is
 
 Corellia is a control plane for AI agents — spawn, deploy, govern, and manage agents across any model, provider, or harness framework. v1 is a hackathon-scoped MVP: one harness (Hermes), one deploy target (Fly.io), Supabase auth, Go backend + Next.js frontend.
@@ -12,9 +14,9 @@ Corellia is a control plane for AI agents — spawn, deploy, govern, and manage 
 
 Precedence — the higher doc wins on conflict:
 
-1. `docs/blueprint.md` — product architecture, data model (§9), **architecture rules (§11)**, MVP scope (§1)
+1. `docs/archive/blueprint.md` — (legacy control-plane) product architecture, data model (§9), **architecture rules (§11)**, MVP scope (§1)
 2. `docs/stack.md` — tech picks with rationale, monorepo layout (§2), **implementation rules (§11)**, env vars (§8)
-3. `docs/vision.md` — product framing (admin/policy-setter model, "garage of harnesses")
+3. `docs/archive/vision.md` — superseded control-plane framing (admin/policy-setter model, "garage of harnesses"). Current direction: `docs/VISION.md`, which wins over all of the above on product intent.
 
 Scaffolding recipes under `docs/archive/` are historical reference for how the codebase came to be — useful when reconstructing intent, never load-bearing for current behavior. `docs/changelog.md` is the diff-log between what the docs say and what the code does at any given milestone.
 
@@ -25,7 +27,7 @@ corellia/
 ├── backend/         Go 1.26 service (Chi + Connect-go + pgx + sqlc)
 ├── frontend/        Next.js 15 App Router (Tailwind + shadcn)
 ├── shared/proto/    Proto IDL — the only FE↔BE contract surface
-├── docs/            vision, blueprint, stack, scaffolding recipes
+├── docs/            VISION.md (current), stack, changelog; archive/ (old direction)
 ├── go.work          Go workspace: `use ./backend`
 └── .env.example     committed template (real env: backend/.env + frontend/.env.local, both gitignored)
 ```
@@ -65,7 +67,7 @@ Both `DATABASE_URL` and `DATABASE_URL_DIRECT` point at Supabase's **Direct Conne
 
 ## Architecture rules (blocking — treated as defects if broken)
 
-From `blueprint.md` §11 and `stack.md` §11. The non-obvious ones:
+From `docs/archive/blueprint.md` §11 and `docs/stack.md` §11. The non-obvious ones:
 
 1. **No Fly-specific code outside `internal/deploy/FlyDeployTarget`.** Everything else sees only the `DeployTarget` interface.
 2. **AgentTemplates pin by Docker image digest, never by mutable tag.** Governance primitive — no exceptions.

@@ -107,10 +107,10 @@ One package per domain. Do not consolidate into a single `domain/` folder — Go
 
 ## Related canonical docs (for *why*, not *how*)
 
-- `docs/blueprint.md` §9 — full data model
-- `docs/blueprint.md` §11 — architecture rules (blocking)
+- `docs/archive/blueprint.md` §9 — full data model
+- `docs/archive/blueprint.md` §11 — architecture rules (blocking)
 - `docs/stack.md` §3 — why proto + Connect-go
 - `docs/stack.md` §6 — data model ↔ Supabase, two-URL DB strategy
 - `docs/stack.md` §11 — implementation rules (blocking)
 - `docs/changelog.md` 0.1.0 — backend scaffolding decisions
-- `docs/completions/frontend-scaffold-completion.md` — frontend scaffolding decisions
+- (frontend scaffolding notes were removed from the tree; see git history)

@@ -1,1 +1,1 @@
-To get started and familiarise yourself with Corellia, look at docs/vision.md, docs/blueprint.md, docs/stack.md and docs/changelog.md (first 200 lines or so, its a long file).
+To get started and familiarise yourself with Corellia, look at docs/VISION.md (current direction), docs/stack.md and docs/changelog.md; the old control-plane docs (vision, blueprint) are in docs/archive/ (first 200 lines or so, its a long file).
