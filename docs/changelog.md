@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.14.0 — Direction Reset: Personal Agent Workspace Vision + Docs Archive Cleanup (2026-10-28)](#0140--direction-reset-personal-agent-workspace-vision--docs-archive-cleanup-2026-10-28)
 - [0.13.12 — Presentation Deck Restructure (4 Problem Slides + Tangle/Thesis Redesign) + Tools Inventory Grid + Carousel Icon Buttons + Layout Overflow Fixes](#01312--presentation-deck-restructure-4-problem-slides--tanglethesis-redesign--tools-inventory-grid--carousel-icon-buttons--layout-overflow-fixes-2026-04-27)
 - [0.13.11 — Spawn RPG Redesign: Per-Card Nebulas + Gallery Cleanup + Three-Column Character Layout](#01311--spawn-rpg-redesign-per-card-nebulas--gallery-cleanup--three-column-character-layout-2026-04-27)
 - [0.13.10 — v1.5 Pillar B Post-Review Hardening: Credential Reattachment + Adapter Revocation Policy + Frozenset Audit + 16 Misc Fixes Across BE / FE / Adapter](#01310--v15-pillar-b-post-review-hardening-credential-reattachment--adapter-revocation-policy--frozenset-audit--16-misc-fixes-across-be--fe--adapter-2026-04-27)
@@ -79,6 +80,53 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.14.0 — Direction Reset: Personal Agent Workspace Vision + Docs Archive Cleanup (2026-10-28)
+
+**Docs-only. All changes are uncommitted in the working tree, pending Phil's review.** No backend, frontend, proto, migration, adapter or dependency change; nothing built or run. Corellia changes direction from a vendor-neutral agent control plane to a personal agent workspace (always-on office screen, 3D agent, voice + keyboard, generated UI). The legacy control-plane code is untouched and still in the tree.
+
+Convention note: this repo's changelog is `docs/changelog.md` (index at top, dated sections, latest first), so this entry lives here and no root `CHANGELOG.md` was created.
+
+### Added
+
+- **`docs/VISION.md`** — new product vision: what Corellia is now, principles, experience, architecture sketch, dynamic UI approach (component catalog, typed tree/slot layout, shared Go/TS schema, bindings and actions, incremental spec streaming, propose/confirm, validation), decision layer, the agent-runtime **open decision** (Hermes vs the OpenWorld DeepSeek harness, tradeoffs and unknowns, evaluation plan), display box, existing-code defaults, non-goals, open questions, relationship to the old direction.
+- **`docs/README.md`** — index of current vs archived docs.
+- **`docs/archive/README.md`** — banner stating the archive is historical and superseded by `VISION.md`, contents table, and an old-path to new-path map.
+
+### Moved (`git mv`, history preserved, contents unchanged)
+
+Old control-plane material to `docs/archive/`, keeping the same relative sub-structure so relative paths between archived files still resolve:
+
+- `docs/vision.md` -> `docs/archive/vision.md`
+- `docs/blueprint.md` -> `docs/archive/blueprint.md`
+- `docs/blueprints/deployment-architecture.md`, `docs/blueprints/adapter-image-blueprint.md` -> `docs/archive/blueprints/`
+- `docs/plans/*` (5 files) -> `docs/archive/plans/`
+- `docs/completions/*` (14 files) -> `docs/archive/completions/`
+- `docs/executing/*` (2 files) -> `docs/archive/executing/`
+- `docs/refs/{fly-commands,governable-agent-surfaces,hermes-tool-name-audit,infra-outline,multiagent-deployment-frameworks,presentation-beat-sheet}.md` -> `docs/archive/refs/`
+
+### Edited
+
+- **`README.md`** — tagline and nav links updated, direction-change note added above "What it does" (body left as the description of the legacy v1), repo-layout `docs/` line, link to the blueprint rules repointed to `docs/archive/blueprint.md`.
+- **`CLAUDE.md`** — direction-change note at top pointing to `docs/VISION.md` and the archive; doc-hierarchy paths and the architecture-rules citation repointed; `docs/` line in the layout block. Control-plane guidance otherwise left as is (it still describes the existing code accurately).
+- **`.claude/commands/get_started.md`** — reading list now starts at `docs/VISION.md`.
+- **`docs/stack.md`** — status banner (picks are defaults under the new direction), companion-docs list repointed; references to scaffolding recipes that are no longer in the tree replaced with a note.
+- **`docs/blueprints/codegen-cheatsheet.md`** — blueprint refs repointed to `docs/archive/blueprint.md`; dead scaffold-completion ref dropped.
+- **`docs/blueprints/login-swarm-animation.md`** — dead references to `login-animation*.md` completion/plan docs (not in the tree; in git history) replaced with a note.
+- **`docs/refs/design-system.md`** — status banner (reference for the v1 frontend, not a mandate) and one `vision.md` reference repointed.
+- **`docs/changelog.md`** — this entry and its index line.
+
+### Removed
+
+- Nothing deleted. Dead references dropped (see Edited): `frontend-scaffolding.md`, `archive/backend-scaffolding.md` (stack.md), `completions/frontend-scaffold-completion.md` (codegen-cheatsheet), `completions/login-animation*.md` and `executing/login-animation-implementation.md` (login-swarm-animation). None of these exist in the tree; all are in git history.
+
+### Known follow-ups (not done, out of scope)
+
+- Code comments, migrations, Dockerfiles and adapter READMEs still cite old doc paths (for example `docs/blueprint.md`, `docs/executing/...`). Use the path map in `docs/archive/README.md`. Not edited, since this change touches docs only.
+- `.claude/commands/code_assessor.md` still tells the assessor to write into `docs/plans`.
+- The legacy control-plane code (fleet, spawn, Fly deploy, tools governance, Supabase auth) is not removed.
+
+---
 
 ## 0.13.12 — Presentation Deck Restructure (4 Problem Slides + Tangle/Thesis Redesign) + Tools Inventory Grid + Carousel Icon Buttons + Layout Overflow Fixes (2026-04-27)
 

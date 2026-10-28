@@ -23,13 +23,9 @@ Companion docs:
 - `docs/refs/elephantasm-animation.md` — the sister-product
   reference whose techniques this animation deliberately diverges
   from (pearl breathing organism vs operator console).
-- `docs/completions/login-animation.md` — the original direction-D
-  selection notes (recommended over Directions A/B/C: constellation
-  swarm, orbital fleet, schematic lattice).
-- `docs/completions/login-animation-phase-{0..7}.md` — phase-by-phase
-  completion notes for the implementation.
-- `docs/executing/login-animation-implementation.md` — the original
-  eight-phase plan; Phase 8 (final tuning) still owed.
+- The original direction-D selection notes, phase completion notes and
+  implementation plan (`login-animation*.md`) are no longer in the tree;
+  recover them from git history if needed.
 
 ---
 
@@ -66,7 +62,7 @@ silhouette of the chevron and never load three.js.
 The brief was: drop a 3D, ultra-refined, ambient animation onto
 `/sign-in` that hits the sophistication of Elephantasm's nebula but
 reads as **Corellia**, not as a sister product. Four directions
-were drafted (the originals are in `docs/completions/login-animation.md`):
+were drafted (the originals are in git history):
 
 - **A — Constellation Swarm.** Static volume of green points with
   drawn mesh edges + spawn pulses. *Discarded:* one-note;
