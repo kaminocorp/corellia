@@ -1,8 +1,10 @@
 import { SIMPLEX_NOISE_GLSL } from "./simplex-noise";
 
 /**
- * Nebula avatar shaders — adapted from `docs/refs/elephantasm-animation.md`,
- * downsized for a card-sized avatar (Phase 2 of agents-ui-mods).
+ * Nebula shaders — adapted from `docs/refs/elephantasm-animation.md`.
+ * Carried over from the v1 spawn avatar (Phase 1 salvage) and now the
+ * 3D agent's body (vision Phase 5); `uBrightness` was added so the state
+ * machine can dim and flare the form.
  *
  * Two layers (vs the source's three; Wisp Tendrils dropped — too soft to
  * read at 240×240):
@@ -99,6 +101,7 @@ uniform vec3 uTint3;
 uniform vec4 uTintFreq;
 uniform vec4 uTintIntensity;
 uniform vec3 uSpatialWeights;
+uniform float uBrightness;
 
 varying float vAlpha;
 varying vec3 vDisplaced;
@@ -129,7 +132,7 @@ void main() {
   color = mix(color, uTint2, moodC * uTintIntensity.z);
   color = mix(color, uTint3, moodD * uTintIntensity.w);
 
-  gl_FragColor = vec4(color, vAlpha * soft);
+  gl_FragColor = vec4(color, vAlpha * soft * uBrightness);
 }
 `;
 
@@ -173,6 +176,8 @@ void main() {
 `;
 
 export const CORE_FRAGMENT_SHADER = /* glsl */ `
+uniform float uBrightness;
+
 varying float vAlpha;
 varying float vWarmCool;
 
@@ -186,6 +191,6 @@ void main() {
   vec3 cool = vec3(0.82, 0.88, 1.00);
   vec3 color = mix(warm, cool, vWarmCool);
 
-  gl_FragColor = vec4(color, vAlpha * soft);
+  gl_FragColor = vec4(color, vAlpha * soft * uBrightness);
 }
 `;

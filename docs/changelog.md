@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)](#0155---phase-5-3d-agent-r3f-nebula-state-machine-audio-hook-adaptive-resolution-fallback-stats-overlay-2026-10-29)
 - [0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)](#0154---phase-4-component-library-15-components--renderer-bindings-hotkeys-decay-placement--catalog-describerank--action-and-screen-endpoints-2026-10-29)
 - [0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)](#0153---phase-3-agentruntime-seam--local-runtime--session-with-sse-event-stream--client-session-store-2026-10-29)
 - [0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)](#0152---phase-2-shared-contract-json-schemas--v1-catalog--gots-codegen--validators--reducers-with-shared-fixtures-2026-10-29)
@@ -86,6 +87,21 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)
+
+Roadmap Phase 5. Full notes: [`completions/phase-05-3d-agent.md`](completions/phase-05-3d-agent.md).
+
+### Added
+
+- **`client/src/agent3d/`**: per-state palettes; `AgentStateMachine` easing shape, motion and colour between idle/listening/thinking/speaking/error with audio modulation while speaking; `AdaptiveResolution` (frame-time EMA → render scale with hysteresis and cooldown); `audioLevel` hook for the Phase 8 analyser; render stats; `Nebula` (lazy R3F scene, two additive point layers, 12 000 + 1 200 particles by default, uniforms from the machine every frame, DPR from the controller); `Agent3D` (WebGL2 + reduced-motion probe, SVG fallback, Suspense) and `StatsOverlay` (`?stats=1`); `?particles=N`.
+- `uBrightness` uniform in the salvaged nebula fragment shaders.
+
+### Edited
+
+- `App.tsx` mounts the 3D agent in the Stage; the Stage's full-visual agent zone is larger.
+
+---
 
 ## 0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)
 

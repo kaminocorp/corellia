@@ -4,6 +4,7 @@ import { CommandInput } from "./CommandInput";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { DebugPane } from "./DebugPane";
 import { Transcript } from "./Transcript";
+import { Agent3D, StatsOverlay } from "../agent3d/Agent3D";
 import { Gallery } from "../gallery/Gallery";
 import { Stage } from "../renderer/Stage";
 import { assignHotkeys } from "../renderer/resolve";
@@ -22,10 +23,11 @@ import { SessionStream } from "../session/stream";
 export function App() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   if (params.get("gallery") === "1") return <Gallery />;
-  return <Display debug={params.get("debug") === "1"} />;
+  const particles = Number(params.get("particles")) || undefined;
+  return <Display debug={params.get("debug") === "1"} stats={params.get("stats") === "1"} particles={particles} />;
 }
 
-function Display({ debug }: { debug: boolean }) {
+function Display({ debug, stats, particles }: { debug: boolean; stats: boolean; particles?: number }) {
   const [devMode, setDevMode] = useState(false);
   const inputValue = useRef("");
   const { connection, agentName, agentState, activeTurnId, spec, touched } = useSessionState((s) => ({
@@ -83,12 +85,7 @@ function Display({ debug }: { debug: boolean }) {
         spec={spec}
         fire={fire}
         onInvalid={(id, msg) => sessionStore.addError("render_invalid", `${id}: ${msg}`)}
-        agent={
-          <div
-            className="h-40 w-40 rounded-full border border-border transition-all duration-700"
-            style={{ opacity: agentState === "idle" ? 0.5 : 1, boxShadow: `0 0 80px var(--color-state-${agentState}) inset` }}
-          />
-        }
+        agent={<Agent3D state={agentState} particles={particles} />}
       />
 
       <header className="absolute top-4 left-5 flex items-center gap-4 font-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
@@ -107,6 +104,7 @@ function Display({ debug }: { debug: boolean }) {
       </footer>
 
       {debug && <DebugPane />}
+      {stats && <StatsOverlay />}
     </main>
   );
 }

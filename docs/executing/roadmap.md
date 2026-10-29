@@ -243,7 +243,7 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 2 Shared contract | done 2026-10-29 | [`../completions/phase-02-shared-contract.md`](../completions/phase-02-shared-contract.md) | 0.15.2 |
 | 3 Session, events, local runtime | done 2026-10-29 | [`../completions/phase-03-session-events-local-runtime.md`](../completions/phase-03-session-events-local-runtime.md) | 0.15.3 |
 | 4 Component library and renderer | done 2026-10-29 | [`../completions/phase-04-component-library-and-renderer.md`](../completions/phase-04-component-library-and-renderer.md) | 0.15.4 |
-| 5 3D agent | pending | | |
+| 5 3D agent | done 2026-10-29 | [`../completions/phase-05-3d-agent.md`](../completions/phase-05-3d-agent.md) | 0.15.5 |
 | 6 Decision layer, actions, tools | pending | | |
 | 7 Cloud runtimes and spike | pending | | |
 | 8 Voice | pending | | |

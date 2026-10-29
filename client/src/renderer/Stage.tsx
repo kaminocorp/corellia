@@ -23,7 +23,7 @@ export function Stage({ spec, agent, fire, onInvalid }: Props) {
     none: "inset-0",
     glance: "inset-0",
     panel: "top-0 bottom-0 left-0 w-[38%]",
-    full: "left-4 bottom-28 h-40 w-40",
+    full: "left-2 bottom-24 h-56 w-56",
   }[mode];
   const uiClass = {
     none: "hidden",
