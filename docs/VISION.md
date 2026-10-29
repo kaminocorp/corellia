@@ -19,7 +19,7 @@ Corellia is a personal agent workspace: an always-on screen in the Fabrica 84 of
 
 ## 3. Experience
 
-- **Always-on screen.** A dedicated display in Phil's office, running full-screen with no chrome. Idle state is an ambient scene, not a blank screen.
+- **Always-on screen.** A dedicated display in Phil's office, running full-screen with no chrome. Idle state is an ambient scene, not a blank screen. Any modern monitor must work (1080p to 4K); there is no fixed target display.
 - **3D agent.** A 3D visualisation of the agent is the persistent focal element. It reflects state (idle, listening, thinking, speaking, error) and gives presence to the voice. Style is undecided (see open questions). The repo already has WebGL particle work (login swarm, spawn nebula; see [`blueprints/login-swarm-animation.md`](blueprints/login-swarm-animation.md) and [`refs/elephantasm-animation.md`](refs/elephantasm-animation.md)) that may be reusable as a starting point.
 - **Input.** Keyboard chat (always focused, no click needed) and microphone voice. Both feed the same conversation. Typed and spoken turns are equivalent.
 - **Output.** Speech through speakers, plus generated UI on screen. Generated UI appears around or beside the 3D agent and clears or decays when no longer relevant.
@@ -28,9 +28,9 @@ Corellia is a personal agent workspace: an always-on screen in the Fabrica 84 of
 ## 4. Architecture sketch
 
 ```
- Display box (Debian, kiosk)                 Corellia backend (Go, default)            Cloud
+ Display box (Debian; kiosk or app shell)    Corellia backend (Go, default)            Cloud
  +-------------------------------+           +-------------------------------+
- | Browser kiosk (TS frontend)   |  events   | Session + event stream (SSE/  |   LLM inference
+ | Web client (TS, WebGL2)       |  events   | Session + event stream (SSE/  |   LLM inference
  |  - 3D agent scene             | <-------- |   Connect stream)             | <-----> (via agent runtime)
  |  - UI renderer (catalog)      |           | Decision layer ("Jev")        |
  |  - keyboard capture           |  turns    | Catalog + spec validation     |   STT / TTS
@@ -44,12 +44,23 @@ Corellia is a personal agent workspace: an always-on screen in the Fabrica 84 of
 
 Components:
 
-- **Display box client.** TypeScript app in a kiosk browser. Renders the 3D agent, the component tree, handles keyboard and audio I/O. Holds no secrets beyond a device credential.
+- **Display box client.** One web-tech client (section 4.1), run in a Chromium kiosk or a native Linux app shell on the box and in a normal browser on macOS during development. Renders the 3D agent, the component tree, handles keyboard and audio I/O. Holds no secrets beyond a device credential.
 - **Backend.** Owns the session, the catalog, spec validation, the decision layer and the action gate. Default: reuse the Go backend and Connect-go contract. See section 9 for what is reused and what is likely dropped.
 - **Agent runtime.** Runs the agent loop (model calls, tools, memory). Behind a narrow `AgentRuntime` interface: send a user turn, receive a stream of typed events (text delta, tool call, tool result, UI spec ops, done, error). Hermes or the DeepSeek harness plugs in here.
 - **Voice pipeline.** Carried over from OpenWorld. Capture, voice activity detection, STT, TTS, barge-in. Details of the OpenWorld implementation are **not yet reviewed for this doc** (see unknowns).
 - **Component library + shared schema.** Section 5.
 - **Decision layer ("Jev logic").** Section 6.
+
+### 4.1 Client approach (default, decided 2026-10-29)
+
+Phil develops and tests on macOS (or in a browser) and runs on the Linux display box. Default:
+
+- **One client, web tech.** TypeScript, WebGL2 with a Three.js-class 3D layer, shaders kept GL ES 3.0 compatible. Reuse the existing TypeScript frontend stack where sensible.
+- **macOS (development).** Run in a normal browser against the dev server. No Mac-specific build.
+- **Display box.** Run the same build either in a fullscreen Chromium kiosk or wrapped as a native Linux app shell (Tauri or Electron). Which one is open (section 11); both use the same code.
+- **Platform adapter.** Platform-specific concerns (mic and speaker access, kiosk and watchdog behaviour, echo cancellation) sit behind a thin adapter. The browser and the shell differ only there.
+- **Adaptive resolution.** Render resolution adapts to the attached display (1080p to 4K) and to measured frame time; no fixed target display.
+- **Alternative considered: fully native** (for example Rust + wgpu: Metal on Mac, Vulkan or GL on Linux). Also cross-platform, but slower to iterate on and cannot reuse the TS frontend. Not the default.
 
 ## 5. Dynamic UI
 
@@ -162,10 +173,10 @@ Two candidates. **No choice is made here.** The point of this section is to make
 
 ## 8. Display box
 
-- **Hardware.** A lightweight Linux machine, Debian: either a VM or a small physical computer. Inference is cloud-based, so there is no local GPU need for models. Which of VM or small machine is not decided.
-- **Display.** A browser in kiosk mode, full-screen, auto-started on boot with auto-login, screen blanking and power saving disabled, a watchdog restarting the browser on crash. Typical stack (a proposal, unverified here): a minimal Wayland or X session plus Chromium in kiosk mode, started by systemd.
-- **3D rendering.** WebGL needs graphics acceleration. A VM without GPU passthrough falls back to software rendering, which constrains the 3D agent's complexity. Treat "can this box hold 30 fps for the agent scene" as an early test, not an assumption.
-- **Audio.** Microphone and speakers on the same box in the same room, so acoustic echo is real. Needs echo cancellation (the browser provides some) and a visible mic-state indicator, ideally a hardware mute.
+- **Hardware.** A lightweight Linux machine, Debian. Current advice: an x86_64 mini PC (Intel N150 class). Inference is cloud-based, so there is no local GPU need for models. Keeping the render path GL ES 3.0 / WebGL2 compatible keeps Raspberry Pi 5 or RK3588 boards possible later.
+- **Display.** The client from section 4.1, in a fullscreen Chromium kiosk or a native Linux app shell (Tauri or Electron; open). Either way: full-screen, auto-started on boot with auto-login, screen blanking and power saving disabled, a watchdog restarting the client on crash. Typical stack (a proposal, unverified here): a minimal Wayland or X session plus the kiosk or shell, started by systemd. Must work with any modern monitor, 1080p to 4K.
+- **3D rendering.** WebGL2 needs graphics acceleration; an integrated GPU is enough, but a VM without GPU passthrough would fall back to software rendering. Render resolution is adaptive (scaled to the display and frame time), so a 4K panel does not imply a 4K render. Treat "can this box hold 30 fps for the agent scene at the attached resolution" as an early test, not an assumption.
+- **Audio.** Microphone and speakers on the same box in the same room, so acoustic echo is real. Needs echo cancellation (the browser provides some; the shell may differ, which is why it sits behind the platform adapter) and a visible mic-state indicator, ideally a hardware mute.
 - **Input.** Keyboard only. The keyboard must always focus the chat input without a click.
 - **Network.** Outbound only to the backend and cloud APIs. Auth is a device credential, not an interactive login.
 - **Ops.** The box is disposable: reprovisionable from a script, no state that matters locally.
@@ -177,7 +188,7 @@ This repo is a working v1 of the old control plane. Defaults below are suggestio
 | Existing | Default for the new direction |
 |---|---|
 | Go backend, Chi, Connect-go, `go.work` monorepo | Keep as the default backend and contract layer. |
-| Next.js 15 + React 19 + TypeScript frontend | Keep as the default for the kiosk client. A kiosk may not need Next.js specifically; open. |
+| Next.js 15 + React 19 + TypeScript frontend | TypeScript stack reused for the display client (section 4.1). The client may not need Next.js specifically (a static WebGL2 app may fit better); open. |
 | Protobuf contract, buf codegen | Keep for ordinary RPC. Schema format for the UI spec is open (5.3). |
 | WebGL particle components (login swarm, spawn nebula) | Candidate starting point for the 3D agent. |
 | Supabase auth, Postgres, orgs/users | Likely unnecessary for one user and one screen. Candidate to drop or defer. |
@@ -202,8 +213,8 @@ No code has been changed or removed. The docs cleanup only moved and edited docu
 4. Shared schema format and transport: JSON Schema vs protobuf; SSE vs Connect streaming (5.3, 5.4).
 5. Where the decision layer lives: backend (default) or inside the agent runtime.
 6. Activation: always-listening with wake word, push-to-talk key, or VAD-gated. Privacy tradeoff for an always-on mic.
-7. 3D agent style and rendering budget on the chosen display box; whether the existing particle work is the right base.
-8. VM vs small physical computer for the display box.
+7. 3D agent style and rendering budget on the chosen display box (adaptive resolution, 1080p to 4K); whether the existing particle work is the right base.
+8. Which shell on the display box: fullscreen Chromium kiosk or a native Linux app shell (Tauri or Electron). Native vs web is settled (web, section 4.1); box hardware default is an x86_64 N150-class mini PC.
 9. Auth and persistence for a single-user device: keep Supabase and Postgres, or reduce to a device token and local state.
 10. Proactivity: can the agent put things on screen unprompted (calendar, alerts), and what is the interruption policy?
 11. Memory: what the agent remembers across days, and where that state lives.

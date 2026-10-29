@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)](#0141---vision-default-client-approach-web-client-browser-on-macos-kiosk-or-shell-on-the-box-2026-10-29)
 - [0.14.0 — Direction Reset: Personal Agent Workspace Vision + Docs Archive Cleanup (2026-10-28)](#0140--direction-reset-personal-agent-workspace-vision--docs-archive-cleanup-2026-10-28)
 - [0.13.12 — Presentation Deck Restructure (4 Problem Slides + Tangle/Thesis Redesign) + Tools Inventory Grid + Carousel Icon Buttons + Layout Overflow Fixes](#01312--presentation-deck-restructure-4-problem-slides--tanglethesis-redesign--tools-inventory-grid--carousel-icon-buttons--layout-overflow-fixes-2026-04-27)
 - [0.13.11 — Spawn RPG Redesign: Per-Card Nebulas + Gallery Cleanup + Three-Column Character Layout](#01311--spawn-rpg-redesign-per-card-nebulas--gallery-cleanup--three-column-character-layout-2026-04-27)
@@ -80,6 +81,25 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)
+
+**Docs-only. Uncommitted in the working tree, pending Phil's review.** No code, build or dependency change.
+
+Records Phil's decision on how the display client is built and run: one web-tech client, run in a browser on macOS during development and in a Chromium kiosk or a native Linux app shell on the display box.
+
+### Edited
+
+- **`docs/VISION.md`**
+  - New **4.1 Client approach**: one TypeScript client (WebGL2, Three.js-class 3D, GL ES 3.0-compatible shaders) reusing the TS frontend stack where sensible; normal browser on macOS, no Mac build; Chromium kiosk or Tauri/Electron shell on the box (open, same code); thin platform adapter for mic/speaker, kiosk/watchdog and echo cancellation; adaptive render resolution; fully native (Rust + wgpu) considered and not chosen.
+  - **3 Experience**: any modern monitor (1080p to 4K), no fixed target display.
+  - **4 Architecture sketch**: diagram and display-client description point to 4.1.
+  - **8 Display box**: hardware advice (x86_64 Intel N150-class mini PC, GL ES 3.0 / WebGL2 path keeps Pi 5 / RK3588 open); display is kiosk or shell; adaptive resolution in 3D rendering; echo cancellation behind the adapter.
+  - **9 Existing code and defaults**: frontend row reflects reuse for the display client.
+  - **11 Open questions**: Q7 notes adaptive resolution; Q8 replaced (was VM vs small computer) with "which shell on the box"; native vs web is settled.
+- **`docs/changelog.md`**: this entry and its index line.
+
+---
 
 ## 0.14.0 — Direction Reset: Personal Agent Workspace Vision + Docs Archive Cleanup (2026-10-28)
 
