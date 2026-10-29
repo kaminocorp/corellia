@@ -3,12 +3,12 @@
  * external store for React (useSyncExternalStore). The spec is advanced
  * with the shared reducer; invalid ops are reported, never rendered.
  */
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 
 import { applyOp, emptySpec, ReducerError } from "../contract";
 import type { AgentState, Capabilities, Proposal, SessionEvent, SpecOp, TranscriptEntry, UISpec } from "../contract";
 
-export type ConnectionStatus = "connecting" | "online" | "reconnecting" | "offline";
+export type ConnectionStatus = "connecting" | "online" | "reconnecting" | "offline" | "unauthorized";
 
 export type ClientError = { code: string; message: string; ts: string; turnId?: string };
 
@@ -28,6 +28,8 @@ export type SessionState = {
   recentEvents: SessionEvent[];
   /** Node id -> epoch ms of its last add/set, for decay. */
   touched: Record<string, number>;
+  /** Speech pieces heard outside a turn (confirm results, reminders), joined into a transcript entry on the final piece. */
+  pendingSpeech: string[];
 };
 
 export const MAX_ERRORS = 20;
@@ -50,7 +52,21 @@ export function initialState(): SessionState {
     errors: [],
     recentEvents: [],
     touched: {},
+    pendingSpeech: [],
   };
+}
+
+/** True when two values are the same object or have the same own enumerable entries (one level deep). */
+export function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (!Object.prototype.hasOwnProperty.call(b, k) || !Object.is((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) return false;
+  }
+  return true;
 }
 
 /** Updates the touched map for an op (pure). */
@@ -88,7 +104,9 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
       transcript: tail(ev.transcript ?? [], MAX_TRANSCRIPT),
       pendingProposals: ev.pending_proposals,
       capabilities: ev.capabilities,
-      touched: Object.fromEntries(Object.keys(ev.spec.nodes).map((id) => [id, Date.parse(ev.ts) || Date.now()])),
+      // Nodes the client already knew keep their timestamps so decay timers
+      // do not restart on every reconnect; new ones count from the snapshot.
+      touched: Object.fromEntries(Object.keys(ev.spec.nodes).map((id) => [id, state.touched[id] ?? (Date.parse(ev.ts) || Date.now())])),
       activeTurnId: ev.agent_state === "idle" ? null : state.activeTurnId,
       streamingText: ev.agent_state === "idle" ? "" : state.streamingText,
       recentEvents: tail([...state.recentEvents, ev], MAX_RECENT),
@@ -136,6 +154,20 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
     case "proposal": {
       const others = state.pendingProposals.filter((p) => p.id !== ev.proposal.id);
       next.pendingProposals = ev.status === "pending" ? [...others, ev.proposal] : others;
+      return next;
+    }
+    case "speech": {
+      // Inside a turn the reply reaches the transcript on turn_done. Outside
+      // one (a confirmed action's result, a reminder) speech is the only
+      // text there is, so it is recorded here, final piece by final piece.
+      if (state.activeTurnId) return next;
+      const pieces = [...state.pendingSpeech, ev.text];
+      if (ev.final) {
+        next.pendingSpeech = [];
+        next.transcript = tail([...state.transcript, { role: "agent", text: pieces.join(" "), ts: ev.ts, turn_id: ev.turn_id }], MAX_TRANSCRIPT);
+      } else {
+        next.pendingSpeech = pieces;
+      }
       return next;
     }
     default:
@@ -191,6 +223,31 @@ export class SessionStore {
 
 export const sessionStore = new SessionStore();
 
-export function useSessionState<T = SessionState>(selector: (s: SessionState) => T = (s) => s as unknown as T): T {
-  return useSyncExternalStore(sessionStore.subscribe, () => selector(sessionStore.getState()), () => selector(sessionStore.getState()));
+/**
+ * Subscribes a component to a slice of the session state. The selector may
+ * return a fresh object: the result is cached per state version and, when a
+ * new result is shallow-equal to the previous one, the previous object is
+ * returned. useSyncExternalStore requires a stable snapshot; a selector that
+ * returned a new object every call made React 19 loop until it gave up with
+ * "Maximum update depth exceeded" and left the page blank (review 2026-10-29).
+ */
+export function useSessionState<T = SessionState>(
+  selector: (s: SessionState) => T = (s) => s as unknown as T,
+  isEqual: (a: T, b: T) => boolean = shallowEqual,
+  store: SessionStore = sessionStore,
+): T {
+  const cache = useRef<{ state: SessionState; value: T } | null>(null);
+  const getSnapshot = () => {
+    const state = store.getState();
+    const c = cache.current;
+    if (c && c.state === state) return c.value;
+    const value = selector(state);
+    if (c && isEqual(c.value, value)) {
+      cache.current = { state, value: c.value };
+      return c.value;
+    }
+    cache.current = { state, value };
+    return value;
+  };
+  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }

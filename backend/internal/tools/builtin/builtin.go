@@ -54,6 +54,10 @@ type Options struct {
 	Location    *time.Location
 	Memory      MemoryStore
 	Reminders   ReminderStore
+	// UICheck validates a show_ui batch before it is reported to the
+	// model and returns one message per rejected op (nil: no checking;
+	// the session still validates every op before it reaches the screen).
+	UICheck func(ops []json.RawMessage) []string
 }
 
 func (o *Options) defaults() {
@@ -94,7 +98,7 @@ func Register(r *tools.Registry, o Options) {
 	r.Register(forgetTool(o))
 	r.Register(reminderTool(o))
 	r.Register(directionsTool(o))
-	r.Register(showUITool())
+	r.Register(showUITool(o))
 }
 
 type m = map[string]any
@@ -505,20 +509,32 @@ func osrmRoute(ctx context.Context, o Options, from, to [2]float64) ([][2]float6
 
 // showUITool lets a runtime without native op emission put a validated
 // spec on screen: its result carries the ops, which the session applies.
-func showUITool() *tools.Tool {
+func showUITool(o Options) *tools.Tool {
 	return &tools.Tool{
 		Name:        "show_ui",
-		Description: "Put a visual on screen: a list of spec ops (add_node, set_slot, set_data, set_root, done) built from the component catalog. Start with clear when replacing what is shown.",
+		Description: "Put a visual on screen: a list of spec ops (add_node, set_slot, set_data, set_root, done) built from the component catalog. Start with clear when replacing what is shown. The result lists any op that was rejected and why; fix and resend only those.",
 		InputSchema: schema(`{"type":"object","additionalProperties":false,"required":["ops"],"properties":{"ops":{"type":"array","minItems":1,"maxItems":200,"items":{"type":"object"}}}}`),
 		Run: func(_ context.Context, args map[string]any) (runtime.ToolResult, error) {
 			raw, _ := args["ops"].([]any)
-			res := runtime.ToolResult{Content: fmt.Sprintf("Displayed %d ops.", len(raw))}
+			var res runtime.ToolResult
 			for _, op := range raw {
 				b, err := json.Marshal(op)
 				if err != nil {
 					return runtime.ToolResult{}, err
 				}
 				res.Ops = append(res.Ops, b)
+			}
+			var rejected []string
+			if o.UICheck != nil {
+				rejected = o.UICheck(res.Ops)
+			}
+			switch {
+			case len(rejected) == 0:
+				res.Content = fmt.Sprintf("Displayed %d ops.", len(raw))
+			case len(rejected) >= len(raw):
+				res.Content = fmt.Sprintf("Nothing was displayed: all %d ops were rejected.\n%s", len(raw), strings.Join(rejected, "\n"))
+			default:
+				res.Content = fmt.Sprintf("Displayed %d of %d ops. Rejected:\n%s", len(raw)-len(rejected), len(raw), strings.Join(rejected, "\n"))
 			}
 			return res, nil
 		},

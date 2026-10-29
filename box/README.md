@@ -5,7 +5,7 @@ How to turn a Debian machine into the Corellia display (VISION.md section 8): fu
 ## What runs where
 
 - The **backend** (`corellia-api.service`) can run on the box itself or on any host the box can reach. It serves the client, the API and the event stream on one port. Cloud APIs (model, STT, TTS, Open-Meteo, OSRM, map tiles) are outbound from the backend or the browser.
-- The **client** runs in Chromium kiosk mode (`corellia-kiosk.service`) as the auto-logged-in `corellia` user on a minimal X session, pointed at `http://<backend>:8080/?kiosk=1&token=<device token>`.
+- The **client** runs in Chromium kiosk mode (`corellia-kiosk.service`) as the auto-logged-in `corellia` user on a minimal X session, pointed at `http://<backend>:8080/?kiosk=1&token=<device token>`. The page stores the token and strips it from the address bar on first load; the backend must run with `CORELLIA_DEVICE_TOKEN` set, which also makes it listen on all interfaces (dev mode binds loopback only and the box could never reach it).
 - The **watchdog** (`corellia-watchdog.timer`) asks `/healthz` for `client_heartbeat_age_s` (the client posts `/api/heartbeat` every 30 s) and restarts the kiosk when the page has been quiet for more than 90 s.
 
 ## Provision

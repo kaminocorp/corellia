@@ -24,13 +24,20 @@ export function CommandInput({ onSubmit, onValueChange, placeholder = "Say somet
     const el = ref.current;
     if (!el) return;
     el.focus();
-    const refocus = () => {
-      // Defer so a programmatic blur (e.g. a dialog in a later phase) can
-      // finish before we pull focus back.
-      window.setTimeout(() => el.focus(), 0);
+    const refocus = (e: FocusEvent) => {
+      // A field marked data-keep-focus (the token prompt) may hold focus;
+      // otherwise defer so a programmatic blur can finish before we pull
+      // focus back.
+      const to = e.relatedTarget as Element | null;
+      if (to?.closest?.("[data-keep-focus]")) return;
+      window.setTimeout(() => {
+        if (document.activeElement?.closest?.("[data-keep-focus]")) return;
+        el.focus();
+      }, 0);
     };
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (document.activeElement === el) return;
+      if (document.activeElement?.closest?.("[data-keep-focus]")) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.length === 1 || e.key === "Backspace" || e.key === "Enter") el.focus();
     };
@@ -48,8 +55,12 @@ export function CommandInput({ onSubmit, onValueChange, placeholder = "Say somet
       if (text) {
         onSubmit(text);
         setValue("");
+        // Consumed: the global key handler must not also treat this Enter
+        // as "confirm the pending proposal" now that the input is empty
+        // (review 2026-10-29, item 3). An Enter on an empty input is left
+        // alone so it can reach a Confirm card's hotkey.
+        e.preventDefault();
       }
-      e.preventDefault();
     }
     if (e.key === "Escape" && value !== "") {
       setValue("");

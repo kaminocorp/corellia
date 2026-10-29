@@ -69,6 +69,9 @@ export class VoiceController {
   }
 
   async init(): Promise<void> {
+    // React StrictMode (Vite dev) runs the effect twice: dispose, then init
+    // again on the same instance. A disposed controller comes back to life.
+    this.disposed = false;
     const c = await this.deps.fetchCapabilities();
     if (this.disposed) return;
     this.caps = c;
@@ -88,13 +91,19 @@ export class VoiceController {
     else if (ev.type === "turn_started" || (ev.type === "turn_done" && ev.status === "cancelled")) this.player.stop();
   }
 
-  /** Barge-in: the user started speaking or typing. */
+  /** Barge-in: the user started speaking. Playback stops and the running turn is cancelled. */
   bargeIn(): void {
     this.player.stop();
     if (this.activeTurnId) this.deps.cancelTurn().catch(() => {});
   }
 
+  /** Typing: playback stops, but the running turn continues (a follow-up is not an interruption). */
+  stopSpeaking(): void {
+    this.player.stop();
+  }
+
   handleKeyDown(e: KeyboardEvent): void {
+    this.player.prime();
     const change = this.activation.keydown(e);
     if (change || (e.ctrlKey && (e.code === "Space" || e.key.toLowerCase() === "m"))) e.preventDefault();
     void this.apply(change);

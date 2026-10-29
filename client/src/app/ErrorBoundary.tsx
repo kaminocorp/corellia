@@ -1,11 +1,18 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-type Props = { children: ReactNode; onError?: (error: Error) => void; label?: string };
+type Props = {
+  children: ReactNode;
+  onError?: (error: Error) => void;
+  label?: string;
+  /** The boundary recovers when this value changes identity (the spec, for generated UI). */
+  resetKey?: unknown;
+};
 type State = { error: Error | null };
 
 /**
  * Keeps a render failure in the generated UI from taking the whole screen
- * (and the 3D agent) down. Resets when the children change identity.
+ * (and the 3D agent) down. Resets when `resetKey` changes (the parent's
+ * `children` prop is a new element on every render, so it is no signal).
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
@@ -20,7 +27,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidUpdate(prev: Props): void {
-    if (this.state.error && prev.children !== this.props.children) this.setState({ error: null });
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null });
   }
 
   render(): ReactNode {

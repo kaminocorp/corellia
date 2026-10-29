@@ -3,8 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommandInput } from "./CommandInput";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { DebugPane } from "./DebugPane";
+import { ErrorLine } from "./ErrorLine";
 import { MicIndicator } from "./MicIndicator";
 import { OfflineBanner } from "./OfflineBanner";
+import { runtimeLabel } from "./runtimeLabel";
+import { TokenPrompt } from "./TokenPrompt";
 import { Transcript } from "./Transcript";
 import { Agent3D, StatsOverlay } from "../agent3d/Agent3D";
 import { Gallery } from "../gallery/Gallery";
@@ -13,6 +16,7 @@ import { assignHotkeys } from "../renderer/resolve";
 import { useDecay } from "../renderer/useDecay";
 import { useGlobalKeys, type GlobalKeyHandlers } from "../renderer/useGlobalKeys";
 import { cancelTurn, clearScreen, fireAction, removeNode, sendTurn } from "../session/api";
+import { setDeviceToken } from "../session/auth";
 import { fetchHealth } from "../session/health";
 import { startHeartbeat } from "../session/heartbeat";
 import { startSoak } from "../session/soak";
@@ -35,13 +39,17 @@ export function App() {
 function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boolean; soak: boolean; particles?: number }) {
   const [devMode, setDevMode] = useState(false);
   const inputValue = useRef("");
-  const { connection, agentName, agentState, activeTurnId, spec, touched } = useSessionState((s) => ({
+  const streamRef = useRef<SessionStream | null>(null);
+  // Selectors may return fresh objects: useSessionState caches by state
+  // version and shallow-compares, so the snapshot stays stable.
+  const { connection, agentName, agentState, activeTurnId, spec, touched, runtime } = useSessionState((s) => ({
     connection: s.connection,
     agentName: s.agentName,
     agentState: s.agentState,
     activeTurnId: s.activeTurnId,
     spec: s.spec,
     touched: s.touched,
+    runtime: s.capabilities?.runtime,
   }));
 
   const voice = useVoice(activeTurnId);
@@ -49,12 +57,14 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
 
   useEffect(() => {
     const stream = new SessionStream(sessionStore, { onEvent: (ev) => controller.onStreamEvent(ev) });
+    streamRef.current = stream;
     stream.connect();
     void fetchHealth().then((h) => setDevMode(h?.dev_mode ?? false));
     const stopHeartbeat = startHeartbeat();
     const stopSoak = soak ? startSoak() : () => {};
     return () => {
       stream.disconnect();
+      streamRef.current = null;
       stopHeartbeat();
       stopSoak();
     };
@@ -92,15 +102,18 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
   const onSubmit = (text: string) => {
     sendTurn(text, "keyboard").catch(report("send_failed"));
   };
+  const onToken = (token: string) => {
+    setDeviceToken(token);
+    streamRef.current?.connect();
+  };
+
+  // The server goes idle at turn_done while speech still plays; the scene
+  // keeps speaking (and reacting to the audio level) until playback ends.
+  const sceneState = voice.status.mic === "capturing" ? "listening" : voice.status.speaking && agentState === "idle" ? "speaking" : agentState;
 
   return (
     <main className="relative h-full w-full overflow-hidden">
-      <Stage
-        spec={spec}
-        fire={fire}
-        onInvalid={(id, msg) => sessionStore.addError("render_invalid", `${id}: ${msg}`)}
-        agent={<Agent3D state={voice.status.mic === "capturing" ? "listening" : agentState} particles={particles} />}
-      />
+      <Stage spec={spec} fire={fire} onInvalid={(id, msg) => sessionStore.addError("render_invalid", `${id}: ${msg}`)} agent={<Agent3D state={sceneState} particles={particles} />} />
 
       <header className="absolute top-4 left-5 flex items-center gap-4 font-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
         <span>{agentName}</span>
@@ -108,11 +121,13 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
         <span data-testid="agent-state" className={agentState === "idle" ? "" : "text-foreground"}>
           {agentState}
         </span>
+        {runtime && <span data-testid="runtime">{runtimeLabel(runtime)}</span>}
       </header>
       <div className="absolute top-4 right-5">
         <MicIndicator status={voice.status} />
       </div>
       <OfflineBanner status={connection} />
+      {connection === "unauthorized" && <TokenPrompt onSubmit={onToken} />}
 
       <footer className="absolute bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 px-6">
         <div className="mb-4">
@@ -121,11 +136,12 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
         <CommandInput
           onSubmit={onSubmit}
           onValueChange={(v) => {
-            if (inputValue.current === "" && v !== "") controller.bargeIn();
+            if (inputValue.current === "" && v !== "") controller.stopSpeaking();
             inputValue.current = v;
           }}
         />
       </footer>
+      <ErrorLine />
 
       {debug && <DebugPane />}
       {stats && <StatsOverlay />}

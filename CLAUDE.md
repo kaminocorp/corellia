@@ -27,8 +27,9 @@ backend/            Go 1.26, one binary: API + SSE stream + static client
     session         turns, spec, proposals, proactive delivery, event bus
     voice           STT/TTS seams (none, openai)  memory   file-backed notes/reminders/transcript
     proactive       reminder scheduler + ambient clock      store   atomic JSON + JSONL
-    httpsrv         Chi router, handlers (thin), SSE, static client
+    httpsrv         Chi router, request guards (guards.go), handlers (thin), SSE, static client
 client/             Vite + React 19 + TypeScript + R3F static bundle
+  e2e/              Playwright smoke test (pnpm e2e)
   src/contract      generated types (gen/: never hand-edit), ajv validators, reducer, checks
   src/components    one React component per catalog entry + registry
   src/renderer      bindings, hotkeys, placement, decay, global keys
@@ -71,6 +72,9 @@ pnpm -C client type-check && pnpm -C client lint && pnpm -C client test && pnpm 
 # Contract (after editing shared/)
 pnpm contracts:generate
 cd backend && go test ./internal/uispec -update     # rewrite reducer goldens (then run the client tests)
+
+# Browser smoke test (Playwright, real Chromium against the Go server; part of pnpm check)
+pnpm e2e                                            # client/e2e/*.spec.ts; scripts/chromium-libs.sh fetches libs without sudo on Linux
 
 # Everything
 pnpm check

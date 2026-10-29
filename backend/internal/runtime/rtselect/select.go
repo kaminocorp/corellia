@@ -13,8 +13,11 @@ import (
 )
 
 // Select builds the runtime named by the config. `auto` picks anthropic
-// when ANTHROPIC_API_KEY is set, else openai when OPENAI_API_KEY or
-// OPENAI_BASE_URL is set, else local. A named runtime without its
+// when ANTHROPIC_API_KEY is set, else openai when OPENAI_BASE_URL names an
+// endpoint, else local. OPENAI_API_KEY alone does not switch the runtime:
+// the README documents it as the voice key, so a silent switch to a
+// gpt model surprised the reviewer (2026-10-29). Set CORELLIA_RUNTIME=openai
+// explicitly for OpenAI's own chat endpoint. A named runtime without its
 // credentials is an error (so a misconfigured box fails loudly).
 func Select(cfg config.Config) (runtime.AgentRuntime, string, error) {
 	name := cfg.Runtime
@@ -22,7 +25,7 @@ func Select(cfg config.Config) (runtime.AgentRuntime, string, error) {
 		switch {
 		case cfg.AnthropicAPIKey != "":
 			name = "anthropic"
-		case cfg.OpenAIAPIKey != "" || cfg.OpenAIBaseURL != "":
+		case cfg.OpenAIBaseURL != "":
 			name = "openai"
 		default:
 			name = "local"
@@ -30,12 +33,17 @@ func Select(cfg config.Config) (runtime.AgentRuntime, string, error) {
 	}
 	switch name {
 	case "local":
-		return local.New(), "keyless local runtime", nil
+		detail := "keyless local runtime (scripted demo)"
+		if cfg.Runtime == "auto" && cfg.OpenAIAPIKey != "" {
+			detail += "; OPENAI_API_KEY is set but only enables voice: set CORELLIA_RUNTIME=openai to chat through it"
+		}
+		return local.New(), detail, nil
 	case "anthropic":
 		if cfg.AnthropicAPIKey == "" {
 			return nil, "", fmt.Errorf("runtime anthropic needs ANTHROPIC_API_KEY")
 		}
-		return anthropicrt.New(anthropicrt.Options{APIKey: cfg.AnthropicAPIKey, Model: cfg.Model, Effort: cfg.Effort}), "model " + orDefault(cfg.Model, "claude-opus-5-5"), nil
+		fallbacks := cfg.AnthropicFallbacks
+		return anthropicrt.New(anthropicrt.Options{APIKey: cfg.AnthropicAPIKey, Model: cfg.Model, Effort: cfg.Effort, Fallbacks: &fallbacks}), "model " + orDefault(cfg.Model, "claude-opus-5-5"), nil
 	case "openai":
 		if cfg.OpenAIAPIKey == "" && cfg.OpenAIBaseURL == "" {
 			return nil, "", fmt.Errorf("runtime openai needs OPENAI_API_KEY or OPENAI_BASE_URL")

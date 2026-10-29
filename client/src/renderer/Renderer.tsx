@@ -18,7 +18,7 @@ export function Renderer({ spec, fire, onInvalid }: Props) {
   const floating = useMemo(() => floatingOverlays(spec), [spec]);
   return (
     <>
-      {spec.root && <NodeView id={spec.root} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />}
+      {spec.root && <NodeView key={spec.root} id={spec.root} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />}
       {floating.map((id) => (
         <div key={id} data-floating={id} className="contents">
           <NodeView id={id} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />
@@ -33,8 +33,8 @@ type NodeProps = Props & { id: string; hotkeys: Map<string, ResolvedAction>; dep
 function NodeView({ id, spec, hotkeys, fire, onInvalid, depth }: NodeProps): ReactNode {
   const node = spec.nodes[id];
   if (!node || depth > 8) return null;
-  const impl = registry[node.type];
-  if (!impl) return null;
+  const Impl = registry[node.type];
+  if (!Impl) return null;
   const resolved = resolveNode(node, spec.data);
   if (resolved.status === "invalid") {
     onInvalid?.(id, resolved.message);
@@ -53,9 +53,13 @@ function NodeView({ id, spec, hotkeys, fire, onInvalid, depth }: NodeProps): Rea
   const actions = Object.values(node.actions ?? {})
     .map((ref) => (ref ? hotkeys.get(ref.id) : undefined))
     .filter((a): a is ResolvedAction => !!a && a.nodeId === id);
+  // Rendered as a component (not called as a function) and keyed by node
+  // id so hooks inside implementations are stable and unmount cleanup runs
+  // when a node is replaced: a Map's WebGL context is released rather than
+  // leaked (review 2026-10-29).
   return (
     <div data-node={id} data-type={node.type} className="contents">
-      {impl({ id, node, props: resolved.props, slot, actions, fire: (actionId) => fire(actionId, id) })}
+      <Impl key={id} id={id} node={node} props={resolved.props} slot={slot} actions={actions} fire={(actionId) => fire(actionId, id)} />
     </div>
   );
 }

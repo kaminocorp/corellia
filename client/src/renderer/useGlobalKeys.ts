@@ -31,6 +31,8 @@ export function useGlobalKeys(h: GlobalKeyHandlers) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // The command input marks the Enter that sent a message as handled.
+      if (e.defaultPrevented) return;
       const what = resolveKey(e.key, h);
       if (!what) return;
       e.preventDefault();

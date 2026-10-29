@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,7 +46,12 @@ func main() {
 		os.Exit(1)
 	}
 	if cfg.DevMode() {
-		slog.Warn("CORELLIA_DEVICE_TOKEN not set: dev mode, loopback clients only")
+		slog.Warn("CORELLIA_DEVICE_TOKEN not set: dev mode, loopback clients only", "listen", cfg.ListenAddr())
+	}
+	loc, err := cfg.Location()
+	if err != nil {
+		slog.Error("config", "err", err)
+		os.Exit(1)
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		slog.Error("data dir", "dir", cfg.DataDir, "err", err)
@@ -78,15 +84,28 @@ func main() {
 	}
 	slog.Info("memory loaded", "dir", st.Dir(), "notes", len(mem.Notes()), "reminders", len(mem.Pending()))
 
+	// show_ui validates its batch through the session, which exists only
+	// after the tools do; the closure binds late.
+	var sess *session.Session
+	uiCheck := func(ops []json.RawMessage) []string {
+		if sess == nil {
+			return nil
+		}
+		var out []string
+		for _, is := range sess.DryRunOps(ops) {
+			out = append(out, fmt.Sprintf("op %d (%s): %s", is.Index, is.Code, is.Message))
+		}
+		return out
+	}
 	toolReg := tools.NewRegistry()
-	builtin.Register(toolReg, builtin.Options{Memory: mem, Reminders: mem})
+	builtin.Register(toolReg, builtin.Options{Memory: mem, Reminders: mem, Location: loc, UICheck: uiCheck})
 	gate := actions.New(toolReg, 2*time.Minute, time.Now)
 	slog.Info("tools registered", "tools", toolReg.Names())
 
 	voiceProviders := voice.Select(cfg)
 	slog.Info("voice providers", "stt", voiceProviders.STT.Name(), "tts", voiceProviders.TTS.Name(), "mode", voiceProviders.Mode)
 
-	sess := session.New(session.Options{
+	sess = session.New(session.Options{
 		AgentName:  cfg.AgentName,
 		Runtime:    rt,
 		Registry:   reg,
@@ -97,12 +116,14 @@ func main() {
 		TTS:        voiceProviders.TTS.Name(),
 		Memory:     mem,
 		Transcript: mem,
+		ImageHosts: append([]string{}, cfg.ImageHosts...),
 	})
 	defer sess.Close()
 
 	schedCtx, stopSched := context.WithCancel(context.Background())
 	defer stopSched()
-	go proactive.New(mem, sess, time.Now, time.Local).Run(schedCtx, time.Second)
+	go proactive.New(mem, sess, time.Now, loc).Run(schedCtx, time.Second)
+	slog.Info("time zone", "location", loc.String())
 
 	handler := httpsrv.New(httpsrv.Deps{
 		Config:    cfg,
@@ -115,7 +136,7 @@ func main() {
 	})
 
 	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Addr:              cfg.ListenAddr(),
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}

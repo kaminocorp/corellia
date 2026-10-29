@@ -91,3 +91,45 @@ describe("SessionStore", () => {
     expect(store.getState().sessionId).toBe("main");
   });
 });
+
+describe("useSessionState", () => {
+  it("returns a stable object for an object selector and re-renders only on change", async () => {
+    const { renderHook, act } = await import("@testing-library/react");
+    const { useSessionState, SessionStore } = await import("./store");
+    const store = new SessionStore();
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders++;
+      return useSessionState((s) => ({ connection: s.connection, agentState: s.agentState }), undefined, store);
+    });
+    const first = result.current;
+    expect(first).toEqual({ connection: "connecting", agentState: "idle" });
+    act(() => store.addError("x", "unrelated change"));
+    expect(result.current).toBe(first);
+    act(() => store.setConnection("online"));
+    expect(result.current).not.toBe(first);
+    expect(result.current.connection).toBe("online");
+    expect(renders).toBeLessThan(6);
+  });
+
+  it("keeps decay timestamps for known nodes across snapshots and records out-of-turn speech", () => {
+    seq = 100;
+    const base = reduce(initialState(), snapshot());
+    const withNode = reduce(base, {
+      type: "spec_op",
+      seq: 102,
+      ts: "2026-10-29T10:00:05Z",
+      op: { op: "add_node", id: "n", node: { type: "Status", props: { text: "x" }, ttl_ms: 60000 } },
+    });
+    const at = withNode.touched.n;
+    expect(at).toBe(Date.parse("2026-10-29T10:00:05Z"));
+    const snap = { ...snapshot(), seq: 102, ts: "2026-10-29T10:30:00Z", spec: withNode.spec } as SessionEvent;
+    const after = reduce(withNode, snap);
+    expect(after.touched.n).toBe(at);
+    const s1 = reduce(after, { type: "speech", seq: 103, ts: "2026-10-29T10:31:00Z", text: "Reminder set.", final: false });
+    expect(s1.transcript).toHaveLength(0);
+    const s2 = reduce(s1, { type: "speech", seq: 104, ts: "2026-10-29T10:31:00Z", text: "I'll tell you at five.", final: true });
+    expect(s2.transcript.at(-1)).toMatchObject({ role: "agent", text: "Reminder set. I'll tell you at five." });
+    expect(s2.pendingSpeech).toEqual([]);
+  });
+});

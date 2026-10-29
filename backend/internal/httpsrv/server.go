@@ -48,12 +48,16 @@ func New(d Deps) http.Handler {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
+	proxies, err := d.Config.TrustedProxyNets()
+	if err != nil {
+		d.Logger.Error("trusted proxies", "err", err)
+	}
 	r := chi.NewRouter()
-	r.Use(middleware.RealIP)
+	r.Use(trustedRealIP(proxies))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
 	r.Use(requestLogger(d.Logger))
-	r.Use(corsMiddleware(d.Config.DevOrigins))
+	r.Use(securityHeaders(d.Config))
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		body := map[string]any{
@@ -70,7 +74,10 @@ func New(d Deps) http.Handler {
 	})
 
 	r.Route("/api", func(r chi.Router) {
+		r.Use(hostGuard(d.Config.DevMode()))
+		r.Use(originGuard(d.Config.DevOrigins))
 		r.Use(auth.Middleware(d.Config.DeviceToken))
+		r.Use(requireJSON("/api/voice/stt"))
 		r.Use(middleware.NoCache)
 		r.Get("/config", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]any{

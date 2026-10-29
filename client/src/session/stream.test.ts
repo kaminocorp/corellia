@@ -53,3 +53,78 @@ describe("SessionStream", () => {
     expect(es.closed).toBe(true);
   });
 });
+
+describe("SessionStream recovery", () => {
+  const snapshot = (seq: number) =>
+    JSON.stringify({
+      type: "session",
+      seq,
+      ts: "2026-10-29T10:00:00Z",
+      session_id: "s",
+      agent_name: "C",
+      agent_state: "idle",
+      spec: { spec_version: 1, root: null, nodes: {}, actions: {}, data: {} },
+      pending_proposals: [],
+      capabilities: { runtime: "local", streaming: true, ui_ops: true, stt: "none", tts: "none" },
+      transcript: [],
+    });
+
+  it("forwards only events newer than the snapshot, so a replay cannot re-speak", () => {
+    const store = new SessionStore();
+    const seen: string[] = [];
+    const stream = new SessionStream(store, { factory: (url) => new FakeEventSource(url) as unknown as EventSource, onEvent: (ev) => seen.push(`${ev.type}:${ev.seq}`) });
+    stream.connect();
+    const es = FakeEventSource.instances.at(-1)!;
+    es.emit("session", snapshot(10));
+    es.emit("speech", JSON.stringify({ type: "speech", seq: 4, ts: "2026-10-29T10:00:00Z", text: "old reply", final: true }));
+    es.emit("speech", JSON.stringify({ type: "speech", seq: 10, ts: "2026-10-29T10:00:00Z", text: "also old", final: true }));
+    es.emit("speech", JSON.stringify({ type: "speech", seq: 11, ts: "2026-10-29T10:00:00Z", text: "new", final: true }));
+    expect(seen).toEqual(["session:10", "speech:11"]);
+  });
+
+  it("probes the API when the browser gives up: 401 becomes unauthorized, otherwise it reconnects with backoff", async () => {
+    const { vi } = await import("vitest");
+    vi.useFakeTimers();
+    try {
+      const store = new SessionStore();
+      let status = 401;
+      const stream = new SessionStream(store, {
+        factory: (url) => new FakeEventSource(url) as unknown as EventSource,
+        probe: async () => status,
+        minDelayMs: 100,
+        maxDelayMs: 400,
+      });
+      stream.connect();
+      let es = FakeEventSource.instances.at(-1)!;
+      (es as unknown as { readyState: number }).readyState = 2;
+      es.onerror?.();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(store.getState().connection).toBe("unauthorized");
+      expect(es.closed).toBe(true);
+      const before = FakeEventSource.instances.length;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(FakeEventSource.instances.length).toBe(before); // waits for a token, no retry storm
+
+      status = 500;
+      stream.connect();
+      es = FakeEventSource.instances.at(-1)!;
+      (es as unknown as { readyState: number }).readyState = 2;
+      es.onerror?.();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(store.getState().connection).toBe("offline");
+      await vi.advanceTimersByTimeAsync(100);
+      expect(FakeEventSource.instances.length).toBe(before + 2);
+      es = FakeEventSource.instances.at(-1)!;
+      (es as unknown as { readyState: number }).readyState = 2;
+      es.onerror?.();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(199);
+      expect(FakeEventSource.instances.length).toBe(before + 2); // second wait is 200ms
+      await vi.advanceTimersByTimeAsync(1);
+      expect(FakeEventSource.instances.length).toBe(before + 3);
+      stream.disconnect();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -19,7 +19,8 @@ describe("Activation", () => {
     expect(a.keydown(key({ code: "Space", ctrlKey: true, repeat: true }))).toBeNull();
     expect(a.setCapturing(true)).toEqual({ from: "listening", to: "capturing" });
     expect(a.setCapturing(false)).toEqual({ from: "capturing", to: "listening" });
-    expect(a.keydown(key({ code: "Space", metaKey: true }))).toEqual({ from: "listening", to: "off" });
+    expect(a.keydown(key({ code: "Space", metaKey: true }))).toBeNull(); // Cmd+Space is Spotlight on macOS
+    expect(a.keydown(key({ code: "Space", ctrlKey: true }))).toEqual({ from: "listening", to: "off" });
     expect(a.open).toBe(false);
   });
 

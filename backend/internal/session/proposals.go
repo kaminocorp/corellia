@@ -183,19 +183,28 @@ func (s *Session) Confirm(id string, source runtime.Source) error {
 	}
 	ctx, cancel := context.WithTimeout(s.baseCtx, 30*time.Second)
 	defer cancel()
-	s.setState(gen.AgentStateThinking, "")
+	// Only touch the agent state when no turn is running: a confirmation
+	// during a turn must not flip the display to idle under it.
+	quiet := s.ActiveTurn() == ""
+	if quiet {
+		s.setState(gen.AgentStateThinking, "")
+	}
 	pd, res, err := s.o.Gate.Confirm(ctx, id)
 	s.hideConfirmCard(id)
 	gp := toGen(pd)
 	if err != nil {
 		if errors.Is(err, actions.ErrNotFound) || errors.Is(err, actions.ErrExpired) {
-			s.setState(gen.AgentStateIdle, "")
+			if quiet {
+				s.setState(gen.AgentStateIdle, "")
+			}
 			return err
 		}
 		s.bus.Publish("proposal", withTurn(map[string]any{"proposal": gp, "status": "failed"}, pd.TurnID))
 		s.bus.Publish("error", withTurn(map[string]any{"code": "action_failed", "message": err.Error()}, pd.TurnID))
 		s.sayAndRecord(pd.TurnID, fmt.Sprintf("That didn't work: %s", err.Error()))
-		s.setState(gen.AgentStateIdle, "")
+		if quiet {
+			s.setState(gen.AgentStateIdle, "")
+		}
 		return nil
 	}
 	s.bus.Publish("proposal", withTurn(map[string]any{"proposal": gp, "status": "confirmed"}, pd.TurnID))
@@ -204,7 +213,9 @@ func (s *Session) Confirm(id string, source runtime.Source) error {
 	if res.Content != "" {
 		s.sayAndRecord(pd.TurnID, res.Content)
 	}
-	s.setState(gen.AgentStateIdle, "")
+	if quiet {
+		s.setState(gen.AgentStateIdle, "")
+	}
 	_ = source
 	return nil
 }

@@ -43,6 +43,7 @@ func TestVoiceEndpoints(t *testing.T) {
 		t.Fatalf("caps: %d %s", rec.Code, rec.Body.String())
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/voice/stt?lang=en", strings.NewReader("AUDIO"))
+	req.Host = "localhost:8080"
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("Content-Type", "audio/webm;codecs=opus")
 	rec = httptest.NewRecorder()
@@ -65,6 +66,7 @@ func TestVoiceEndpoints(t *testing.T) {
 func TestVoiceNoneProviders(t *testing.T) {
 	h := voiceServer(t, voice.Providers{STT: voice.None{}, TTS: voice.None{}, Mode: "toggle"})
 	req := httptest.NewRequest(http.MethodPost, "/api/voice/stt", strings.NewReader("AUDIO"))
+	req.Host = "localhost:8080"
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("Content-Type", "audio/webm")
 	rec := httptest.NewRecorder()

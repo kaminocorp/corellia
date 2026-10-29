@@ -10,6 +10,8 @@ export type PlayBackend = {
   /** Plays one piece; resolves when it finishes or is stopped. */
   speak(text: string): Promise<void>;
   stop(): void;
+  /** Called from a user gesture so autoplay policy lets later speech through. */
+  prime?(): void;
 };
 
 export type PlayerCallbacks = { onSpeaking?: (speaking: boolean) => void; onError?: (err: Error) => void };
@@ -27,6 +29,11 @@ export class SpeechPlayer {
   setBackend(b: PlayBackend): void {
     this.stop();
     this.backend = b;
+  }
+
+  /** Forwarded from the first key press; cheap to call repeatedly. */
+  prime(): void {
+    this.backend.prime?.();
   }
 
   get isSpeaking(): boolean {
@@ -89,6 +96,15 @@ export class ServerTtsBackend implements PlayBackend {
     if (!this.ctx) this.ctx = new AudioContext();
     if (this.ctx.state === "suspended") void this.ctx.resume();
     return this.ctx;
+  }
+
+  /** Chrome keeps an AudioContext created outside a gesture suspended; create and resume it on the first key press. */
+  prime(): void {
+    try {
+      this.context();
+    } catch {
+      /* no AudioContext (tests) */
+    }
   }
 
   async speak(text: string): Promise<void> {

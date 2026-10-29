@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -203,7 +204,32 @@ func TestParseWhen(t *testing.T) {
 func TestShowUI(t *testing.T) {
 	r, _ := registry(t)
 	res, err := r.Call(context.Background(), "show_ui", map[string]any{"ops": []any{map[string]any{"op": "clear"}, map[string]any{"op": "done"}}})
-	if err != nil || len(res.Ops) != 2 {
+	if err != nil || len(res.Ops) != 2 || res.Content != "Displayed 2 ops." {
 		t.Fatalf("show_ui: %+v %v", res, err)
+	}
+}
+
+func TestShowUIReportsRejectedOps(t *testing.T) {
+	r := tools.NewRegistry()
+	Register(r, Options{UICheck: func(ops []json.RawMessage) []string {
+		var out []string
+		for i, op := range ops {
+			if strings.Contains(string(op), "Iframe") {
+				out = append(out, fmt.Sprintf("op %d (unknown_component): Iframe is not in the catalog", i))
+			}
+		}
+		return out
+	}})
+	ops := []any{map[string]any{"op": "clear"}, map[string]any{"op": "add_node", "id": "x", "node": map[string]any{"type": "Iframe"}}, map[string]any{"op": "done"}}
+	res, err := r.Call(context.Background(), "show_ui", map[string]any{"ops": ops})
+	if err != nil || len(res.Ops) != 3 {
+		t.Fatalf("show_ui: %+v %v", res, err)
+	}
+	if !strings.HasPrefix(res.Content, "Displayed 2 of 3 ops. Rejected:") || !strings.Contains(res.Content, "unknown_component") {
+		t.Fatalf("content = %q", res.Content)
+	}
+	res, _ = r.Call(context.Background(), "show_ui", map[string]any{"ops": ops[1:2]})
+	if !strings.HasPrefix(res.Content, "Nothing was displayed") {
+		t.Fatalf("content = %q", res.Content)
 	}
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { isTileError } from "./mapErrors";
 import { Label, Panel } from "./primitives";
 import type { ComponentImpl } from "./types";
 
@@ -18,7 +19,12 @@ export const MapView: ComponentImpl = ({ props }) => {
   const markers = (props.markers as Marker[]) ?? [];
   const route = (props.route as LatLng[]) ?? [];
   const el = useRef<HTMLDivElement>(null);
-  const [failed, setFailed] = useState<string | null>(null);
+  // A failure is tied to the inputs that produced it, so new inputs
+  // (a different place, a retry) get a fresh map instead of the fallback.
+  const inputsKey = JSON.stringify([center, zoom, markers, route]);
+  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+  const failed = failure && failure.key === inputsKey ? failure.message : null;
+  const setFailed = (message: string) => setFailure({ key: inputsKey, message });
 
   useEffect(() => {
     let disposed = false;
@@ -56,7 +62,10 @@ export const MapView: ComponentImpl = ({ props }) => {
           },
         });
         map = m;
-        m.on("error", (e: { error?: Error }) => {
+        m.on("error", (e: { error?: Error; tile?: unknown; sourceId?: string }) => {
+          // A single tile failing (offline for a moment, a 404) is not a
+          // dead map: MapLibre retries and the rest of the map still shows.
+          if (isTileError(e)) return;
           if (!disposed) setFailed(e.error?.message ?? "map error");
         });
         m.on("load", () => {
@@ -84,7 +93,7 @@ export const MapView: ComponentImpl = ({ props }) => {
     };
     // Re-create the map when the inputs change identity; props are plain JSON.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(center), zoom, JSON.stringify(markers), JSON.stringify(route)]);
+  }, [inputsKey]);
 
   if (failed) {
     return (

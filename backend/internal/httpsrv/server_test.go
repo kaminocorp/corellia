@@ -21,6 +21,7 @@ func newTestServer(t *testing.T, clientDir string, token string) http.Handler {
 
 func get(h http.Handler, url string, remote string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, url, nil)
+	req.Host = "localhost:8080"
 	req.RemoteAddr = remote
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -89,6 +90,7 @@ func TestStaticMissingClient(t *testing.T) {
 func TestCORSPreflight(t *testing.T) {
 	h := newTestServer(t, t.TempDir(), "")
 	req := httptest.NewRequest(http.MethodOptions, "/api/config", nil)
+	req.Host = "localhost:8080"
 	req.Header.Set("Origin", "http://localhost:5173")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -96,6 +98,7 @@ func TestCORSPreflight(t *testing.T) {
 		t.Fatalf("preflight: %d %v", rec.Code, rec.Header())
 	}
 	req = httptest.NewRequest(http.MethodOptions, "/api/config", nil)
+	req.Host = "localhost:8080"
 	req.Header.Set("Origin", "http://evil.example")
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -113,6 +116,7 @@ func TestHeartbeat(t *testing.T) {
 		t.Fatalf("no heartbeat yet: %s", rec.Body.String())
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/heartbeat", nil)
+	req.Host = "localhost:8080"
 	req.RemoteAddr = "127.0.0.1:1"
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

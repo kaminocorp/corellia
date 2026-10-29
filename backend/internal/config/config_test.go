@@ -67,3 +67,60 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestListenAddrAndProxies(t *testing.T) {
+	dev := Config{Port: 8080}
+	if got := dev.ListenAddr(); got != "127.0.0.1:8080" {
+		t.Errorf("dev ListenAddr = %q", got)
+	}
+	tok := Config{Port: 8080, DeviceToken: "0123456789abcdef0123456789abcdef"}
+	if got := tok.ListenAddr(); got != ":8080" {
+		t.Errorf("token ListenAddr = %q", got)
+	}
+	bound := Config{Port: 9000, Bind: "0.0.0.0"}
+	if got := bound.ListenAddr(); got != "0.0.0.0:9000" {
+		t.Errorf("bind ListenAddr = %q", got)
+	}
+	nets, err := Config{TrustedProxies: []string{"10.0.0.0/8", "192.168.1.5", " "}}.TrustedProxyNets()
+	if err != nil || len(nets) != 2 || nets[1].String() != "192.168.1.5/32" {
+		t.Errorf("TrustedProxyNets = %v, %v", nets, err)
+	}
+	if _, err := (Config{TrustedProxies: []string{"nope"}}).TrustedProxyNets(); err == nil {
+		t.Error("bad CIDR accepted")
+	}
+	valid := Config{Port: 8080, AgentName: "x", Runtime: "auto", Effort: "low", STT: "auto", TTS: "auto", VoiceMode: "toggle"}
+	withBind := valid
+	withBind.Bind = "localhost"
+	if err := withBind.Validate(); err == nil {
+		t.Error("bind hostname accepted")
+	}
+	withTZ := valid
+	withTZ.TZ = "Mars/Olympus"
+	if err := withTZ.Validate(); err == nil {
+		t.Error("bad TZ accepted")
+	}
+	loc, err := (Config{TZ: "Europe/Lisbon"}).Location()
+	if err != nil || loc.String() != "Europe/Lisbon" {
+		t.Errorf("Location = %v, %v", loc, err)
+	}
+}
+
+func TestHostAllowed(t *testing.T) {
+	pats := []string{"upload.wikimedia.org", "*.unsplash.com"}
+	cases := map[string]bool{
+		"upload.wikimedia.org": true,
+		"UPLOAD.wikimedia.org": true,
+		"images.unsplash.com":  true,
+		"unsplash.com":         false,
+		"evil.org":             false,
+		"":                     false,
+	}
+	for host, want := range cases {
+		if got := HostAllowed(pats, host); got != want {
+			t.Errorf("HostAllowed(%q) = %v, want %v", host, got, want)
+		}
+	}
+	if !HostAllowed([]string{"*"}, "anything.example") {
+		t.Error("wildcard should allow everything")
+	}
+}

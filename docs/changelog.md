@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)](#01511---phase-11-review-fixes-stable-store-selectors--browser-smoke-test-playwright--enterproposal-fix--dev-mode-request-guards-and-csp--visible-failures--reconnecttoken-prompt--ci-2026-10-29)
 - [0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)](#01510---phase-10-display-box-provisioning-kiosk-watchdog-systemd--heartbeat-request-logging-dockerfile--client-error-boundary-offline-banner-soak--docs-rewrite-2026-10-29)
 - [0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)](#0159---phase-9-file-store--memoryremindertranscript-persistence--memory-summary-in-prompts--proactive-scheduler-reminders-ambient-clock-with-hold-policy-2026-10-29)
 - [0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)](#0158---phase-8-voice-stttts-seams--openai-audio-provider--endpoints-client-vad-capture-browser-recognition-fallback-speech-playback-with-audio-level-activation-keys-barge-in-mic-indicator-2026-10-29)
@@ -92,6 +93,33 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)
+
+Roadmap Phase 11, added after the independent review ([`executing/review-2026-10-29.md`](executing/review-2026-10-29.md)) found the build not usable. Full notes: [`completions/phase-11-review-fixes.md`](completions/phase-11-review-fixes.md).
+
+### Fixed
+
+- **Blank display**: `useSessionState` returns a stable snapshot (cached, shallow-compared selector); `App` is mounted in a test with a fake `EventSource` and `fetch`.
+- **Enter sent a message and confirmed the pending proposal**: the input marks the submitting Enter as handled and the global key handler ignores handled events; vitest and browser regression tests.
+- **Dev-mode bypass**: `RealIP` dropped unless `CORELLIA_TRUSTED_PROXIES` names the peer; `CORELLIA_BIND` (loopback by default in dev mode); dev-mode Host guard; Origin guard (403 for foreign origins); JSON-only POSTs; CSP and security headers.
+- **Silent failures**: failed turns end with an apology in the transcript and speech plus an error card; the client shows the latest error outside `?debug=1`; `CORELLIA_ANTHROPIC_FALLBACKS` escape hatch.
+- **Replay re-spoke old replies** on reload: only unseen events reach the voice controller.
+- **Fresh snapshot dropped** (`transcript: null`) and **Confirm card removed by the next turn's `clear`**: both found by the new smoke test.
+- Image host allowlist (`CORELLIA_IMAGE_HOSTS`); keyed component rendering (no Map WebGL leak); tile failures no longer kill a map; error boundary resets on spec change; decay timers survive reconnects; UTF-8-safe truncation; blank turns rejected; Confirm leaves the state alone during a turn; `auto` no longer switches to OpenAI on `OPENAI_API_KEY` alone; `CORELLIA_TZ`; typing stops playback without cancelling; scene stays `speaking` during playback; Cmd no longer toggles the mic; recognition stops after fatal errors; audio primed on first key press; voice survives StrictMode.
+
+### Added
+
+- **Browser smoke test**: `client/e2e/smoke.spec.ts` (Playwright 1.60, real Chromium against the Go server; fails on any console error), `pnpm e2e`, part of `pnpm check`; `scripts/chromium-libs.sh` makes it run on Linux without sudo.
+- **SSE reconnect with backoff**, `unauthorized` state, token prompt; `?token=` removed from the address bar.
+- `show_ui` reports rejected ops to the model (`Session.DryRunOps`); header names the runtime ("local demo"); speech outside a turn reaches the transcript.
+- `.github/workflows/check.yml`: client checks, `go vet`, `go test -race`, gofmt, contract drift, smoke test.
+
+### Edited
+
+- `README.md`, `CLAUDE.md`, `docs/stack.md`, `box/README.md`, `.env.example`, `backend/Dockerfile`, roadmap (Phase 11 and progress), catalog Image example (contracts regenerated).
+
+---
 
 ## 0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)
 

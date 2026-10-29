@@ -29,6 +29,9 @@ export type BrowserSttCallbacks = {
   onError?: (err: string) => void;
 };
 
+/** Recognition errors after which a restart would only loop. */
+export const FATAL = new Set(["not-allowed", "service-not-allowed", "audio-capture", "network", "language-not-supported"]);
+
 export class BrowserStt {
   private rec: SpeechRecognitionLike | null = null;
   private wanted = false;
@@ -63,7 +66,15 @@ export class BrowserStt {
     rec.onspeechstart = () => this.cb.onSpeechStart?.();
     rec.onspeechend = () => this.cb.onSpeechEnd?.();
     rec.onerror = (e) => {
-      if (e.error !== "no-speech" && e.error !== "aborted") this.cb.onError?.(e.error);
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      // Permission, device and service failures do not fix themselves:
+      // restarting would spin. Report once and stay stopped.
+      if (FATAL.has(e.error)) {
+        this.wanted = false;
+        this.cb.onError?.(`speech recognition stopped: ${e.error}`);
+        return;
+      }
+      this.cb.onError?.(e.error);
     };
     rec.onend = () => {
       // Chrome ends continuous sessions after a while; keep it alive.

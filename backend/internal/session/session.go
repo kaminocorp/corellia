@@ -12,11 +12,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/hejijunhao/corellia/backend/internal/actions"
 	"github.com/hejijunhao/corellia/backend/internal/catalog"
+	"github.com/hejijunhao/corellia/backend/internal/config"
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/contract/gen"
 	"github.com/hejijunhao/corellia/backend/internal/decision"
@@ -58,6 +61,9 @@ type Options struct {
 	// STT and TTS name the configured voice providers (Phase 8), "none"
 	// when absent; surfaced in capabilities.
 	STT, TTS string
+	// ImageHosts restricts the Image component's src to these hosts
+	// (config.HostAllowed patterns). Nil: unrestricted.
+	ImageHosts []string
 }
 
 // MemorySummariser renders memory for the runtime prompt.
@@ -239,7 +245,9 @@ func (s *Session) Snapshot() map[string]any {
 		"spec":              uispec.Clone(s.spec),
 		"pending_proposals": pending,
 		"capabilities":      s.Capabilities(),
-		"transcript":        append([]gen.TranscriptEntry(nil), transcript...),
+		// Never nil: a fresh session must encode as [] (null fails the
+		// client's schema check and the whole snapshot would be dropped).
+		"transcript": append(make([]gen.TranscriptEntry, 0, len(transcript)), transcript...),
 	}
 }
 
@@ -339,6 +347,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 	var reply []byte
 	specTouched := false
 	spoke := false
+	failure := ""
 
 	finish := func() {
 		s.mu.Lock()
@@ -347,6 +356,11 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 		}
 		s.state = gen.AgentStateIdle
 		text := string(reply)
+		if status == gen.TurnDoneEventStatusFailed {
+			// A failed turn must not be silent (review 2026-10-29, item 5):
+			// the apology becomes the reply the user sees and hears.
+			text = failureReply(text, failure)
+		}
 		if text != "" {
 			s.appendTranscriptLocked(gen.TranscriptEntry{Role: gen.TranscriptEntryRoleAgent, Text: text, Ts: s.o.Now(), TurnID: ptr(gen.TurnID(turn.ID))})
 		}
@@ -358,7 +372,11 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 			Source: turn.Source, UserText: turn.Text, ReplyText: text, SpecChanged: specTouched,
 			RootFit: rootFit, ScreenBusy: busy, Now: s.o.Now(),
 		})
-		if status != gen.TurnDoneEventStatusCancelled && d.Respond {
+		switch {
+		case status == gen.TurnDoneEventStatusFailed:
+			s.showStatusCard("That didn't work: "+truncate(failure, 160), "error", 20*time.Second)
+			s.publishSpeech(turn.ID, decision.Sentences(text))
+		case status != gen.TurnDoneEventStatusCancelled && d.Respond:
 			if d.AutoCard && text != "" {
 				s.showReplyCard(text, d.AutoCardTTL)
 			}
@@ -376,6 +394,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 	ch, err := s.o.Runtime.Start(ctx, turn)
 	if err != nil {
 		status = gen.TurnDoneEventStatusFailed
+		failure = err.Error()
 		s.bus.Publish("error", map[string]any{"turn_id": turn.ID, "code": "runtime_start", "message": err.Error(), "fatal": true})
 		finish()
 		return
@@ -427,6 +446,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 			s.bus.Publish("error", map[string]any{"turn_id": turn.ID, "code": "runtime", "message": msg, "fatal": ev.Fatal})
 			if ev.Fatal {
 				status = gen.TurnDoneEventStatusFailed
+				failure = msg
 			}
 		case runtime.EventDone:
 		}
@@ -462,6 +482,11 @@ func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 		return false
 	}
 	s.mu.Lock()
+	if e := s.checkImageHostLocked(op); e != nil {
+		s.mu.Unlock()
+		s.bus.Publish("error", withTurn(map[string]any{"code": e.Code, "message": e.Error()}, turnID))
+		return false
+	}
 	if e := s.v.CheckOp(&s.spec, op); e != nil {
 		s.mu.Unlock()
 		s.bus.Publish("error", withTurn(map[string]any{"code": e.Code, "message": e.Error()}, turnID))
@@ -488,7 +513,24 @@ func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 	for _, is := range issues {
 		s.bus.Publish("error", withTurn(map[string]any{"code": is.Code, "message": is.Error()}, turnID))
 	}
+	if _, isClear := op.(gen.ClearOp); isClear {
+		s.restoreConfirmCards()
+	}
 	return true
+}
+
+// restoreConfirmCards puts the Confirm card of every still-pending
+// proposal back after a clear. A proposal that is confirmable by Enter
+// must stay visible: a runtime that starts its next visual with `clear`
+// (the local runtime does) would otherwise leave an invisible proposal
+// armed (found by the browser smoke test, 2026-10-29).
+func (s *Session) restoreConfirmCards() {
+	if s.o.Gate == nil {
+		return
+	}
+	for _, p := range s.o.Gate.Pending() {
+		s.showConfirmCard(p)
+	}
 }
 
 func (s *Session) addProposal(turnID string, p runtime.Proposal) {
@@ -599,7 +641,113 @@ func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return fmt.Sprintf("%s…", s[:n])
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return fmt.Sprintf("%s…", string(r[:n]))
+}
+
+// failureReply is what the user sees and hears when a turn fails: the
+// partial reply, if any, followed by a short apology with the reason.
+func failureReply(partial, reason string) string {
+	apology := "Sorry, that didn't work on my side."
+	if reason != "" {
+		apology += " " + truncate(reason, 200)
+	}
+	if strings.TrimSpace(partial) == "" {
+		return apology
+	}
+	return strings.TrimSpace(partial) + "\n\n" + apology
+}
+
+// checkImageHostLocked enforces Options.ImageHosts on Image nodes (an
+// add_node of type Image, or set_props with src on an existing Image).
+func (s *Session) checkImageHostLocked(op contract.Op) *uispec.Error {
+	if s.o.ImageHosts == nil {
+		return nil
+	}
+	var id, src string
+	switch o := op.(type) {
+	case gen.AddNodeOp:
+		if o.Node.Type != "Image" {
+			return nil
+		}
+		id = string(o.ID)
+		src, _ = o.Node.Props["src"].(string)
+	case gen.SetPropsOp:
+		n, ok := s.spec.Nodes[string(o.ID)]
+		if !ok || n.Type != "Image" {
+			return nil
+		}
+		id = string(o.ID)
+		src, _ = o.Props["src"].(string)
+	default:
+		return nil
+	}
+	if src == "" {
+		return nil // a binding; the Content-Security-Policy covers resolved values
+	}
+	u, err := url.Parse(src)
+	if err != nil || !config.HostAllowed(s.o.ImageHosts, u.Hostname()) {
+		return &uispec.Error{Code: "image_host_not_allowed", NodeID: id, Message: fmt.Sprintf("Image src host %q is not in the allowed list (%s)", hostOf(src), strings.Join(s.o.ImageHosts, ", "))}
+	}
+	return nil
+}
+
+func hostOf(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	return u.Hostname()
+}
+
+// OpIssue is one rejected op from DryRunOps.
+type OpIssue struct {
+	Index   int
+	Code    string
+	Message string
+}
+
+// DryRunOps validates a batch of ops against a copy of the current spec,
+// applying each accepted op so later ops in the batch can refer to earlier
+// ones. It changes nothing. show_ui uses it so the model learns which ops
+// were rejected instead of hearing "Displayed N ops." for all of them.
+func (s *Session) DryRunOps(raw []json.RawMessage) []OpIssue {
+	var issues []OpIssue
+	if s.o.Registry == nil {
+		return nil
+	}
+	s.mu.Lock()
+	spec := uispec.Clone(s.spec)
+	hosts := s.o.ImageHosts
+	s.mu.Unlock()
+	scratch := &Session{o: Options{ImageHosts: hosts}, spec: spec}
+	for i, r := range raw {
+		op, err := s.o.Registry.DecodeOp(r)
+		if err != nil {
+			issues = append(issues, OpIssue{Index: i, Code: "invalid_op", Message: err.Error()})
+			continue
+		}
+		if e := scratch.checkImageHostLocked(op); e != nil {
+			issues = append(issues, OpIssue{Index: i, Code: e.Code, Message: e.Error()})
+			continue
+		}
+		if e := s.v.CheckOp(&scratch.spec, op); e != nil {
+			issues = append(issues, OpIssue{Index: i, Code: e.Code, Message: e.Error()})
+			continue
+		}
+		if err := uispec.Apply(&scratch.spec, op); err != nil {
+			code := "invalid_op"
+			var re *uispec.Error
+			if errors.As(err, &re) {
+				code = re.Code
+			}
+			issues = append(issues, OpIssue{Index: i, Code: code, Message: err.Error()})
+		}
+	}
+	return issues
 }
 
 // ErrActionNotFound is returned when an action id is unknown.
@@ -749,6 +897,25 @@ func (s *Session) rootFitLocked() string {
 		return "full"
 	}
 	return "panel"
+}
+
+// showStatusCard puts a one-line status (level info|ok|warn|error) in a
+// corner for ttl.
+func (s *Session) showStatusCard(text, level string, ttl time.Duration) {
+	ttlMs := int(ttl / time.Millisecond)
+	if ttlMs < 1000 {
+		ttlMs = 1000
+	}
+	ops := []map[string]any{
+		{"op": "add_node", "id": "status_card_text", "node": map[string]any{"type": "Status", "props": map[string]any{"text": truncate(text, 200), "level": level}}},
+		{"op": "add_node", "id": "status_card", "node": map[string]any{"type": "Overlay", "props": map[string]any{"position": "top_right"}, "slots": map[string]any{"content": []string{"status_card_text"}}, "ttl_ms": ttlMs}},
+	}
+	for _, op := range ops {
+		if err := s.publishLocalOp(op); err != nil {
+			s.o.Logger.Error("session: status card", "err", err)
+			return
+		}
+	}
 }
 
 // showReplyCard renders the reply text as a floating glance card.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/hejijunhao/corellia/backend/internal/actions"
 	"github.com/hejijunhao/corellia/backend/internal/contract"
@@ -79,6 +80,10 @@ func (h *SessionHandler) PostTurn(w http.ResponseWriter, r *http.Request) {
 		Source string `json:"source"`
 	}
 	if !h.decodeBody(w, r, "TurnRequest", &req) {
+		return
+	}
+	if strings.TrimSpace(req.Text) == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "text must not be blank")
 		return
 	}
 	source := runtime.SourceKeyboard

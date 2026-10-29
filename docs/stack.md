@@ -25,7 +25,11 @@
 
 ## Environment
 
-Backend variables are read only in `backend/internal/config` and documented in `.env.example`: server (`PORT`, `CORELLIA_DEVICE_TOKEN`, `CORELLIA_CLIENT_DIR`, `CORELLIA_DATA_DIR`, `CORELLIA_AGENT_NAME`, `CORELLIA_DEV_ORIGINS`), runtime (`CORELLIA_RUNTIME`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `CORELLIA_MODEL`, `CORELLIA_EFFORT`, `CORELLIA_HERMES_URL`, `CORELLIA_HERMES_TOKEN`), voice (`CORELLIA_STT`, `CORELLIA_TTS`, `CORELLIA_TTS_VOICE`, `CORELLIA_VOICE_MODE`). The client has no environment file; it reads `/api/config`, `/api/session` and `/api/voice/capabilities`.
+Backend variables are read only in `backend/internal/config` and documented in `.env.example`: server (`PORT`, `CORELLIA_BIND`, `CORELLIA_DEVICE_TOKEN`, `CORELLIA_TRUSTED_PROXIES`, `CORELLIA_CLIENT_DIR`, `CORELLIA_DATA_DIR`, `CORELLIA_AGENT_NAME`, `CORELLIA_DEV_ORIGINS`, `CORELLIA_IMAGE_HOSTS`, `CORELLIA_TZ`), runtime (`CORELLIA_RUNTIME`, `ANTHROPIC_API_KEY`, `CORELLIA_ANTHROPIC_FALLBACKS`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `CORELLIA_MODEL`, `CORELLIA_EFFORT`, `CORELLIA_HERMES_URL`, `CORELLIA_HERMES_TOKEN`), voice (`CORELLIA_STT`, `CORELLIA_TTS`, `CORELLIA_TTS_VOICE`, `CORELLIA_VOICE_MODE`). The client has no environment file; it reads `/api/config`, `/api/session` and `/api/voice/capabilities`.
+
+### Request guards
+
+Every `/api` request passes, in order: a trusted-proxy real-IP rewrite (only when `CORELLIA_TRUSTED_PROXIES` names the peer; forwarded headers are otherwise ignored), a Host check in dev mode (loopback names only, against DNS rebinding), an Origin check (same origin or a listed dev origin; anything else is 403, preflight included), the device-token check (loopback-only in dev mode), and a JSON content-type requirement on POSTs with a body (`/api/voice/stt` excepted). Every response carries a Content-Security-Policy (`img-src` built from `CORELLIA_IMAGE_HOSTS`, `connect-src` includes the OpenStreetMap tile host, `'unsafe-eval'` because Ajv compiles the contract validators at load time) plus `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a Permissions-Policy that keeps only the microphone. `httpsrv/guards.go` holds all of it.
 
 ## HTTP API
 
@@ -40,8 +44,8 @@ Backend variables are read only in `backend/internal/config` and documented in `
 | `GET /api/voice/capabilities`, `POST /api/voice/stt`, `POST /api/voice/tts` | Voice |
 | `POST /api/heartbeat` | Client liveness for the box watchdog |
 
-Bodies and events are defined in `shared/schema/api.schema.json` and `events.schema.json`.
+Bodies and events are defined in `shared/schema/api.schema.json` and `events.schema.json`. A blank `text` is a 400; a failed turn ends with `turn_done` `status: failed` whose `text` is the apology the user sees and hears.
 
 ## Deploy
 
-`backend/Dockerfile` builds the client and the backend into one image (`docker build -f backend/Dockerfile -t corellia .`), data in `/data`. For the box, `box/provision.sh` installs the kiosk and optionally the backend as `corellia-api.service`. Nothing is deployed from this repository automatically.
+`backend/Dockerfile` builds the client and the backend into one image (`docker build -f backend/Dockerfile -t corellia .`), data in `/data`, listening on all interfaces; it needs `CORELLIA_DEVICE_TOKEN` (dev mode accepts loopback only, which a container never sees) and `TZ` or `CORELLIA_TZ` for reminders. For the box, `box/provision.sh` installs the kiosk and optionally the backend as `corellia-api.service`. Nothing is deployed from this repository automatically; `.github/workflows/check.yml` runs the checks, including `go test -race` and the browser smoke test.

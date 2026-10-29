@@ -24,7 +24,11 @@ RUN apk add --no-cache ca-certificates tzdata && adduser -D -h /app corellia
 WORKDIR /app
 COPY --from=backend /out/api /app/api
 COPY --from=client /src/client/dist /app/client
-ENV CORELLIA_CLIENT_DIR=/app/client CORELLIA_DATA_DIR=/data PORT=8080
+# The container is reached over the bridge network, never loopback, so it
+# needs a CORELLIA_DEVICE_TOKEN (dev mode would refuse every client) and
+# must listen on all interfaces. Set TZ (or CORELLIA_TZ) so reminders fire
+# in the owner's zone; tzdata is installed.
+ENV CORELLIA_CLIENT_DIR=/app/client CORELLIA_DATA_DIR=/data PORT=8080 CORELLIA_BIND=0.0.0.0
 VOLUME ["/data"]
 USER corellia
 EXPOSE 8080

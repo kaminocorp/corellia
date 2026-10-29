@@ -1,6 +1,6 @@
 # Corellia vision implementation roadmap
 
-**Status:** complete (all ten phases done on 2026-10-29). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
+**Status:** Phase 11 (review fixes) done on 2026-10-29; the build is a usable alpha. Phases 0-10 were completed the same day and found not ready by the independent review ([`review-2026-10-29.md`](review-2026-10-29.md)). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
 **Scope:** implement [`../VISION.md`](../VISION.md) end to end: an always-on personal agent workspace (3D agent, keyboard + voice, generated UI from a closed catalog, propose/confirm actions, decision layer, swappable agent runtime, display-box deployment).
 **Branch:** all work on `feat/vision-implementation`, pushed only to that branch. No merges, no PRs, no deploys.
 **Companion records:** one `docs/completions/phase-NN-<name>.md` per completed phase, one `docs/changelog.md` entry per phase.
@@ -218,9 +218,19 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 
 ---
 
+### Phase 11: Review fixes
+
+- **Scope:** everything the independent review of 2026-10-29 ([`review-2026-10-29.md`](review-2026-10-29.md)) marked blocking, plus the non-blocking items that stand between the build and a usable alpha. Added after Phase 10; the review is committed with this phase.
+- **Deliverables:**
+  - Blocking: a stable `useSessionState` (cached, shallow-compared selector) and a vitest that mounts `App` with fake `EventSource`/`fetch`; a Playwright smoke test (`/`, `/?gallery=1`, `/?debug=1`, plus the Enter/proposal scenario) against the Go server, failing on any console error, in `pnpm check` and CI, runnable without sudo on Linux via `scripts/chromium-libs.sh`; Enter no longer both sends and confirms (input marks the event handled, the global handler ignores handled events; regression tests in vitest and in the browser); dev-mode hardening (no `RealIP` unless `CORELLIA_TRUSTED_PROXIES` names the peer, `CORELLIA_BIND` with loopback default in dev mode, JSON-only POSTs, Origin and Host guards, security headers with a CSP); failures visible outside `?debug=1` (apology in the transcript and speech, error status card, error line) and `CORELLIA_ANTHROPIC_FALLBACKS`; replayed events no longer re-trigger speech.
+  - Found by the smoke test: a fresh session's snapshot encoded `transcript` as `null` and was dropped by the client (blank header, no capabilities); a `clear` from the next turn removed the pending proposal's Confirm card while Enter still confirmed it (cards are restored after every clear).
+  - Non-blocking: SSE reconnect with backoff and a distinct `unauthorized` state with a token prompt; `?token=` removed from the address bar; Image host allowlist (`CORELLIA_IMAGE_HOSTS`) enforced on ops and in the CSP; renderer renders components as keyed elements (Map cleanup runs, no WebGL context leak) and tile failures no longer kill a map; `auto` no longer switches to OpenAI on `OPENAI_API_KEY` alone; `CORELLIA_TZ`; UTF-8-safe truncation; error boundary resets on spec change; decay timers survive reconnects; `show_ui` reports rejected ops to the model; blank turns rejected; speech outside a turn reaches the transcript; the scene stays `speaking` while audio plays; typing stops playback without cancelling the turn; Cmd no longer toggles the mic; browser recognition stops after fatal errors; audio context primed on the first key press; StrictMode no longer kills voice under Vite; Confirm no longer flips the state under a running turn; the header names the runtime (`local demo`); a CI workflow with `go test -race`.
+- **Dependencies:** Phase 10.
+- **Acceptance:** `pnpm check` green including the browser smoke test; the Mac run path (`pnpm -C client build && go run ./cmd/api`) shows the display, completes a turn and keeps a pending proposal visible and unconfirmed across a sent message.
+
 ## 4. Versioning and records
 
-- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10.
+- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11).
 - Completion notes: `docs/completions/phase-NN-<name>.md` with sections: Summary, What was built, Design decisions, Files changed, How to run, How to test, Known gaps, Follow-ups.
 - Commits: one per phase at minimum, conventional subject `phase N: <name>`; pushed to `origin/feat/vision-implementation` only.
 
@@ -249,3 +259,4 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 8 Voice | done 2026-10-29 | [`../completions/phase-08-voice.md`](../completions/phase-08-voice.md) | 0.15.8 |
 | 9 Memory, persistence, proactivity | done 2026-10-29 | [`../completions/phase-09-memory-persistence-proactivity.md`](../completions/phase-09-memory-persistence-proactivity.md) | 0.15.9 |
 | 10 Display box, hardening, docs | done 2026-10-29 | [`../completions/phase-10-display-box-hardening-docs.md`](../completions/phase-10-display-box-hardening-docs.md) | 0.15.10 |
+| 11 Review fixes | done 2026-10-29 | [`../completions/phase-11-review-fixes.md`](../completions/phase-11-review-fixes.md) | 0.15.11 |

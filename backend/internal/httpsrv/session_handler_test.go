@@ -34,6 +34,7 @@ func sessionServer(t *testing.T) (http.Handler, *session.Session) {
 
 func post(h http.Handler, url, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, url, strings.NewReader(body))
+	req.Host = "localhost:8080"
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()

@@ -5,6 +5,7 @@ const LABEL: Record<ConnectionStatus, string> = {
   online: "online",
   reconnecting: "reconnecting",
   offline: "offline",
+  unauthorized: "unauthorized",
 };
 
 export function ConnectionIndicator({ status, devMode }: { status: ConnectionStatus; devMode?: boolean }) {
@@ -15,7 +16,7 @@ export function ConnectionIndicator({ status, devMode }: { status: ConnectionSta
         aria-hidden
         className={
           "inline-block h-2 w-2 rounded-full " +
-          (online ? "bg-primary animate-telemetry" : status === "offline" ? "bg-destructive" : "bg-state-thinking animate-telemetry")
+          (online ? "bg-primary animate-telemetry" : status === "offline" || status === "unauthorized" ? "bg-destructive" : "bg-state-thinking animate-telemetry")
         }
       />
       <span>

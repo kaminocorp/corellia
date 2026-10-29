@@ -38,7 +38,7 @@ export function Stage({ spec, agent, fire, onInvalid }: Props) {
         {agent}
       </div>
       <div className={`absolute overflow-hidden transition-all duration-500 ${uiClass}`} data-testid="ui-zone">
-        <ErrorBoundary label="generated UI failed to render" onError={(e) => onInvalid?.("render", e.message)}>
+        <ErrorBoundary label="generated UI failed to render" resetKey={spec} onError={(e) => onInvalid?.("render", e.message)}>
           <Renderer spec={spec} fire={fire} onInvalid={onInvalid} />
         </ErrorBoundary>
       </div>

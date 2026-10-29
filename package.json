@@ -7,7 +7,8 @@
     "test": "pnpm -C client test",
     "type-check": "pnpm -C client type-check",
     "lint": "pnpm -C client lint",
-    "check": "pnpm type-check && pnpm lint && pnpm test && cd backend && go vet ./... && go test ./...",
-    "contracts:generate": "./scripts/contracts-generate.sh"
+    "check": "pnpm type-check && pnpm lint && pnpm test && cd backend && go vet ./... && go test ./... && cd .. && pnpm e2e",
+    "contracts:generate": "./scripts/contracts-generate.sh",
+    "e2e": "./scripts/e2e.sh"
   }
 }

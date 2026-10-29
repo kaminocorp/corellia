@@ -34,7 +34,9 @@ pnpm -C client build
 cd backend && go run ./cmd/api          # http://localhost:8080
 ```
 
-Open it in a browser (Chrome on macOS is the development target). Type "show me a map of Lisbon" or press `Ctrl+Space` and say it. Useful flags: `?debug=1` (spec and events), `?stats=1` (fps and render scale), `?gallery=1` (every component), `?particles=6000`, `?soak=1`.
+Open http://localhost:8080 in a browser (Chrome on macOS is the development target). Type "show me a map of Lisbon" or press `Ctrl+Space` and say it. Without a key the header says **local demo**: the local runtime is a scripted stand-in with a dozen intents, not a model. Useful flags: `?debug=1` (spec and events), `?stats=1` (fps and render scale), `?gallery=1` (every component), `?particles=6000`, `?soak=1`.
+
+Without `CORELLIA_DEVICE_TOKEN` the server is in dev mode: it listens on `127.0.0.1` only, serves loopback hosts only, and refuses cross-origin requests, so macOS shows no firewall prompt. With a token it listens on every interface (`CORELLIA_BIND` pins one); the display presents the token once as `?token=`, which the page stores and removes from the address bar, or types it into the prompt the page shows when the backend answers 401.
 
 With hot reload on both sides:
 
@@ -42,13 +44,18 @@ With hot reload on both sides:
 overmind start      # client on :5173 (proxies the API), backend on :8080 via air
 ```
 
-Configuration is `backend/.env` (template: [`.env.example`](.env.example)). Setting `ANTHROPIC_API_KEY` switches the runtime to Claude; `OPENAI_API_KEY` adds server speech recognition and synthesis.
+Configuration is `backend/.env` (template: [`.env.example`](.env.example)). Setting `ANTHROPIC_API_KEY` switches the runtime to Claude; `OPENAI_API_KEY` adds server speech recognition and synthesis and nothing else (`CORELLIA_RUNTIME=openai` or `OPENAI_BASE_URL` selects an OpenAI-compatible chat runtime explicitly). The Anthropic runtime has not yet been run against the live API from this repository; if every turn fails with the apology card, try `CORELLIA_ANTHROPIC_FALLBACKS=false`.
+
+Mac voice notes: `Ctrl+Space` toggles the mic (Cmd is left alone so Spotlight keeps working); if "select previous input source" is bound to Ctrl+Space in System Settings, change one of them. Use headphones or `CORELLIA_VOICE_MODE=ptt` on laptop speakers, otherwise the agent's own voice can interrupt it.
 
 ## Check it
 
 ```bash
-pnpm check          # client type-check, lint, tests; backend vet and tests
+pnpm check          # client type-check, lint, tests; backend vet and tests; browser smoke test
+pnpm e2e            # the smoke test alone: real Chromium against the Go server (/, /?gallery=1, /?debug=1)
 ```
+
+The smoke test ([`client/e2e/smoke.spec.ts`](client/e2e/smoke.spec.ts)) fails on any console error. It needs Playwright's Chromium once: `pnpm -C client exec playwright install chromium-headless-shell`. On a Linux machine without sudo, `scripts/chromium-libs.sh` fetches the system libraries Chromium needs with `apt-get download` into `client/.chromium-libs/`; `pnpm e2e` runs it automatically. CI ([`.github/workflows/check.yml`](.github/workflows/check.yml)) runs the same plus `go test -race` and a contract-drift check.
 
 ## Layout
 

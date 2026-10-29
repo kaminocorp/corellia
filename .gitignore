@@ -17,3 +17,9 @@ client/dist/
 .vscode/
 .idea/
 .DS_Store
+
+# Browser smoke test
+client/.chromium-libs/
+client/.chromium-libs.*/
+client/test-results/
+client/playwright-report/
