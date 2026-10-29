@@ -15,6 +15,7 @@ The previous product (a control plane for agent fleets) was removed in Phase 1; 
 ```
 backend/            Go 1.26, one binary: API + SSE stream + static client
   cmd/api           entrypoint            cmd/runtime-spike   VISION 7 evaluation script
+                                          cmd/runtime-check   live check of a runtime (scripts/anthropic-live-check.sh)
   internal/
     config          the only os.Getenv reader (validates at boot)
     auth            device-token middleware (dev mode = loopback only)
@@ -30,7 +31,7 @@ backend/            Go 1.26, one binary: API + SSE stream + static client
     httpsrv         Chi router, request guards (guards.go), handlers (thin), SSE, static client
 client/             Vite + React 19 + TypeScript + R3F static bundle
   e2e/              Playwright smoke test (pnpm e2e)
-  src/contract      generated types (gen/: never hand-edit), ajv validators, reducer, checks
+  src/contract      generated types + precompiled validators (gen/: never hand-edit), reducer, checks
   src/components    one React component per catalog entry + registry
   src/renderer      bindings, hotkeys, placement, decay, global keys
   src/agent3d       nebula scene, state machine, adaptive resolution, fallback
@@ -46,7 +47,7 @@ adapters/hermes/    legacy Hermes sidecar image (hermes runtime target)
 
 1. `AgentRuntime` is the only seam to any model, harness or agent framework. Provider SDKs and wire formats stay inside `internal/runtime/<impl>/`.
 2. The client renders only what validates against the catalog; the server validates every spec op before forwarding (`uispec.Validator`). Nothing of the model's choosing reaches the DOM except typed props the catalog declares.
-3. One schema, two languages: `shared/schema` and `shared/catalog` are the source. Run `pnpm contracts:generate` after changing them; generated Go and TS are committed and drift-tested.
+3. One schema, two languages: `shared/schema` and `shared/catalog` are the source. Run `pnpm contracts:generate` after changing them; generated Go and TS (types and precompiled validators) are committed and drift-tested. The client never compiles a schema at runtime: the CSP has no `'unsafe-eval'`.
 4. All env vars are read in `backend/internal/config`. The client reads runtime values from the API.
 5. Side effects go through propose → confirm. Tools that mutate anything outside Corellia's own store are `RequiresConfirm`.
 6. No pointer paths. Every action is reachable by keyboard or voice.
@@ -62,6 +63,8 @@ adapters/hermes/    legacy Hermes sidecar image (hermes runtime target)
 go vet ./... && go test ./...
 go run ./cmd/api                                    # serves ../client/dist on :8080
 go run ./cmd/runtime-spike -runtime local          # VISION 7 script → docs/executing/spikes/
+go run ./cmd/runtime-check -runtime local          # live check (plain turn, tool turn, cancel); with a key: scripts/anthropic-live-check.sh
+go test ./internal/runtime/anthropic -update       # rewrite the Messages API request goldens after a deliberate change
 air                                                 # hot reload
 
 # Client (from repo root)
@@ -69,7 +72,7 @@ pnpm install
 pnpm -C client dev                                  # :5173, proxies /api and /healthz to :8080
 pnpm -C client type-check && pnpm -C client lint && pnpm -C client test && pnpm -C client build
 
-# Contract (after editing shared/)
+# Contract (after editing shared/): Go types + embedded copies, TS types, precompiled Ajv validators
 pnpm contracts:generate
 cd backend && go test ./internal/uispec -update     # rewrite reducer goldens (then run the client tests)
 

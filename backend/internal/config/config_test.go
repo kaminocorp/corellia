@@ -35,7 +35,7 @@ func TestLoadDefaults(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	base := Config{Port: 8080, AgentName: "Corellia", Runtime: "auto", Effort: "low", STT: "auto", TTS: "auto", VoiceMode: "toggle"}
+	base := Config{Port: 8080, AgentName: "Corellia", Runtime: "auto", Effort: "low", STT: "auto", TTS: "auto", VoiceMode: "toggle", VoiceBargeIn: "auto"}
 	cases := []struct {
 		name    string
 		mutate  func(*Config)
@@ -52,6 +52,8 @@ func TestValidate(t *testing.T) {
 		{"bad effort", func(c *Config) { c.Effort = "turbo" }, "CORELLIA_EFFORT"},
 		{"bad stt", func(c *Config) { c.STT = "whisper" }, "CORELLIA_STT"},
 		{"bad voice mode", func(c *Config) { c.VoiceMode = "wake" }, "CORELLIA_VOICE_MODE"},
+		{"bad barge-in", func(c *Config) { c.VoiceBargeIn = "sometimes" }, "CORELLIA_VOICE_BARGE_IN"},
+		{"barge-in off", func(c *Config) { c.VoiceBargeIn = "off" }, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

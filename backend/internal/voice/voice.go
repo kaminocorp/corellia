@@ -58,4 +58,7 @@ type Capabilities struct {
 	TTSFormat string `json:"tts_format,omitempty"`
 	// Mode is the activation mode the client should use (toggle | ptt).
 	Mode string `json:"mode"`
+	// BargeIn is auto (speech interrupts playback) or off (ignored while
+	// the agent is speaking).
+	BargeIn string `json:"barge_in"`
 }

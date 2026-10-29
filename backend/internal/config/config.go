@@ -82,6 +82,11 @@ type Config struct {
 	// VoiceMode is the mic activation mode the client uses: toggle
 	// (Ctrl+Space toggles an open, VAD-gated mic) or ptt (hold Ctrl+Space).
 	VoiceMode string `env:"CORELLIA_VOICE_MODE" envDefault:"toggle"`
+	// VoiceBargeIn: auto (speech while the agent talks stops playback and
+	// the turn) or off (speech detected while the agent is talking is
+	// ignored; typing and Escape still interrupt). `off` is for laptop
+	// speakers, where the agent's own voice reaches the mic.
+	VoiceBargeIn string `env:"CORELLIA_VOICE_BARGE_IN" envDefault:"auto"`
 
 	// DevOrigins are extra origins allowed by CORS (the Vite dev server by
 	// default). Comma-separated. The Vite proxy makes this unnecessary in
@@ -131,6 +136,11 @@ func (c Config) Validate() error {
 	case "toggle", "ptt":
 	default:
 		return fmt.Errorf("config: CORELLIA_VOICE_MODE %q is not one of toggle|ptt", c.VoiceMode)
+	}
+	switch c.VoiceBargeIn {
+	case "auto", "off":
+	default:
+		return fmt.Errorf("config: CORELLIA_VOICE_BARGE_IN %q is not one of auto|off", c.VoiceBargeIn)
 	}
 	if t := c.DeviceToken; t != "" && len(t) < 16 {
 		return fmt.Errorf("config: CORELLIA_DEVICE_TOKEN must be at least 16 characters when set")

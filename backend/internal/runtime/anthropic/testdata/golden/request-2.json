@@ -1,0 +1,165 @@
+{
+  "body": {
+    "fallbacks": "default",
+    "max_tokens": 4096,
+    "messages": [
+      {
+        "content": [
+          {
+            "text": "hi",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      },
+      {
+        "content": [
+          {
+            "text": "Hello.",
+            "type": "text"
+          }
+        ],
+        "role": "assistant"
+      },
+      {
+        "content": [
+          {
+            "text": "show me the time",
+            "type": "text"
+          }
+        ],
+        "role": "user"
+      },
+      {
+        "content": [
+          {
+            "signature": "EqQBCkYIBxgCIkD0sig",
+            "thinking": "",
+            "type": "thinking"
+          },
+          {
+            "text": "Let me show that.",
+            "type": "text"
+          },
+          {
+            "id": "toolu_01ShowUi",
+            "input": {
+              "ops": [
+                {
+                  "op": "clear"
+                },
+                {
+                  "id": "s",
+                  "node": {
+                    "props": {
+                      "text": "14:00"
+                    },
+                    "type": "Status"
+                  },
+                  "op": "add_node"
+                },
+                {
+                  "id": "s",
+                  "op": "set_root"
+                },
+                {
+                  "op": "done"
+                }
+              ]
+            },
+            "name": "show_ui",
+            "type": "tool_use"
+          }
+        ],
+        "role": "assistant"
+      },
+      {
+        "content": [
+          {
+            "content": [
+              {
+                "text": "Displayed 4 ops.",
+                "type": "text"
+              }
+            ],
+            "is_error": false,
+            "tool_use_id": "toolu_01ShowUi",
+            "type": "tool_result"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "model": "claude-opus-5-5",
+    "output_config": {
+      "effort": "low"
+    },
+    "stream": true,
+    "system": [
+      {
+        "cache_control": {
+          "type": "ephemeral"
+        },
+        "text": "You are Corellia, a personal assistant living on an always-on display in the user's office. The user talks to you by voice or keyboard; your replies are spoken aloud through speakers and may also be shown as visuals.\n\nSpeaking style:\n- Short, natural sentences a person would say out loud. Usually one to three sentences.\n- No markdown, bullet lists, headings or code in spoken text. Numbers and times as you would say them.\n- Do not describe visuals you show; just show them and say the one thing that matters.\n- If you need to do something with side effects (reminders, directions, deleting a memory), call the tool; it will ask the user to confirm. Tell the user it needs their confirmation.\n- Use tools for facts you do not know (time, weather, places). Never invent them.\n\nVisuals:\nWhen something is better seen than heard (a place, a list, numbers, a schedule, a comparison, a chart), call the show_ui tool with a list of spec ops that assemble components from the catalog below. Rules:\n- Ops run in order. Start with {\"op\":\"clear\"} when replacing what is on screen. End with {\"op\":\"done\"}.\n- {\"op\":\"add_node\",\"id\":\"\u003cid\u003e\",\"node\":{\"type\":\"\u003cComponent\u003e\",\"props\":{...},\"slots\":{\"\u003cslot\u003e\":[\"\u003cchildId\u003e\", ...]}}} adds a node. Ids are short letters/digits. Add parents before children is fine; every referenced child must exist by the end.\n- {\"op\":\"set_data\",\"value\":{...}} stores data; a prop may be {\"bind\":\"$.path.to.value\"} instead of a literal (only for props marked bindable). Prefer literals for small values.\n- {\"op\":\"set_root\",\"id\":\"\u003cid\u003e\"} chooses the root. A root of type Overlay floats as a small glance card; Card/Stack/Grid/Split roots take a panel or the full screen.\n- Keep it small: at most a dozen nodes, props that match the schema exactly, no extra props. Use \"ttl_ms\" on a node for things that should fade (for example 30000 for a clock).\n- Markdown is the only component that takes prose; keep prose short.\n\nComponents: Status\n\nCurrent date and time: Thursday 1 January 1970, 00:00 (UTC)\n",
+        "type": "text"
+      }
+    ],
+    "tools": [
+      {
+        "description": "time",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "timezone": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "get_time"
+      },
+      {
+        "description": "reminder",
+        "input_schema": {
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        },
+        "name": "set_reminder"
+      },
+      {
+        "description": "ui",
+        "input_schema": {
+          "properties": {
+            "ops": {
+              "type": "array"
+            }
+          },
+          "required": [
+            "ops"
+          ],
+          "type": "object"
+        },
+        "name": "show_ui"
+      }
+    ]
+  },
+  "headers": {
+    "accept": "application/json",
+    "anthropic-beta": "server-side-fallback-2026-07-01",
+    "anthropic-version": "2026-10-21",
+    "authorization": "Bearer test-key",
+    "content-type": "application/json"
+  },
+  "method": "POST",
+  "path": "/v1/messages"
+}

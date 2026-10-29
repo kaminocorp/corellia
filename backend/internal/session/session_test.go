@@ -109,7 +109,7 @@ func TestTurnLifecycleWithLocalRuntime(t *testing.T) {
 	for _, e := range evs {
 		seen[e["type"].(string)]++
 	}
-	if seen["turn_started"] != 1 || seen["text_delta"] == 0 || seen["spec_op"] < 5 || seen["speech"] != 1 {
+	if seen["turn_started"] != 1 || seen["text_delta"] == 0 || seen["spec_op"] < 5 || seen["speech"] == 0 {
 		t.Fatalf("event mix = %v", seen)
 	}
 	if seen["error"] != 0 {
@@ -400,7 +400,7 @@ func TestProposeConfirmFlow(t *testing.T) {
 	note(drainUntil(t, ch, "turn_done", out.TurnID))
 	s.WaitTurn(out.TurnID)
 	spec := s.Spec()
-	if _, ok := spec.Nodes["confirm_p_fixed"]; !ok {
+	if _, ok := spec.Nodes["confirm_p_fixed_card"]; !ok {
 		t.Fatalf("confirm card missing: %v", spec.Nodes)
 	}
 	if len(s.Snapshot()["pending_proposals"].([]gen.Proposal)) != 1 {
@@ -419,7 +419,7 @@ func TestProposeConfirmFlow(t *testing.T) {
 		t.Fatalf("reminders = %+v", rs)
 	}
 	spec = s.Spec()
-	if _, ok := spec.Nodes["confirm_p_fixed"]; ok {
+	if _, ok := spec.Nodes["confirm_p_fixed_card"]; ok {
 		t.Fatal("confirm card not removed")
 	}
 	if _, ok := spec.Nodes["status_reminder"]; !ok {
@@ -445,7 +445,7 @@ func TestRejectAndExpireFlow(t *testing.T) {
 	if len(store.Reminders()) != 0 || len(s.PendingProposals()) != 0 {
 		t.Fatal("reject executed or left the proposal")
 	}
-	if _, ok := s.Spec().Nodes["confirm_p_fixed"]; ok {
+	if _, ok := s.Spec().Nodes["confirm_p_fixed_card"]; ok {
 		t.Fatal("card not removed on reject")
 	}
 	// Expiry: the gate clock is fixed, so use a gate with a tiny TTL.
@@ -458,7 +458,7 @@ func TestRejectAndExpireFlow(t *testing.T) {
 	if n := s2.ExpireProposals(); n != 1 {
 		t.Fatalf("expired %d", n)
 	}
-	if _, ok := s2.Spec().Nodes["confirm_p_fixed"]; ok {
+	if _, ok := s2.Spec().Nodes["confirm_p_fixed_card"]; ok {
 		t.Fatal("card not removed on expiry")
 	}
 }
@@ -508,4 +508,86 @@ func TestLocalRuntimeUsesRegistryForTime(t *testing.T) {
 	if !strings.Contains(tr[len(tr)-1].Text, "14:00 on Thursday 29 October 2026") {
 		t.Fatalf("reply = %q", tr[len(tr)-1].Text)
 	}
+}
+
+// TestSpeechStreamsDuringTurn: sentences are published as speech while the
+// runtime is still writing, the remainder goes out at the end and the
+// transcript still holds the whole reply once (Phase 12, VISION 7
+// criterion 1).
+func TestSpeechStreamsDuringTurn(t *testing.T) {
+	gate := make(chan struct{})
+	rt := &pacedRuntime{deltas: []string{"The first sentence ", "is done. The second ", "one too! And a tail"}, gate: gate}
+	s := New(Options{Registry: reg(t), Runtime: rt})
+	defer s.Close()
+	ch, unsub := s.Subscribe(0)
+	defer unsub()
+	id, _, _ := s.StartTurn("tell me", runtime.SourceKeyboard)
+	// Two deltas in: the first sentence must already be speech, with no turn_done yet.
+	gate <- struct{}{}
+	gate <- struct{}{}
+	evs := drainUntil(t, ch, "speech", id)
+	if last := evs[len(evs)-1]; last["text"] != "The first sentence is done." || last["final"] != false {
+		t.Fatalf("first streamed piece = %v", last)
+	}
+	for _, e := range evs {
+		if e["type"] == "turn_done" {
+			t.Fatal("turn_done before the streamed speech")
+		}
+	}
+	gate <- struct{}{}
+	close(gate)
+	evs = drainUntil(t, ch, "turn_done", id)
+	var speech []string
+	finals := 0
+	for _, e := range evs {
+		if e["type"] == "speech" {
+			speech = append(speech, e["text"].(string))
+			if e["final"] == true {
+				finals++
+			}
+		}
+	}
+	if strings.Join(speech, "|") != "The second one too!|And a tail" || finals != 1 {
+		t.Fatalf("speech after the first piece = %v (finals %d)", speech, finals)
+	}
+	s.WaitTurn(id)
+	tr := s.Snapshot()["transcript"].([]gen.TranscriptEntry)
+	if len(tr) != 2 || tr[1].Text != "The first sentence is done. The second one too! And a tail" {
+		t.Fatalf("transcript = %+v", tr)
+	}
+}
+
+// pacedRuntime emits one text delta per receive on gate, then done when gate closes.
+type pacedRuntime struct {
+	deltas []string
+	gate   chan struct{}
+}
+
+func (g *pacedRuntime) Name() string { return "paced" }
+func (g *pacedRuntime) Capabilities() runtime.Capabilities {
+	return runtime.Capabilities{Streaming: true}
+}
+func (g *pacedRuntime) Start(ctx context.Context, _ runtime.Turn) (<-chan runtime.Event, error) {
+	out := make(chan runtime.Event)
+	go func() {
+		defer close(out)
+		for _, d := range g.deltas {
+			select {
+			case _, ok := <-g.gate:
+				if !ok {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+			select {
+			case out <- runtime.Event{Kind: runtime.EventTextDelta, Text: d}:
+			case <-ctx.Done():
+				return
+			}
+		}
+		<-g.gate
+		out <- runtime.Event{Kind: runtime.EventDone}
+	}()
+	return out, nil
 }

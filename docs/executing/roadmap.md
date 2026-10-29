@@ -1,6 +1,6 @@
 # Corellia vision implementation roadmap
 
-**Status:** Phase 11 (review fixes) done on 2026-10-29; the build is a usable alpha. Phases 0-10 were completed the same day and found not ready by the independent review ([`review-2026-10-29.md`](review-2026-10-29.md)). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
+**Status:** Phase 12 (verifiable cloud runtime, streamed speech, strict CSP, remaining review items) done on 2026-10-29; the build is a usable alpha. Phase 11 (review fixes) was done the same day. Phases 0-10 were completed the same day and found not ready by the independent review ([`review-2026-10-29.md`](review-2026-10-29.md)). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
 **Scope:** implement [`../VISION.md`](../VISION.md) end to end: an always-on personal agent workspace (3D agent, keyboard + voice, generated UI from a closed catalog, propose/confirm actions, decision layer, swappable agent runtime, display-box deployment).
 **Branch:** all work on `feat/vision-implementation`, pushed only to that branch. No merges, no PRs, no deploys.
 **Companion records:** one `docs/completions/phase-NN-<name>.md` per completed phase, one `docs/changelog.md` entry per phase.
@@ -228,9 +228,20 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 - **Dependencies:** Phase 10.
 - **Acceptance:** `pnpm check` green including the browser smoke test; the Mac run path (`pnpm -C client build && go run ./cmd/api`) shows the display, completes a turn and keeps a pending proposal visible and unconfirmed across a sent message.
 
+### Phase 12: Verifiable cloud runtime, streamed speech, strict CSP, remaining review items
+
+- **Scope:** the follow-ups Phase 11 left open ([`../completions/phase-11-review-fixes.md`](../completions/phase-11-review-fixes.md), "Follow-ups" and "Known gaps") plus the review's non-blocking items that were still open. Added after Phase 11.
+- **Deliverables:**
+  - **Anthropic runtime verifiable without a key, checkable in one command with one.** A contract test records every request the runtime sends to the Messages API (headers and JSON bodies) as committed golden files under `runtime/anthropic/testdata/`, replays a recorded multi-round stream (text, `show_ui` tool use, gated tool, refusal, HTTP error) and asserts the event sequence the session receives; `go test ./internal/runtime/anthropic -update` rewrites the goldens so a reviewer can diff the wire shape against the API reference. `cmd/runtime-check` runs a live check against the configured runtime (connect, a plain turn, a tool turn with `show_ui`, cancel) and prints a pass/fail table with a diagnosis for the usual failures (bad key, unknown model, rejected beta, no tool use); `scripts/anthropic-live-check.sh` runs it and then the VISION 7 spike and writes the report to `docs/executing/spikes/`. A live Go test (`CORELLIA_LIVE=1`) does the same inside `go test`.
+  - **Speech streams during the turn.** The session feeds text deltas through a sentence splitter (`decision.SentenceStream`) and publishes each completed sentence as a `speech` event while the model is still writing; the remainder goes out as the final piece at `turn_done`, and a failed turn's apology follows it. The decider says whether a turn streams (`decision.Streamer`; the rules decider streams every user turn, holds proactive items as before). The spike reports time to first speech.
+  - **No `'unsafe-eval'`.** `scripts/gen-validators.mjs` compiles the Ajv validators (schemas plus per-component props) into `client/src/contract/gen/validators.js` at contract-generation time (committed, drift-tested); the client loads them instead of compiling at startup; the CSP drops `'unsafe-eval'`; the smoke test proves the bundle runs under it.
+  - **Review items:** pending proposals render as one stacked list (newest on top, only the newest bound to Enter/Escape, the rest numbered); digit hotkeys no longer swallow a message that starts with a digit (a lone digit fires after a short grace period, a digit followed by typing goes into the input); `risk: high` proposals ignore spoken confirmation phrases and ask for a key press; the UI zone scrolls by keyboard (arrows, PageUp/PageDown) when the input is empty instead of clipping; `CORELLIA_VOICE_BARGE_IN=off` disables speech-start barge-in while the agent is speaking (laptop speakers), reported in voice capabilities; push-to-talk delivers the utterance in flight at key-up; dead proposal API code removed.
+- **Dependencies:** Phase 11.
+- **Acceptance:** `pnpm check` green (contract goldens, sentence-stream tests, drift test for the precompiled validators, hotkey and proposal-stack tests, smoke test under the strict CSP); with no key, `cmd/runtime-check -runtime anthropic` fails fast with a clear message; with a key, it prints the table and the spike report lands in `docs/executing/spikes/` (not runnable here; documented as the owner's first step on a Mac).
+
 ## 4. Versioning and records
 
-- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11).
+- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11) and 0.15.12 (Phase 12).
 - Completion notes: `docs/completions/phase-NN-<name>.md` with sections: Summary, What was built, Design decisions, Files changed, How to run, How to test, Known gaps, Follow-ups.
 - Commits: one per phase at minimum, conventional subject `phase N: <name>`; pushed to `origin/feat/vision-implementation` only.
 
@@ -260,3 +271,4 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 9 Memory, persistence, proactivity | done 2026-10-29 | [`../completions/phase-09-memory-persistence-proactivity.md`](../completions/phase-09-memory-persistence-proactivity.md) | 0.15.9 |
 | 10 Display box, hardening, docs | done 2026-10-29 | [`../completions/phase-10-display-box-hardening-docs.md`](../completions/phase-10-display-box-hardening-docs.md) | 0.15.10 |
 | 11 Review fixes | done 2026-10-29 | [`../completions/phase-11-review-fixes.md`](../completions/phase-11-review-fixes.md) | 0.15.11 |
+| 12 Verifiable cloud runtime, streamed speech, strict CSP, review items | done 2026-10-29 | [`../completions/phase-12-cloud-runtime-speech-csp.md`](../completions/phase-12-cloud-runtime-speech-csp.md) | 0.15.12 |

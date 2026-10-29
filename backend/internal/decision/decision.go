@@ -5,6 +5,7 @@
 package decision
 
 import (
+	"bytes"
 	"regexp"
 	"strings"
 	"time"
@@ -130,38 +131,83 @@ func (r *Rules) Decide(in Input) Decision {
 	return d
 }
 
-var sentenceEnd = regexp.MustCompile(`([.!?]+)(\s+|$)`)
-
-// Sentences splits text into speakable pieces, keeping punctuation and
-// merging very short fragments into their neighbour so TTS requests are
-// not tiny.
+// Sentences splits text into speakable pieces with the same rule as
+// SentenceStream, so a turn spoken at the end and a turn spoken as it
+// streams sound the same. A short trailing fragment joins the piece before it.
 func Sentences(text string) []string {
-	text = strings.TrimSpace(text)
-	if text == "" {
+	var st SentenceStream
+	out := st.Push(text + " ")
+	if rest := st.Flush(); rest != "" {
+		if len(rest) < MinPiece && len(out) > 0 {
+			out[len(out)-1] += " " + rest
+		} else {
+			out = append(out, rest)
+		}
+	}
+	return out
+}
+
+// Streamer is implemented by deciders that can say, before a turn's text
+// is complete, whether its sentences may be spoken as they complete
+// (VISION 7 criterion 1: time to first audible response). A decider
+// without it is treated as "speak at the end".
+type Streamer interface {
+	StreamSpeech(Input) bool
+}
+
+// StreamSpeech implements Streamer: user turns stream; proactive items go
+// through Decide at the end as before.
+func (r *Rules) StreamSpeech(in Input) bool { return in.Proactive == "" }
+
+// MinPiece is the shortest sentence SentenceStream emits on its own;
+// shorter ones ("Sure.") wait for the next sentence so TTS requests are
+// not tiny, while "It's 14:05." still goes out alone.
+const MinPiece = 8
+
+// cleanSpeech strips Markdown emphasis so TTS does not read asterisks.
+var cleanSpeech = strings.NewReplacer("**", "", "*", "", "`", "", "_", " ")
+
+var sentenceBoundary = regexp.MustCompile(`([.!?]+\s+|\n\s*\n)`)
+
+// SentenceStream turns streamed text deltas into speakable sentences as
+// they complete. A sentence ends at punctuation followed by whitespace, or
+// at a blank line; the whitespace is the proof that "3.5" or "e.g." is not
+// an end. Push returns the sentences completed by the delta (cleaned like
+// Sentences); Flush returns whatever is left.
+type SentenceStream struct {
+	buf []byte
+}
+
+// Push appends a delta and returns the sentences it completed.
+func (s *SentenceStream) Push(delta string) []string {
+	if delta == "" {
 		return nil
 	}
-	// Strip Markdown emphasis so TTS does not read asterisks.
-	clean := strings.NewReplacer("**", "", "*", "", "`", "", "_", " ").Replace(text)
+	s.buf = append(s.buf, delta...)
 	var out []string
 	last := 0
-	for _, m := range sentenceEnd.FindAllStringIndex(clean, -1) {
-		piece := strings.TrimSpace(clean[last:m[1]])
-		last = m[1]
+	for _, m := range sentenceBoundary.FindAllIndex(s.buf, -1) {
+		piece := strings.TrimSpace(cleanSpeech.Replace(string(s.buf[last:m[1]])))
+		if len(piece) < MinPiece {
+			continue // too short to say alone; it merges with the next sentence
+		}
 		if piece != "" {
 			out = append(out, piece)
 		}
+		last = m[1]
 	}
-	if rest := strings.TrimSpace(clean[last:]); rest != "" {
-		out = append(out, rest)
+	if last > 0 {
+		s.buf = append([]byte(nil), s.buf[last:]...)
 	}
-	// Merge fragments shorter than 12 characters into the previous piece.
-	var merged []string
-	for _, s := range out {
-		if len(merged) > 0 && len(s) < 12 {
-			merged[len(merged)-1] += " " + s
-			continue
-		}
-		merged = append(merged, s)
-	}
-	return merged
+	return out
 }
+
+// Flush returns the unfinished remainder, if any, and empties the stream.
+func (s *SentenceStream) Flush() string {
+	rest := strings.TrimSpace(cleanSpeech.Replace(string(s.buf)))
+	s.buf = nil
+	return rest
+}
+
+// Pending reports whether the stream holds unspoken text.
+func (s *SentenceStream) Pending() bool { return len(bytes.TrimSpace(s.buf)) > 0 }

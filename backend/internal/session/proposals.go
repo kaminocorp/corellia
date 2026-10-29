@@ -18,7 +18,7 @@ import (
 
 // Outcome is what Handle did with a piece of user input.
 type Outcome struct {
-	Handled         string // turn | confirmed | rejected
+	Handled         string // turn | confirmed | rejected | held (high risk: key press required)
 	TurnID          string
 	CancelledTurnID string
 	ProposalID      string
@@ -80,6 +80,12 @@ func (s *Session) Handle(text string, source runtime.Source) (Outcome, error) {
 				return Outcome{Handled: "rejected", ProposalID: p.ID}, nil
 			case IsConfirmPhrase(text):
 				s.recordUser(text, source)
+				if p.Risk == "high" && source == runtime.SourceVoice {
+					// A spoken "ok" is too easy to pick up from a TV or a
+					// phone call; high-risk actions want a deliberate key.
+					s.sayAndRecord(p.TurnID, "This one needs a key press: Enter to confirm, Escape to cancel.")
+					return Outcome{Handled: "held", ProposalID: p.ID}, nil
+				}
 				if err := s.Confirm(p.ID, source); err != nil {
 					return Outcome{}, err
 				}
@@ -148,33 +154,65 @@ func sanitizeID(id string) string {
 	return out
 }
 
-func (s *Session) showConfirmCard(p actions.Pending) {
-	nid := confirmNodeID(p.ID)
-	props := map[string]any{"proposal_id": p.ID, "title": p.Label, "risk": p.Risk}
-	if p.Detail != "" {
-		props["detail"] = p.Detail
+// Proposal cards share one floating overlay, newest on top, so two pending
+// proposals never sit on top of each other (review 2026-10-29). Only the
+// newest card is bound to Enter and Escape; the others get numbered
+// hotkeys from the renderer and are also reachable by voice.
+const proposalsOverlayID = "proposals"
+
+// renderProposals rebuilds the proposal overlay from the gate. With no
+// pending proposal the overlay is removed.
+func (s *Session) renderProposals() {
+	if s.o.Gate == nil {
+		return
 	}
-	ops := []map[string]any{
-		{"op": "set_action", "id": nid + "_yes", "action": map[string]any{"kind": "tool", "tool": "confirm_proposal", "args": map[string]any{"proposal_id": p.ID}}},
-		{"op": "set_action", "id": nid + "_no", "action": map[string]any{"kind": "tool", "tool": "reject_proposal", "args": map[string]any{"proposal_id": p.ID}}},
-		{"op": "add_node", "id": nid + "_card", "node": map[string]any{"type": "Confirm", "props": props,
-			"actions": map[string]any{
-				"confirm": map[string]any{"id": nid + "_yes", "label": "Do it", "hotkey": "enter"},
-				"reject":  map[string]any{"id": nid + "_no", "label": "Cancel", "hotkey": "escape"},
-			}}},
-		{"op": "add_node", "id": nid, "node": map[string]any{"type": "Overlay", "props": map[string]any{"position": "bottom_right"}, "slots": map[string]any{"content": []string{nid + "_card"}}}},
+	pending := s.o.Gate.Pending()
+	s.mu.Lock()
+	_, shown := s.spec.Nodes[proposalsOverlayID]
+	s.mu.Unlock()
+	if shown {
+		if err := s.RemoveNode(proposalsOverlayID); err != nil {
+			s.o.Logger.Error("session: proposal overlay", "err", err)
+		}
 	}
+	if len(pending) == 0 {
+		return
+	}
+	var ops []map[string]any
+	var cards []string
+	for i, p := range pending {
+		nid := confirmNodeID(p.ID)
+		props := map[string]any{"proposal_id": p.ID, "title": p.Label, "risk": p.Risk}
+		if p.Detail != "" {
+			props["detail"] = p.Detail
+		}
+		yes := map[string]any{"id": nid + "_yes", "label": "Do it"}
+		no := map[string]any{"id": nid + "_no", "label": "Cancel"}
+		if i == 0 {
+			yes["hotkey"] = "enter"
+			no["hotkey"] = "escape"
+		}
+		ops = append(ops,
+			map[string]any{"op": "set_action", "id": nid + "_yes", "action": map[string]any{"kind": "tool", "tool": "confirm_proposal", "args": map[string]any{"proposal_id": p.ID}}},
+			map[string]any{"op": "set_action", "id": nid + "_no", "action": map[string]any{"kind": "tool", "tool": "reject_proposal", "args": map[string]any{"proposal_id": p.ID}}},
+			map[string]any{"op": "add_node", "id": nid + "_card", "node": map[string]any{"type": "Confirm", "props": props, "actions": map[string]any{"confirm": yes, "reject": no}}},
+		)
+		cards = append(cards, nid+"_card")
+	}
+	ops = append(ops,
+		map[string]any{"op": "add_node", "id": proposalsOverlayID + "_stack", "node": map[string]any{"type": "Stack", "props": map[string]any{"direction": "column", "gap": "sm"}, "slots": map[string]any{"children": cards}}},
+		map[string]any{"op": "add_node", "id": proposalsOverlayID, "node": map[string]any{"type": "Overlay", "props": map[string]any{"position": "bottom_right"}, "slots": map[string]any{"content": []string{proposalsOverlayID + "_stack"}}}},
+	)
 	for _, op := range ops {
 		if err := s.publishLocalOp(op); err != nil {
-			s.o.Logger.Error("session: confirm card", "err", err)
+			s.o.Logger.Error("session: proposal card", "err", err)
 			return
 		}
 	}
 }
 
-func (s *Session) hideConfirmCard(id string) {
-	_ = s.RemoveNode(confirmNodeID(id))
-}
+func (s *Session) showConfirmCard(actions.Pending) { s.renderProposals() }
+func (s *Session) hideConfirmCard(string)          { s.renderProposals() }
 
 // Confirm executes a pending proposal.
 func (s *Session) Confirm(id string, source runtime.Source) error {
@@ -253,7 +291,14 @@ func (s *Session) sayAndRecord(turnID string, text string) {
 	s.publishSpeech(turnID, decision.Sentences(text))
 }
 
+// publishSpeech says pieces in order; the last one is marked final.
 func (s *Session) publishSpeech(turnID string, pieces []string) {
+	s.publishSpeechPieces(turnID, pieces, true)
+}
+
+// publishSpeechPieces publishes speech events. With closing false none of
+// the pieces is final: more follows (sentences streamed during a turn).
+func (s *Session) publishSpeechPieces(turnID string, pieces []string, closing bool) {
 	if len(pieces) > 0 {
 		s.mu.Lock()
 		until := s.o.Now().Add(estimateSpeech(pieces))
@@ -263,7 +308,7 @@ func (s *Session) publishSpeech(turnID string, pieces []string) {
 		s.mu.Unlock()
 	}
 	for i, piece := range pieces {
-		ev := map[string]any{"text": piece, "final": i == len(pieces)-1}
+		ev := map[string]any{"text": piece, "final": closing && i == len(pieces)-1}
 		if turnID != "" {
 			ev["turn_id"] = turnID
 		}

@@ -101,3 +101,49 @@ describe("VoiceController", () => {
     expect(backend.stop).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("VoiceController review items (Phase 12)", () => {
+  it("with barge-in off, speech during playback neither interrupts nor becomes a turn", async () => {
+    const { d, backend, cb } = deps({ fetchCapabilities: async () => ({ stt: "openai", tts: "openai", mode: "toggle" as const, barge_in: "off" as const }) });
+    const c = new VoiceController(d);
+    await c.init();
+    c.handleKeyDown(ctrlSpace());
+    await flush();
+    c.setActiveTurn("t1");
+    let release: () => void = () => {};
+    backend.speak = () => new Promise<void>((r) => (release = r));
+    c.onStreamEvent({ type: "speech", seq: 1, ts: "x", text: "Talking." } as SessionEvent);
+    await flush();
+    expect(c.getStatus().speaking).toBe(true);
+    cb().onSpeechStart?.();
+    expect(backend.stop).not.toHaveBeenCalled();
+    expect(d.cancelTurn).not.toHaveBeenCalled();
+    await cb().onUtterance(new Blob(["x"]), "audio/webm");
+    await flush();
+    expect(d.transcribe).not.toHaveBeenCalled();
+    expect(d.sendTurn).not.toHaveBeenCalled();
+    // Once the agent is quiet, speech is a turn again.
+    release();
+    await flush();
+    expect(c.getStatus().speaking).toBe(false);
+    cb().onSpeechStart?.();
+    await cb().onUtterance(new Blob(["x"]), "audio/webm");
+    await flush();
+    expect(d.sendTurn).toHaveBeenCalledWith("what time is it");
+  });
+
+  it("push-to-talk delivers the utterance in flight at key-up", async () => {
+    const { d, capture, cb } = deps({ fetchCapabilities: async () => ({ stt: "openai", tts: "openai", mode: "ptt" as const }) });
+    const c = new VoiceController(d);
+    await c.init();
+    c.handleKeyDown(ctrlSpace());
+    await flush();
+    expect(c.getStatus().mic).toBe("listening");
+    cb().onSpeechStart?.();
+    expect(c.getStatus().mic).toBe("capturing");
+    c.handleKeyUp(new KeyboardEvent("keyup", { code: "Space" }));
+    await flush();
+    expect(capture.stop).toHaveBeenCalledWith(true);
+    expect(c.getStatus().mic).toBe("off");
+  });
+});

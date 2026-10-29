@@ -4,14 +4,15 @@ import "github.com/hejijunhao/corellia/backend/internal/config"
 
 // Providers bundles the selected STT and TTS.
 type Providers struct {
-	STT  STT
-	TTS  TTS
-	Mode string
+	STT     STT
+	TTS     TTS
+	Mode    string
+	BargeIn string
 }
 
 // Select resolves CORELLIA_STT / CORELLIA_TTS (auto|none|openai).
 func Select(cfg config.Config) Providers {
-	p := Providers{STT: None{}, TTS: None{}, Mode: cfg.VoiceMode}
+	p := Providers{STT: None{}, TTS: None{}, Mode: cfg.VoiceMode, BargeIn: cfg.VoiceBargeIn}
 	var oa *OpenAI
 	openai := func() *OpenAI {
 		if oa == nil {
@@ -46,7 +47,10 @@ func contains(s, sub string) bool {
 
 // Capabilities reports the providers.
 func (p Providers) Capabilities() Capabilities {
-	c := Capabilities{STT: p.STT.Name(), TTS: p.TTS.Name(), Mode: p.Mode}
+	c := Capabilities{STT: p.STT.Name(), TTS: p.TTS.Name(), Mode: p.Mode, BargeIn: p.BargeIn}
+	if c.BargeIn == "" {
+		c.BargeIn = "auto"
+	}
 	if o, ok := p.TTS.(*OpenAI); ok {
 		c.TTSFormat = o.MIME()
 	}

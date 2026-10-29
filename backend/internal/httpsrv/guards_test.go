@@ -131,7 +131,7 @@ func TestSecurityHeaders(t *testing.T) {
 	h := serverWith(t, config.Config{ImageHosts: []string{"upload.wikimedia.org", "*.unsplash.com"}})
 	rec := do(h, http.MethodGet, "/healthz", "127.0.0.1:1", nil, "")
 	csp := rec.Header().Get("Content-Security-Policy")
-	for _, want := range []string{"default-src 'self'", "script-src 'self' 'unsafe-eval'", "img-src 'self' data: blob: https://upload.wikimedia.org https://*.unsplash.com", "connect-src 'self' https://tile.openstreetmap.org", "worker-src 'self' blob:", "frame-ancestors 'none'"} {
+	for _, want := range []string{"default-src 'self'", "script-src 'self'; ", "img-src 'self' data: blob: https://upload.wikimedia.org https://*.unsplash.com", "connect-src 'self' https://tile.openstreetmap.org", "worker-src 'self' blob:", "frame-ancestors 'none'"} {
 		if !strings.Contains(csp, want) {
 			t.Errorf("CSP missing %q: %s", want, csp)
 		}

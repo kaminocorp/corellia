@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)](#01512---phase-12-anthropic-contract-goldens--live-check-runtime-check--streamed-speech-per-sentence--precompiled-validators-no-unsafe-eval--proposal-stack-digit-grace-period-keyboard-scroll-barge-in-setting-ptt-flush-2026-10-29)
 - [0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)](#01511---phase-11-review-fixes-stable-store-selectors--browser-smoke-test-playwright--enterproposal-fix--dev-mode-request-guards-and-csp--visible-failures--reconnecttoken-prompt--ci-2026-10-29)
 - [0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)](#01510---phase-10-display-box-provisioning-kiosk-watchdog-systemd--heartbeat-request-logging-dockerfile--client-error-boundary-offline-banner-soak--docs-rewrite-2026-10-29)
 - [0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)](#0159---phase-9-file-store--memoryremindertranscript-persistence--memory-summary-in-prompts--proactive-scheduler-reminders-ambient-clock-with-hold-policy-2026-10-29)
@@ -93,6 +94,35 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)
+
+Roadmap Phase 12: the follow-ups Phase 11 left open plus the review's remaining non-blocking items. Full notes: [`completions/phase-12-cloud-runtime-speech-csp.md`](completions/phase-12-cloud-runtime-speech-csp.md).
+
+### Added
+
+- **Anthropic runtime contract test**: recorded Messages API streams (`runtime/anthropic/testdata/recorded/`) replayed from an `httptest` server; every request the runtime sends is compared with committed goldens (`testdata/golden/`, `go test ./internal/runtime/anthropic -update`). Found and recorded: the SDK sends the key as `Authorization: Bearer`.
+- **`cmd/runtime-check`** + **`scripts/anthropic-live-check.sh`**: a live plain turn, tool turn with `show_ui` and cancel against the configured runtime, with a pass/fail table and a diagnosis naming the setting to change; the script then runs the VISION 7 spike. `TestLiveAnthropic` (`CORELLIA_LIVE=1`) is the in-test twin.
+- **Streamed speech**: `decision.SentenceStream` and the `decision.Streamer` seam; the session publishes each completed sentence as a `speech` event during the turn and the remainder at `turn_done`; the spike reports time to first speech.
+- **Precompiled validators**: `scripts/gen-validators.mjs` (Ajv standalone) → `client/src/contract/gen/validators.js`, run by `pnpm contracts:generate` and drift-tested; `client/src/contract/validatorRuntime.ts` holds the two runtime helpers. Ajv is no longer in the bundle.
+- `CORELLIA_VOICE_BARGE_IN=auto|off` (reported as `barge_in` in `/api/voice/capabilities`); `Outcome.Handled: held`.
+
+### Changed
+
+- CSP `script-src` is `'self'` (no `'unsafe-eval'`); the smoke test runs under it.
+- Pending proposals render as one stacked overlay (newest on top, only the top card bound to Enter/Escape); `risk: high` proposals ignore spoken confirmation phrases and ask for a key press.
+- A lone digit hotkey fires after a 350 ms grace period and a digit followed by typing starts a message; the UI zone scrolls by keyboard (arrows, PageUp/PageDown) instead of clipping.
+- Push-to-talk delivers the utterance in flight at key-up; `decision.Sentences` shares the stream's splitting rule (short pieces wait for the next sentence; minimum 8 characters).
+
+### Removed
+
+- Dead `confirmProposal`/`rejectProposal` client API functions.
+
+### Edited
+
+- `README.md`, `CLAUDE.md`, `docs/stack.md`, `.env.example`, roadmap (Phase 12 and progress).
+
+---
 
 ## 0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)
 

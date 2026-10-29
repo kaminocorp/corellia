@@ -39,14 +39,15 @@ var script = []string{
 }
 
 type turnStats struct {
-	Text       string
-	Handled    string
-	FirstToken time.Duration
-	FirstOp    time.Duration
-	Total      time.Duration
-	Ops        int
-	SpecErrors int
-	Status     string
+	Text        string
+	Handled     string
+	FirstToken  time.Duration
+	FirstOp     time.Duration
+	FirstSpeech time.Duration
+	Total       time.Duration
+	Ops         int
+	SpecErrors  int
+	Status      string
 }
 
 func main() {
@@ -103,6 +104,10 @@ func main() {
 				if st.FirstToken == 0 {
 					st.FirstToken = time.Since(start)
 				}
+			case "speech":
+				if st.FirstSpeech == 0 {
+					st.FirstSpeech = time.Since(start)
+				}
 			case "spec_op":
 				st.Ops++
 				if st.FirstOp == 0 {
@@ -152,16 +157,17 @@ func render(name, detail string, results []turnStats, cancelLatency time.Duratio
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Runtime spike: %s\n\n", name)
 	fmt.Fprintf(&b, "**Date:** %s. **Runtime:** %s (%s). **Script:** VISION.md section 7, ten turns.\n\n", time.Now().Format("2006-01-02 15:04 MST"), name, detail)
-	b.WriteString("| # | Turn | Handled | First token | First op | Total | Ops | Spec errors | Status |\n|---|---|---|---|---|---|---|---|---|\n")
+	b.WriteString("| # | Turn | Handled | First token | First speech | First op | Total | Ops | Spec errors | Status |\n|---|---|---|---|---|---|---|---|---|---|\n")
 	var ops, errs, turns int
-	var sumFirst, sumTotal time.Duration
+	var sumFirst, sumSpeech, sumTotal time.Duration
 	for i, r := range results {
-		fmt.Fprintf(&b, "| %d | %s | %s | %s | %s | %s | %d | %d | %s |\n", i+1, r.Text, r.Handled, ms(r.FirstToken), ms(r.FirstOp), ms(r.Total), r.Ops, r.SpecErrors, r.Status)
+		fmt.Fprintf(&b, "| %d | %s | %s | %s | %s | %s | %s | %d | %d | %s |\n", i+1, r.Text, r.Handled, ms(r.FirstToken), ms(r.FirstSpeech), ms(r.FirstOp), ms(r.Total), r.Ops, r.SpecErrors, r.Status)
 		if r.Handled == "turn" {
 			turns++
 			ops += r.Ops
 			errs += r.SpecErrors
 			sumFirst += r.FirstToken
+			sumSpeech += r.FirstSpeech
 			sumTotal += r.Total
 		}
 	}
@@ -172,6 +178,7 @@ func render(name, detail string, results []turnStats, cancelLatency time.Duratio
 	b.WriteString("\n## Summary\n\n")
 	if turns > 0 {
 		fmt.Fprintf(&b, "- Mean time to first token: %s\n", ms(sumFirst/time.Duration(turns)))
+		fmt.Fprintf(&b, "- Mean time to first speech (VISION 7 criterion 1): %s\n", ms(sumSpeech/time.Duration(turns)))
 		fmt.Fprintf(&b, "- Mean total turn time: %s\n", ms(sumTotal/time.Duration(turns)))
 	}
 	fmt.Fprintf(&b, "- Spec ops accepted on first try: %.1f%% (%d ops, %d rejected)\n", validity, ops, errs)

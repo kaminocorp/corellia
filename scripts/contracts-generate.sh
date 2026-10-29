@@ -3,6 +3,7 @@
 #   - Go types            backend/internal/contract/gen/*.go      (go-jsonschema)
 #   - Go embedded copies  backend/internal/contract/embed/*.json  (byte copies)
 #   - TS types            client/src/contract/gen/*.ts            (json-schema-to-typescript)
+#   - TS validators       client/src/contract/gen/validators.js    (Ajv standalone, no eval at runtime)
 # Run from anywhere. Commit the output; drift tests in both languages fail
 # when the output is stale.
 set -euo pipefail
@@ -45,5 +46,8 @@ cp "$CATALOG/catalog.json" "$GO_EMBED/catalog.json"
 
 # --- TS types ---------------------------------------------------------------
 node "$ROOT/scripts/gen-ts-types.mjs" "$SCHEMA" "$TS_GEN"
+
+# --- TS precompiled validators ---------------------------------------------
+node "$ROOT/scripts/gen-validators.mjs" "$ROOT/shared" "$TS_GEN/validators.js"
 
 echo "contracts generated"

@@ -1,32 +1,41 @@
 /**
- * Runtime validators compiled from the shared schemas with Ajv. Mirrors
- * backend/internal/contract. Compiled once at module load.
+ * Runtime validators for the shared schemas and the catalog. They are
+ * precompiled by scripts/gen-validators.mjs into gen/validators.js (so no
+ * `new Function` runs in the browser and the Content-Security-Policy needs
+ * no 'unsafe-eval'); this module only wraps them. Mirrors
+ * backend/internal/contract.
  */
-import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020";
-import addFormats from "ajv-formats";
+import type { ErrorObject, ValidateFunction } from "ajv/dist/2020";
 
 import { catalog, schemas } from "./schemas";
+import * as compiled from "./gen/validators";
 import type { ComponentDef } from "./gen/catalog";
 import type { SpecOp } from "./gen/ops";
 import type { UISpec } from "./gen/uispec";
 import type { SessionEvent } from "./gen/events";
 
-const ajv = new Ajv2020({ allErrors: true, strict: false, allowUnionTypes: true });
-addFormats(ajv);
-for (const s of Object.values(schemas)) ajv.addSchema(s as object);
+const validators = compiled as unknown as Record<string, ValidateFunction | undefined>;
 
-const specValidator = ajv.getSchema(schemas.uiSpec.$id)!;
-const opValidator = ajv.getSchema(schemas.ops.$id)!;
-const eventValidator = ajv.getSchema(schemas.events.$id)!;
-const catalogValidator = ajv.getSchema(schemas.catalog.$id)!;
+const specValidator = compiled.validateUISpec;
+const opValidator = compiled.validateOp;
+const eventValidator = compiled.validateEvent;
+const catalogValidator = compiled.validateCatalog;
+
+/** Same text as Ajv's errorsText: `data<instancePath> <message>` per error. */
+export function errorsText(errors: readonly ErrorObject[] | null | undefined, separator = "; "): string {
+  if (!errors || errors.length === 0) return "No errors";
+  return errors.map((e) => `data${e.instancePath} ${e.message ?? ""}`.trimEnd()).join(separator);
+}
 
 if (!catalogValidator(catalog)) {
-  throw new Error("shared/catalog/catalog.json does not match catalog.schema.json: " + ajv.errorsText(catalogValidator.errors));
+  throw new Error("shared/catalog/catalog.json does not match catalog.schema.json: " + errorsText(catalogValidator.errors));
 }
 
 const propsValidators = new Map<string, ValidateFunction>();
-for (const [name, def] of Object.entries(catalog.components)) {
-  propsValidators.set(name, ajv.compile(def.props as object));
+for (const name of Object.keys(catalog.components)) {
+  const fn = validators[`validateProps_${name}`];
+  if (!fn) throw new Error(`no precompiled props validator for ${name}: run pnpm contracts:generate`);
+  propsValidators.set(name, fn);
 }
 
 export const componentNames: readonly string[] = Object.keys(catalog.components).sort();
@@ -40,7 +49,7 @@ export type ValidationResult = { ok: true } | { ok: false; message: string; erro
 function result(fn: ValidateFunction, value: unknown): ValidationResult {
   if (fn(value)) return { ok: true };
   const errors = fn.errors ?? [];
-  return { ok: false, message: ajv.errorsText(errors, { separator: "; " }), errors };
+  return { ok: false, message: errorsText(errors), errors };
 }
 
 export function validateSpec(value: unknown): ValidationResult {
@@ -56,8 +65,8 @@ export function validateEvent(value: unknown): ValidationResult {
 }
 
 export function validateApi(def: string, value: unknown): ValidationResult {
-  const fn = ajv.getSchema(`${schemas.api.$id}#/$defs/${def}`);
-  if (!fn) return { ok: false, message: `unknown api definition ${def}`, errors: [] };
+  const fn = validators[`validateApi_${def}`];
+  if (!fn || !(def in (schemas.api.$defs ?? {}))) return { ok: false, message: `unknown api definition ${def}`, errors: [] };
   return result(fn, value);
 }
 
@@ -83,7 +92,7 @@ export function validateProps(
     return !bound.has(missing);
   });
   if (remaining.length === 0) return { ok: true };
-  return { ok: false, message: ajv.errorsText(remaining, { separator: "; " }), errors: remaining };
+  return { ok: false, message: errorsText(remaining), errors: remaining };
 }
 
 export function isSpecOp(value: unknown): value is SpecOp {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { CommandInput } from "./CommandInput";
+import { CommandInput, type CommandInputHandle } from "./CommandInput";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { DebugPane } from "./DebugPane";
 import { ErrorLine } from "./ErrorLine";
@@ -36,9 +36,20 @@ export function App() {
   return <Display debug={params.get("debug") === "1"} stats={params.get("stats") === "1"} soak={params.get("soak") === "1"} particles={particles} />;
 }
 
+/** Keyboard scrolling of the generated UI (review 2026-10-29: long content was clipped). */
+function scrollUIZone(dir: "up" | "down" | "page_up" | "page_down"): boolean {
+  const zone = document.querySelector<HTMLElement>('[data-testid="ui-zone"]');
+  if (!zone || zone.scrollHeight <= zone.clientHeight) return false;
+  const page = Math.max(120, zone.clientHeight * 0.8);
+  const delta = { up: -120, down: 120, page_up: -page, page_down: page }[dir];
+  zone.scrollBy({ top: delta, behavior: "smooth" });
+  return true;
+}
+
 function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boolean; soak: boolean; particles?: number }) {
   const [devMode, setDevMode] = useState(false);
   const inputValue = useRef("");
+  const inputRef = useRef<CommandInputHandle>(null);
   const streamRef = useRef<SessionStream | null>(null);
   // Selectors may return fresh objects: useSessionState caches by state
   // version and shallow-compares, so the snapshot stays stable.
@@ -83,9 +94,11 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
   const hotkeys = useMemo(() => assignHotkeys(spec), [spec]);
   const keyHandlers = useMemo<GlobalKeyHandlers>(
     () => ({
-      inputEmpty: () => inputValue.current === "",
+      inputValue: () => inputValue.current,
+      clearInput: () => inputRef.current?.clear(),
       hotkeys,
       fire,
+      scroll: (dir) => scrollUIZone(dir),
       cancel: () => {
         if (!activeTurnId) return false;
         cancelTurn().catch(() => {});
@@ -134,6 +147,7 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
           <Transcript />
         </div>
         <CommandInput
+          ref={inputRef}
           onSubmit={onSubmit}
           onValueChange={(v) => {
             if (inputValue.current === "" && v !== "") controller.stopSpeaking();

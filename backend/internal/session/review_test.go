@@ -179,3 +179,54 @@ func TestTruncateIsUTF8Safe(t *testing.T) {
 		t.Errorf("truncate = %q", got)
 	}
 }
+
+// TestProposalsStackAndHighRiskNeedsKey: two pending proposals share one
+// overlay, newest on top with the Enter/Escape binding; a spoken "ok" does
+// not confirm a high-risk proposal (Phase 12 review items).
+func TestProposalsStackAndHighRiskNeedsKey(t *testing.T) {
+	s, _, _ := gated(t)
+	defer s.Close()
+	s.propose("", runtime.Proposal{ID: "p_low", Tool: "set_reminder", Args: map[string]any{"text": "a", "at": "17:00"}, Label: "Low", Risk: "low"})
+	s.propose("", runtime.Proposal{ID: "p_high", Tool: "forget", Args: map[string]any{"id": "n1"}, Label: "High", Risk: "high"})
+	spec := s.Spec()
+	stack, ok := spec.Nodes["proposals_stack"]
+	if !ok || spec.Nodes["proposals"].Type != "Overlay" {
+		t.Fatalf("no proposal overlay/stack: %v", spec.Nodes)
+	}
+	children := stack.Slots["children"]
+	if len(children) != 2 || children[0] != "confirm_p_high_card" || children[1] != "confirm_p_low_card" {
+		t.Fatalf("stack children = %v", children)
+	}
+	top := spec.Nodes["confirm_p_high_card"].Actions["confirm"]
+	under := spec.Nodes["confirm_p_low_card"].Actions["confirm"]
+	if top.Hotkey == nil || *top.Hotkey != "enter" || under.Hotkey != nil {
+		t.Fatalf("hotkeys: top=%+v under=%+v", top, under)
+	}
+	// Voice "ok" is held for the high-risk one; a keyboard "ok" confirms (it fails to execute: unknown note, which is fine here).
+	out, err := s.Handle("ok", runtime.SourceVoice)
+	if err != nil || out.Handled != "held" || out.ProposalID != "p_high" {
+		t.Fatalf("voice ok on high risk: %+v %v", out, err)
+	}
+	if n := len(s.o.Gate.Pending()); n != 2 {
+		t.Fatalf("pending after held = %d", n)
+	}
+	out, err = s.Handle("ok", runtime.SourceKeyboard)
+	if err != nil || out.Handled != "confirmed" || out.ProposalID != "p_high" {
+		t.Fatalf("keyboard ok on high risk: %+v %v", out, err)
+	}
+	// One left: it is now the top card and owns Enter.
+	spec = s.Spec()
+	if _, gone := spec.Nodes["confirm_p_high_card"]; gone {
+		t.Fatal("confirmed card still shown")
+	}
+	a := spec.Nodes["confirm_p_low_card"].Actions["confirm"]
+	if a.Hotkey == nil || *a.Hotkey != "enter" {
+		t.Fatalf("remaining card not bound to enter: %+v", a)
+	}
+	if err := s.Reject("p_low", runtime.SourceKeyboard); err != nil {
+		t.Fatal(err)
+	}
+	if _, shown := s.Spec().Nodes["proposals"]; shown {
+		t.Fatal("overlay not removed with the last proposal")
+	}
+}

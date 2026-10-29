@@ -56,3 +56,46 @@ func TestSentences(t *testing.T) {
 		}
 	}
 }
+
+func TestSentenceStream(t *testing.T) {
+	var st SentenceStream
+	var got []string
+	deltas := []string{"Sure", ". Here is ", "the **first** sentence. And", " the second one, which is 3.5 km long! ", "Then a question? Fi", "nal words"}
+	for _, d := range deltas {
+		got = append(got, st.Push(d)...)
+	}
+	want := []string{"Sure. Here is the first sentence.", "And the second one, which is 3.5 km long!", "Then a question?"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("pushed = %q, want %q", got, want)
+	}
+	if !st.Pending() {
+		t.Fatal("remainder not pending")
+	}
+	if rest := st.Flush(); rest != "Final words" {
+		t.Fatalf("flush = %q", rest)
+	}
+	if st.Pending() || st.Flush() != "" {
+		t.Fatal("stream not empty after flush")
+	}
+	// A blank line ends a sentence without punctuation.
+	if got := st.Push("First paragraph without a stop\n\nSecond"); !reflect.DeepEqual(got, []string{"First paragraph without a stop"}) {
+		t.Fatalf("blank line = %q", got)
+	}
+	// The whole text, pushed at once, agrees with Sentences.
+	var all SentenceStream
+	text := "It's 14:05. Three things today: standup, review, call. Ok?"
+	pieces := all.Push(text + " ")
+	if rest := all.Flush(); rest != "" {
+		pieces[len(pieces)-1] += " " + rest // the short remainder rule of Sentences
+	}
+	if !reflect.DeepEqual(pieces, Sentences(text)) {
+		t.Fatalf("stream %q != Sentences %q", pieces, Sentences(text))
+	}
+}
+
+func TestRulesStreamSpeech(t *testing.T) {
+	r := NewRules()
+	if !r.StreamSpeech(Input{Source: runtime.SourceKeyboard}) || r.StreamSpeech(Input{Proactive: "reminder"}) {
+		t.Fatal("user turns stream, proactive items do not")
+	}
+}

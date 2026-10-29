@@ -348,6 +348,12 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 	specTouched := false
 	spoke := false
 	failure := ""
+	// Sentences are spoken as they complete when the decider allows it
+	// (VISION 7 criterion 1); the remainder goes out with turn_done.
+	var stream *decision.SentenceStream
+	if st, ok := s.o.Decider.(decision.Streamer); ok && st.StreamSpeech(decision.Input{Source: turn.Source, UserText: turn.Text, Now: s.o.Now()}) {
+		stream = &decision.SentenceStream{}
+	}
 
 	finish := func() {
 		s.mu.Lock()
@@ -375,12 +381,26 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 		switch {
 		case status == gen.TurnDoneEventStatusFailed:
 			s.showStatusCard("That didn't work: "+truncate(failure, 160), "error", 20*time.Second)
-			s.publishSpeech(turn.ID, decision.Sentences(text))
-		case status != gen.TurnDoneEventStatusCancelled && d.Respond:
+			if stream != nil {
+				// Whatever was already said stays said; the apology follows
+				// the unspoken rest of the partial reply.
+				s.publishSpeech(turn.ID, decision.Sentences(stream.Flush()+" "+failureReply("", failure)))
+			} else {
+				s.publishSpeech(turn.ID, decision.Sentences(text))
+			}
+		case status == gen.TurnDoneEventStatusCancelled:
+			// Nothing more is said; the client cut playback on turn_done.
+		case d.Respond:
 			if d.AutoCard && text != "" {
 				s.showReplyCard(text, d.AutoCardTTL)
 			}
-			s.publishSpeech(turn.ID, d.Speech)
+			if stream != nil {
+				if rest := stream.Flush(); rest != "" {
+					s.publishSpeech(turn.ID, decision.Sentences(rest))
+				}
+			} else {
+				s.publishSpeech(turn.ID, d.Speech)
+			}
 		}
 		modality := string(d.Modality)
 		if status == gen.TurnDoneEventStatusCancelled {
@@ -415,6 +435,11 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 				s.setState(gen.AgentStateSpeaking, turn.ID)
 			}
 			s.bus.Publish("text_delta", map[string]any{"turn_id": turn.ID, "delta": ev.Text})
+			if stream != nil {
+				if pieces := stream.Push(ev.Text); len(pieces) > 0 {
+					s.publishSpeechPieces(turn.ID, pieces, false)
+				}
+			}
 		case runtime.EventSpecOp:
 			if s.applyOp(turn.ID, ev.Op) {
 				specTouched = true
@@ -519,19 +544,12 @@ func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 	return true
 }
 
-// restoreConfirmCards puts the Confirm card of every still-pending
+// restoreConfirmCards puts the Confirm cards of every still-pending
 // proposal back after a clear. A proposal that is confirmable by Enter
 // must stay visible: a runtime that starts its next visual with `clear`
 // (the local runtime does) would otherwise leave an invisible proposal
 // armed (found by the browser smoke test, 2026-10-29).
-func (s *Session) restoreConfirmCards() {
-	if s.o.Gate == nil {
-		return
-	}
-	for _, p := range s.o.Gate.Pending() {
-		s.showConfirmCard(p)
-	}
-}
+func (s *Session) restoreConfirmCards() { s.renderProposals() }
 
 func (s *Session) addProposal(turnID string, p runtime.Proposal) {
 	if p.ID == "" {

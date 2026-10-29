@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type Ref } from "react";
+
+export type CommandInputHandle = { clear(): void };
 
 type Props = {
   onSubmit: (text: string) => void;
   /** Reports every value change so global hotkeys know when the input is empty. */
   onValueChange?: (value: string) => void;
   placeholder?: string;
+  /** Imperative handle: the digit hotkeys clear a lone digit once it fires. */
+  ref?: Ref<CommandInputHandle>;
 };
 
 /**
@@ -12,13 +16,14 @@ type Props = {
  * whenever a printable key is pressed anywhere on the page (VISION 3,
  * "keyboard chat, always focused, no click needed").
  */
-export function CommandInput({ onSubmit, onValueChange, placeholder = "Say something…" }: Props) {
+export function CommandInput({ onSubmit, onValueChange, placeholder = "Say something…", ref: handle }: Props) {
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValueState] = useState("");
   const setValue = (v: string) => {
     setValueState(v);
     onValueChange?.(v);
   };
+  useImperativeHandle(handle, () => ({ clear: () => setValue("") }));
 
   useEffect(() => {
     const el = ref.current;

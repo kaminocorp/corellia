@@ -16,7 +16,9 @@ type Props = {
  * Lays out the agent and the generated UI. The root's fit decides the
  * zone: glance overlays float in a corner over the scene, panels take
  * the right side with the agent shifting left, full visuals take most of
- * the screen with the agent tucked into a corner.
+ * the screen with the agent tucked into a corner. The zone scrolls (by
+ * keyboard: arrows and PageUp/PageDown while the input is empty) instead
+ * of clipping long content.
  */
 export function Stage({ spec, agent, fire, onInvalid }: Props) {
   const mode = placement(spec);
@@ -37,7 +39,10 @@ export function Stage({ spec, agent, fire, onInvalid }: Props) {
       <div className={`absolute flex items-center justify-center transition-all duration-700 ease-out ${agentClass}`} aria-hidden>
         {agent}
       </div>
-      <div className={`absolute overflow-hidden transition-all duration-500 ${uiClass}`} data-testid="ui-zone">
+      <div
+        className={`absolute overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all duration-500 ${uiClass}`}
+        data-testid="ui-zone"
+      >
         <ErrorBoundary label="generated UI failed to render" resetKey={spec} onError={(e) => onInvalid?.("render", e.message)}>
           <Renderer spec={spec} fire={fire} onInvalid={onInvalid} />
         </ErrorBoundary>

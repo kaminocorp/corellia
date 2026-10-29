@@ -164,11 +164,10 @@ func requireJSON(exempt ...string) func(http.Handler) http.Handler {
 
 // securityHeaders adds a Content-Security-Policy built from the image
 // host allowlist plus the usual hardening headers. The client is a single
-// bundle with no inline scripts. 'unsafe-eval' is needed because Ajv
-// compiles the contract validators with new Function at load time (the
-// smoke test went blank without it); precompiling them at build time
-// would remove it. MapLibre needs blob workers and inline style
-// attributes, tiles come from OpenStreetMap over fetch.
+// bundle with no inline scripts and no eval: the contract validators are
+// precompiled at contract-generation time (Phase 12), so script-src is
+// 'self' alone. MapLibre needs blob workers and inline style attributes,
+// tiles come from OpenStreetMap over fetch.
 func securityHeaders(cfg config.Config) func(http.Handler) http.Handler {
 	csp := contentSecurityPolicy(cfg.ImageHosts)
 	return func(next http.Handler) http.Handler {
@@ -201,7 +200,7 @@ func contentSecurityPolicy(imageHosts []string) string {
 	}
 	return strings.Join([]string{
 		"default-src 'self'",
-		"script-src 'self' 'unsafe-eval'",
+		"script-src 'self'",
 		"style-src 'self' 'unsafe-inline'",
 		"img-src " + strings.Join(img, " "),
 		"connect-src 'self' " + tileHost,

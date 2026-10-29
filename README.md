@@ -44,7 +44,7 @@ With hot reload on both sides:
 overmind start      # client on :5173 (proxies the API), backend on :8080 via air
 ```
 
-Configuration is `backend/.env` (template: [`.env.example`](.env.example)). Setting `ANTHROPIC_API_KEY` switches the runtime to Claude; `OPENAI_API_KEY` adds server speech recognition and synthesis and nothing else (`CORELLIA_RUNTIME=openai` or `OPENAI_BASE_URL` selects an OpenAI-compatible chat runtime explicitly). The Anthropic runtime has not yet been run against the live API from this repository; if every turn fails with the apology card, try `CORELLIA_ANTHROPIC_FALLBACKS=false`.
+Configuration is `backend/.env` (template: [`.env.example`](.env.example)). Setting `ANTHROPIC_API_KEY` switches the runtime to Claude; `OPENAI_API_KEY` adds server speech recognition and synthesis and nothing else (`CORELLIA_RUNTIME=openai` or `OPENAI_BASE_URL` selects an OpenAI-compatible chat runtime explicitly). The Anthropic runtime is verified against recorded Messages API fixtures and request goldens (`backend/internal/runtime/anthropic/testdata/`); with a key, run `scripts/anthropic-live-check.sh` first: it checks a plain turn, a tool turn with `show_ui` and a cancel against the live API, prints a diagnosis for the usual failures (bad key, unknown model, rejected beta: `CORELLIA_ANTHROPIC_FALLBACKS=false`), then writes the VISION 7 spike report to `docs/executing/spikes/`. No live run has happened from this repository yet (no key here).
 
 Mac voice notes: `Ctrl+Space` toggles the mic (Cmd is left alone so Spotlight keeps working); if "select previous input source" is bound to Ctrl+Space in System Settings, change one of them. Use headphones or `CORELLIA_VOICE_MODE=ptt` on laptop speakers, otherwise the agent's own voice can interrupt it.
 
@@ -61,7 +61,7 @@ The smoke test ([`client/e2e/smoke.spec.ts`](client/e2e/smoke.spec.ts)) fails on
 
 ```
 backend/   Go service: config, auth (device token), contract, uispec, catalog, runtime/*, tools, actions,
-           decision, session, voice, memory, proactive, store, httpsrv; cmd/api, cmd/runtime-spike
+           decision, session, voice, memory, proactive, store, httpsrv; cmd/api, cmd/runtime-spike, cmd/runtime-check
 client/    Vite + React + R3F: contract, components, renderer, agent3d, voice, platform, session, app
 shared/    JSON Schemas and the component catalog (the only cross-language contract)
 box/       Debian display-box provisioning: kiosk, watchdog, systemd units

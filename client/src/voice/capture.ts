@@ -84,13 +84,19 @@ export class MicCapture {
     }, this.tickMs);
   }
 
-  stop(): void {
+  /**
+   * Stops capture. With `flush`, an utterance in progress is delivered
+   * instead of dropped: push-to-talk releases the key while the user is
+   * still finishing the sentence (review 2026-10-29).
+   */
+  stop(flush = false): void {
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
+    const deliver = flush && this.inSpeech;
     this.inSpeech = false;
     this.vad.reset();
     if (this.recorder && this.recorder.state !== "inactive") {
-      this.discardNext = true;
+      this.discardNext = !deliver;
       try {
         this.recorder.stop();
       } catch {

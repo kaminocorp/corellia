@@ -20,7 +20,7 @@ export type VoiceStatus = {
   error: string | null;
 };
 
-export type Capture = { start(stream: MediaStream): void; stop(): void };
+export type Capture = { start(stream: MediaStream): void; stop(flush?: boolean): void };
 
 export type VoiceDeps = {
   getMicStream: () => Promise<MediaStream>;
@@ -45,9 +45,11 @@ export class VoiceController {
   readonly player: SpeechPlayer;
   private capture: Capture | null = null;
   private stt: { start(): void; stop(): void } | null = null;
-  private caps: VoiceCapabilities = { stt: "none", tts: "none", mode: "toggle" };
+  private caps: VoiceCapabilities = { stt: "none", tts: "none", mode: "toggle", barge_in: "auto" };
   private activeTurnId: string | null = null;
   private disposed = false;
+  /** Speech that began while the agent was talking with barge-in off: its text is dropped. */
+  private ignoreUtterance = false;
 
   constructor(private readonly deps: VoiceDeps) {
     this.player = new SpeechPlayer(silent, {
@@ -97,6 +99,29 @@ export class VoiceController {
     if (this.activeTurnId) this.deps.cancelTurn().catch(() => {});
   }
 
+  /**
+   * Speech start from the mic. With CORELLIA_VOICE_BARGE_IN=off, speech
+   * detected while the agent is talking is taken for the agent's own voice
+   * on the speakers (laptops without headphones) and ignored, text
+   * included; typing and Escape still interrupt.
+   */
+  private onSpeechStart(): void {
+    if (this.caps.barge_in === "off" && this.player.isSpeaking) {
+      this.ignoreUtterance = true;
+      return;
+    }
+    this.ignoreUtterance = false;
+    this.bargeIn();
+    void this.apply(this.activation.setCapturing(true));
+  }
+
+  /** True once per utterance that began during playback with barge-in off. */
+  private dropUtterance(): boolean {
+    const drop = this.ignoreUtterance;
+    this.ignoreUtterance = false;
+    return drop;
+  }
+
   /** Typing: playback stops, but the running turn continues (a follow-up is not an interruption). */
   stopSpeaking(): void {
     this.player.stop();
@@ -139,18 +164,19 @@ export class VoiceController {
     const wasOpen = change.from === "listening" || change.from === "capturing";
     const nowOpen = change.to === "listening" || change.to === "capturing";
     if (nowOpen && !wasOpen) await this.openMic();
-    else if (wasOpen && !nowOpen) this.closeMic();
+    // Push-to-talk: the key goes up while the sentence is still being
+    // finished; deliver what was captured instead of dropping it.
+    else if (wasOpen && !nowOpen) this.closeMic(this.caps.mode === "ptt" && change.from === "capturing");
   }
 
   private async openMic(): Promise<void> {
     try {
       if (this.caps.stt === "none" && this.deps.browserRecognition()) {
         const stt = this.deps.createBrowserStt({
-          onText: (t) => this.submitVoice(t),
-          onSpeechStart: () => {
-            this.bargeIn();
-            void this.apply(this.activation.setCapturing(true));
+          onText: (t) => {
+            if (!this.dropUtterance()) this.submitVoice(t);
           },
+          onSpeechStart: () => this.onSpeechStart(),
           onSpeechEnd: () => void this.apply(this.activation.setCapturing(false)),
           onError: (e) => this.patch({ error: e }),
         });
@@ -159,12 +185,10 @@ export class VoiceController {
       } else {
         const stream = await this.deps.getMicStream();
         const cap = this.deps.createCapture({
-          onSpeechStart: () => {
-            this.bargeIn();
-            void this.apply(this.activation.setCapturing(true));
-          },
+          onSpeechStart: () => this.onSpeechStart(),
           onUtterance: async (blob, mime) => {
             void this.apply(this.activation.setCapturing(false));
+            if (this.dropUtterance()) return;
             if (this.caps.stt === "none") {
               this.patch({ error: "no speech recognition available; configure a server STT provider" });
               return;
@@ -189,8 +213,8 @@ export class VoiceController {
     }
   }
 
-  private closeMic(): void {
-    this.capture?.stop();
+  private closeMic(flush = false): void {
+    this.capture?.stop(flush);
     this.capture = null;
     this.stt?.stop();
     this.stt = null;

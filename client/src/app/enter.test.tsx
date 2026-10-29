@@ -15,11 +15,13 @@ function Harness({ fire }: { fire: (id: string, node: string) => void }) {
   const value = useRef("");
   const confirm: ResolvedAction = { id: "yes", label: "Do it", hotkey: "enter", slot: "confirm", nodeId: "card" };
   const h: GlobalKeyHandlers = {
-    inputEmpty: () => value.current === "",
+    inputValue: () => value.current,
+    clearInput: () => {},
     hotkeys: new Map([["yes", confirm]]),
     fire,
     cancel: () => false,
     clear: () => {},
+    scroll: () => false,
   };
   useGlobalKeys(h);
   return <CommandInput onSubmit={() => {}} onValueChange={(v) => (value.current = v)} />;
