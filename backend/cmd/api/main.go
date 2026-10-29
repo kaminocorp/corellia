@@ -24,6 +24,7 @@ import (
 	"github.com/hejijunhao/corellia/backend/internal/session"
 	"github.com/hejijunhao/corellia/backend/internal/tools"
 	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
+	"github.com/hejijunhao/corellia/backend/internal/voice"
 )
 
 // Set via -ldflags "-X main.version=... -X main.commit=...".
@@ -67,6 +68,9 @@ func main() {
 	gate := actions.New(toolReg, 2*time.Minute, time.Now)
 	slog.Info("tools registered", "tools", toolReg.Names())
 
+	voiceProviders := voice.Select(cfg)
+	slog.Info("voice providers", "stt", voiceProviders.STT.Name(), "tts", voiceProviders.TTS.Name(), "mode", voiceProviders.Mode)
+
 	sess := session.New(session.Options{
 		AgentName: cfg.AgentName,
 		Runtime:   rt,
@@ -74,6 +78,8 @@ func main() {
 		Tools:     toolReg,
 		Gate:      gate,
 		Decider:   decision.NewRules(),
+		STT:       voiceProviders.STT.Name(),
+		TTS:       voiceProviders.TTS.Name(),
 	})
 	defer sess.Close()
 
@@ -82,6 +88,7 @@ func main() {
 		Build:   httpsrv.BuildInfo{Version: version, Commit: commit},
 		Session: httpsrv.NewSessionHandler(sess, reg),
 		Events:  httpsrv.NewEventsHandler(sess),
+		Voice:   httpsrv.NewVoiceHandler(voiceProviders),
 	})
 
 	srv := &http.Server{

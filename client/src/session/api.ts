@@ -63,3 +63,21 @@ export function rejectProposal(proposalId: string, source: "keyboard" | "voice" 
   const body: ConfirmRequest = { proposal_id: proposalId, source };
   return postJSON<{ ok: boolean }>("/api/action/reject", body, fetchImpl);
 }
+
+/** POST /api/voice/stt with raw audio; the server answers 501 when no provider is configured. */
+export async function transcribe(audio: Blob, mime: string, fetchImpl: typeof fetch = fetch): Promise<{ text: string }> {
+  const res = await fetchImpl("/api/voice/stt", { method: "POST", headers: { "Content-Type": mime || "audio/webm", ...authHeaders() }, body: audio });
+  const body = (await res.json().catch(() => ({}))) as { text?: string; error?: string; code?: string };
+  if (!res.ok) throw new ApiError(res.status, body.code ?? "http_error", body.error ?? `HTTP ${res.status}`);
+  return { text: body.text ?? "" };
+}
+
+/** POST /api/voice/tts; resolves to encoded audio bytes. */
+export async function synthesize(text: string, fetchImpl: typeof fetch = fetch): Promise<ArrayBuffer> {
+  const res = await fetchImpl("/api/voice/tts", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ text }) });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiError(res.status, body.code ?? "http_error", body.error ?? `HTTP ${res.status}`);
+  }
+  return res.arrayBuffer();
+}

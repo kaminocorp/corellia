@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)](#0158---phase-8-voice-stttts-seams--openai-audio-provider--endpoints-client-vad-capture-browser-recognition-fallback-speech-playback-with-audio-level-activation-keys-barge-in-mic-indicator-2026-10-29)
 - [0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)](#0157---phase-7-cloud-runtimes-anthropic-streaming--tool-use-openai-compatibledeepseek-hermes-sidecar-deepseek-harness-stub--runtime-selector--runtime-spike-2026-10-29)
 - [0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)](#0156---phase-6-decision-layer-rules--proposeconfirm-gate--tool-registry-with-built-ins-time-geocode-weather-memory-reminders-directions-show_ui--confirm-cards-and-phrases-2026-10-29)
 - [0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)](#0155---phase-5-3d-agent-r3f-nebula-state-machine-audio-hook-adaptive-resolution-fallback-stats-overlay-2026-10-29)
@@ -89,6 +90,21 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)
+
+Roadmap Phase 8. Full notes: [`completions/phase-08-voice.md`](completions/phase-08-voice.md).
+
+### Added
+
+- **Backend** `internal/voice` (`STT`/`TTS` interfaces, `None`, `OpenAI` audio provider, `Select`), endpoints `GET /api/voice/capabilities`, `POST /api/voice/stt`, `POST /api/voice/tts`; config `CORELLIA_STT`, `CORELLIA_TTS`, `CORELLIA_TTS_VOICE`, `CORELLIA_VOICE_MODE`.
+- **Client** platform adapter (browser; shell stub), energy VAD, mic capture with utterance segmentation, browser `SpeechRecognition` fallback, speech player with server TTS (analyser → 3D audio level) and `speechSynthesis` backends, activation state machine (`Ctrl+Space` toggle / push-to-talk, `Ctrl+M` mute), `VoiceController` with barge-in on speech or typing, `MicIndicator`, `transcribe`/`synthesize` API calls. 13 new tests.
+
+### Edited
+
+- `App.tsx` mounts the voice controller and indicator; the agent shows `listening` while capturing. `.env.example` documents the voice variables.
+
+---
 
 ## 0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)
 

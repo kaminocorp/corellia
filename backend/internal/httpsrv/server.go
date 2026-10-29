@@ -32,6 +32,7 @@ type Deps struct {
 	// routes still work), which the Phase 1 tests rely on.
 	Session *SessionHandler
 	Events  http.Handler
+	Voice   *VoiceHandler
 }
 
 // New builds the root http.Handler.
@@ -78,6 +79,11 @@ func New(d Deps) http.Handler {
 		}
 		if d.Events != nil {
 			r.Get("/events", d.Events.ServeHTTP)
+		}
+		if d.Voice != nil {
+			r.Get("/voice/capabilities", d.Voice.GetCapabilities)
+			r.Post("/voice/stt", d.Voice.PostSTT)
+			r.Post("/voice/tts", d.Voice.PostTTS)
 		}
 		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})

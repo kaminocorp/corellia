@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommandInput } from "./CommandInput";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { DebugPane } from "./DebugPane";
+import { MicIndicator } from "./MicIndicator";
 import { Transcript } from "./Transcript";
 import { Agent3D, StatsOverlay } from "../agent3d/Agent3D";
 import { Gallery } from "../gallery/Gallery";
@@ -14,6 +15,7 @@ import { cancelTurn, clearScreen, fireAction, removeNode, sendTurn } from "../se
 import { fetchHealth } from "../session/health";
 import { sessionStore, useSessionState } from "../session/store";
 import { SessionStream } from "../session/stream";
+import { useVoice } from "../voice/useVoice";
 
 /**
  * The display shell: the Stage (agent focal area + generated UI), the
@@ -39,12 +41,15 @@ function Display({ debug, stats, particles }: { debug: boolean; stats: boolean; 
     touched: s.touched,
   }));
 
+  const voice = useVoice(activeTurnId);
+  const controller = voice.controller;
+
   useEffect(() => {
-    const stream = new SessionStream(sessionStore);
+    const stream = new SessionStream(sessionStore, { onEvent: (ev) => controller.onStreamEvent(ev) });
     stream.connect();
     void fetchHealth().then((h) => setDevMode(h?.dev_mode ?? false));
     return () => stream.disconnect();
-  }, []);
+  }, [controller]);
 
   const report = (code: string) => (e: Error) => sessionStore.addError(code, e.message);
   const fire = useCallback((actionId: string, nodeId: string) => {
@@ -85,7 +90,7 @@ function Display({ debug, stats, particles }: { debug: boolean; stats: boolean; 
         spec={spec}
         fire={fire}
         onInvalid={(id, msg) => sessionStore.addError("render_invalid", `${id}: ${msg}`)}
-        agent={<Agent3D state={agentState} particles={particles} />}
+        agent={<Agent3D state={voice.status.mic === "capturing" ? "listening" : agentState} particles={particles} />}
       />
 
       <header className="absolute top-4 left-5 flex items-center gap-4 font-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
@@ -95,12 +100,21 @@ function Display({ debug, stats, particles }: { debug: boolean; stats: boolean; 
           {agentState}
         </span>
       </header>
+      <div className="absolute top-4 right-5">
+        <MicIndicator status={voice.status} />
+      </div>
 
       <footer className="absolute bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 px-6">
         <div className="mb-4">
           <Transcript />
         </div>
-        <CommandInput onSubmit={onSubmit} onValueChange={(v) => (inputValue.current = v)} />
+        <CommandInput
+          onSubmit={onSubmit}
+          onValueChange={(v) => {
+            if (inputValue.current === "" && v !== "") controller.bargeIn();
+            inputValue.current = v;
+          }}
+        />
       </footer>
 
       {debug && <DebugPane />}

@@ -50,6 +50,16 @@ type Config struct {
 	HermesURL   string `env:"CORELLIA_HERMES_URL"`
 	HermesToken string `env:"CORELLIA_HERMES_TOKEN"`
 
+	// STT / TTS select the voice providers: auto (openai when OPENAI_API_KEY
+	// is set and not pointed at DeepSeek, else none), none, openai.
+	STT string `env:"CORELLIA_STT" envDefault:"auto"`
+	TTS string `env:"CORELLIA_TTS" envDefault:"auto"`
+	// TTSVoice is the provider voice name ("" = provider default).
+	TTSVoice string `env:"CORELLIA_TTS_VOICE"`
+	// VoiceMode is the mic activation mode the client uses: toggle
+	// (Ctrl+Space toggles an open, VAD-gated mic) or ptt (hold Ctrl+Space).
+	VoiceMode string `env:"CORELLIA_VOICE_MODE" envDefault:"toggle"`
+
 	// DevOrigins are extra origins allowed by CORS (the Vite dev server by
 	// default). Comma-separated. The Vite proxy makes this unnecessary in
 	// the default dev setup; it exists for running the client from another
@@ -86,6 +96,18 @@ func (c Config) Validate() error {
 	case "low", "medium", "high", "xhigh", "max":
 	default:
 		return fmt.Errorf("config: CORELLIA_EFFORT %q is not one of low|medium|high|xhigh|max", c.Effort)
+	}
+	for _, v := range []string{c.STT, c.TTS} {
+		switch v {
+		case "auto", "none", "openai":
+		default:
+			return fmt.Errorf("config: CORELLIA_STT/CORELLIA_TTS %q is not one of auto|none|openai", v)
+		}
+	}
+	switch c.VoiceMode {
+	case "toggle", "ptt":
+	default:
+		return fmt.Errorf("config: CORELLIA_VOICE_MODE %q is not one of toggle|ptt", c.VoiceMode)
 	}
 	if t := c.DeviceToken; t != "" && len(t) < 16 {
 		return fmt.Errorf("config: CORELLIA_DEVICE_TOKEN must be at least 16 characters when set")
