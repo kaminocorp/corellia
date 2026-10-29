@@ -38,3 +38,7 @@ Returns every issue, not just the first: `dangling_ref` (root, slot child, or no
 ## Binding paths
 
 `$` then any number of `.key` (identifier) or `[index]` segments. Resolution walks `data`; a missing key, an index out of range, or a non-container in the middle yields "unresolved". Resolution never throws.
+
+## Floating overlays
+
+An `Overlay` node that no slot references (and that is not the root) is rendered as a floating layer in addition to the root tree. The session uses this for confirmation cards, auto text cards and proactive glance cards so they never disturb the main tree. `clear` removes them like any node; `remove_node` on the overlay id dismisses one.

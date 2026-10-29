@@ -71,6 +71,8 @@ func New(d Deps) http.Handler {
 			r.Post("/turn/cancel", d.Session.PostCancel)
 			r.Get("/catalog", d.Session.GetCatalog)
 			r.Post("/action", d.Session.PostAction)
+			r.Post("/action/confirm", d.Session.PostConfirm)
+			r.Post("/action/reject", d.Session.PostReject)
 			r.Post("/screen/clear", d.Session.PostScreenClear)
 			r.Post("/screen/remove", d.Session.PostScreenRemove)
 		}

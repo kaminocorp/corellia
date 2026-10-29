@@ -1,4 +1,4 @@
-import type { ActionRequest, CancelRequest, TurnRequest, TurnResponse } from "../contract";
+import type { ActionRequest, CancelRequest, ConfirmRequest, TurnRequest, TurnResponse } from "../contract";
 import { authHeaders } from "./auth";
 
 export class ApiError extends Error {
@@ -52,4 +52,14 @@ export function clearScreen(fetchImpl?: typeof fetch) {
 
 export function removeNode(nodeId: string, fetchImpl?: typeof fetch) {
   return postJSON<{ ok: boolean }>("/api/screen/remove", { node_id: nodeId }, fetchImpl);
+}
+
+export function confirmProposal(proposalId: string, source: "keyboard" | "voice" = "keyboard", fetchImpl?: typeof fetch) {
+  const body: ConfirmRequest = { proposal_id: proposalId, source };
+  return postJSON<{ ok: boolean }>("/api/action/confirm", body, fetchImpl);
+}
+
+export function rejectProposal(proposalId: string, source: "keyboard" | "voice" = "keyboard", fetchImpl?: typeof fetch) {
+  const body: ConfirmRequest = { proposal_id: proposalId, source };
+  return postJSON<{ ok: boolean }>("/api/action/reject", body, fetchImpl);
 }

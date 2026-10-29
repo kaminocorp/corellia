@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/hejijunhao/corellia/backend/internal/actions"
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/runtime"
 	"github.com/hejijunhao/corellia/backend/internal/session"
@@ -14,7 +15,7 @@ import (
 // sessionAPI is the slice of *session.Session the handlers need, so tests
 // can fake it.
 type sessionAPI interface {
-	StartTurn(text string, source runtime.Source) (turnID string, cancelled string, err error)
+	Handle(text string, source runtime.Source) (session.Outcome, error)
 	Cancel(turnID string) bool
 	Snapshot() map[string]any
 	Subscribe(lastSeq int) (<-chan session.Item, func())
@@ -22,6 +23,8 @@ type sessionAPI interface {
 	FireAction(actionID string, nodeID string) error
 	ClearScreen() error
 	RemoveNode(id string) error
+	Confirm(id string, source runtime.Source) error
+	Reject(id string, source runtime.Source) error
 }
 
 // SessionHandler serves /api/session, /api/turn, /api/turn/cancel and
@@ -82,7 +85,7 @@ func (h *SessionHandler) PostTurn(w http.ResponseWriter, r *http.Request) {
 	if req.Source == "voice" {
 		source = runtime.SourceVoice
 	}
-	id, cancelled, err := h.s.StartTurn(req.Text, source)
+	out, err := h.s.Handle(req.Text, source)
 	if err != nil {
 		if errors.Is(err, session.ErrNoRuntime) {
 			writeError(w, http.StatusServiceUnavailable, "no_runtime", err.Error())
@@ -91,9 +94,12 @@ func (h *SessionHandler) PostTurn(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "turn_failed", err.Error())
 		return
 	}
-	resp := map[string]any{"turn_id": id}
-	if cancelled != "" {
-		resp["cancelled_turn_id"] = cancelled
+	resp := map[string]any{"turn_id": out.TurnID, "handled": out.Handled}
+	if out.CancelledTurnID != "" {
+		resp["cancelled_turn_id"] = out.CancelledTurnID
+	}
+	if out.ProposalID != "" {
+		resp["proposal_id"] = out.ProposalID
 	}
 	writeJSON(w, http.StatusAccepted, resp)
 }
@@ -129,6 +135,40 @@ func (h *SessionHandler) PostAction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotImplemented, "action_unsupported", err.Error())
 	default:
 		writeError(w, http.StatusBadRequest, "action_failed", err.Error())
+	}
+}
+
+// PostConfirm confirms a pending proposal; PostReject rejects it.
+func (h *SessionHandler) PostConfirm(w http.ResponseWriter, r *http.Request) { h.decide(w, r, true) }
+func (h *SessionHandler) PostReject(w http.ResponseWriter, r *http.Request)  { h.decide(w, r, false) }
+
+func (h *SessionHandler) decide(w http.ResponseWriter, r *http.Request, confirm bool) {
+	var req struct {
+		ProposalID string `json:"proposal_id"`
+		Source     string `json:"source"`
+	}
+	if !h.decodeBody(w, r, "ConfirmRequest", &req) {
+		return
+	}
+	source := runtime.SourceKeyboard
+	if req.Source == "voice" {
+		source = runtime.SourceVoice
+	}
+	var err error
+	if confirm {
+		err = h.s.Confirm(req.ProposalID, source)
+	} else {
+		err = h.s.Reject(req.ProposalID, source)
+	}
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	case errors.Is(err, actions.ErrNotFound), errors.Is(err, actions.ErrExpired):
+		writeError(w, http.StatusNotFound, "proposal_not_found", err.Error())
+	case errors.Is(err, session.ErrNoGate):
+		writeError(w, http.StatusNotImplemented, "no_gate", err.Error())
+	default:
+		writeError(w, http.StatusBadRequest, "decision_failed", err.Error())
 	}
 }
 

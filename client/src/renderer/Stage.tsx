@@ -26,7 +26,7 @@ export function Stage({ spec, agent, fire, onInvalid }: Props) {
     full: "left-2 bottom-24 h-56 w-56",
   }[mode];
   const uiClass = {
-    none: "hidden",
+    none: "inset-0 pointer-events-none",
     glance: "inset-0 pointer-events-none",
     panel: "top-16 bottom-36 left-[40%] right-6",
     full: "top-14 bottom-36 left-6 right-6",

@@ -80,6 +80,19 @@ type TurnResponse struct {
 	// Set when starting this turn cancelled a running one.
 	CancelledTurnID *string `json:"cancelled_turn_id,omitempty,omitzero"`
 
+	// `turn` when a runtime turn started; `confirmed`/`rejected` when the text was a
+	// confirmation phrase applied to the pending proposal instead.
+	Handled *TurnResponseHandled `json:"handled,omitempty,omitzero"`
+
+	// Set with `confirmed`/`rejected`.
+	ProposalID *string `json:"proposal_id,omitempty,omitzero"`
+
 	// TurnID corresponds to the JSON schema field "turn_id".
 	TurnID string `json:"turn_id"`
 }
+
+type TurnResponseHandled string
+
+const TurnResponseHandledConfirmed TurnResponseHandled = "confirmed"
+const TurnResponseHandledRejected TurnResponseHandled = "rejected"
+const TurnResponseHandledTurn TurnResponseHandled = "turn"

@@ -3,7 +3,7 @@ import { Fragment, useMemo, type ReactNode } from "react";
 import { registry } from "../components/registry";
 import type { ResolvedAction } from "../components/types";
 import type { UISpec } from "../contract";
-import { assignHotkeys, resolveNode } from "./resolve";
+import { assignHotkeys, floatingOverlays, resolveNode } from "./resolve";
 
 type Props = {
   spec: UISpec;
@@ -12,11 +12,20 @@ type Props = {
   onInvalid?: (nodeId: string, message: string) => void;
 };
 
-/** Renders the spec tree from its root. Nothing renders unless it validates. */
+/** Renders the spec tree from its root plus floating overlays. Nothing renders unless it validates. */
 export function Renderer({ spec, fire, onInvalid }: Props) {
   const hotkeys = useMemo(() => assignHotkeys(spec), [spec]);
-  if (!spec.root) return null;
-  return <NodeView id={spec.root} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />;
+  const floating = useMemo(() => floatingOverlays(spec), [spec]);
+  return (
+    <>
+      {spec.root && <NodeView id={spec.root} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />}
+      {floating.map((id) => (
+        <div key={id} data-floating={id} className="contents">
+          <NodeView id={id} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />
+        </div>
+      ))}
+    </>
+  );
 }
 
 type NodeProps = Props & { id: string; hotkeys: Map<string, ResolvedAction>; depth: number };

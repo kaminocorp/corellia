@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)](#0156---phase-6-decision-layer-rules--proposeconfirm-gate--tool-registry-with-built-ins-time-geocode-weather-memory-reminders-directions-show_ui--confirm-cards-and-phrases-2026-10-29)
 - [0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)](#0155---phase-5-3d-agent-r3f-nebula-state-machine-audio-hook-adaptive-resolution-fallback-stats-overlay-2026-10-29)
 - [0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)](#0154---phase-4-component-library-15-components--renderer-bindings-hotkeys-decay-placement--catalog-describerank--action-and-screen-endpoints-2026-10-29)
 - [0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)](#0153---phase-3-agentruntime-seam--local-runtime--session-with-sse-event-stream--client-session-store-2026-10-29)
@@ -87,6 +88,24 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)
+
+Roadmap Phase 6. Full notes: [`completions/phase-06-decision-actions-tools.md`](completions/phase-06-decision-actions-tools.md).
+
+### Added
+
+- **`internal/tools`** registry (schema-validated calls, gated tools return proposals, `Execute` for the gate) and **`tools/builtin`**: `get_time`, `geocode`, `get_weather` (Open-Meteo), `remember`/`recall`/`forget`, `set_reminder`, `open_directions` (OSRM, straight-line fallback), `show_ui`; in-memory stores until Phase 9. Tool results may carry spec ops.
+- **`internal/actions`** gate: propose, confirm (executes once), reject, expiry.
+- **`internal/decision`**: `Decider` seam, `Rules` default (modality, speech sentences, auto text card, proactive hold), `Sentences`.
+- **Session**: `Handle` with confirm/reject phrase detection, floating `Confirm` cards (`Enter`/`Esc`), confirm/reject/expire with status events, `tool` and `propose` action kinds with bound-arg resolution, decider-driven speech and reply cards, tool-result ops. Endpoints `POST /api/action/confirm` and `/reject`; `TurnResponse.handled`.
+- **Client**: floating overlays rendered beside the root with hotkeys; confirm/reject API calls.
+
+### Edited
+
+- Local runtime uses the registry for time, reminders (parses `HH:MM`) and weather. `cmd/api` wires tools, gate and decider. `REDUCER.md` documents floating overlays.
+
+---
 
 ## 0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)
 

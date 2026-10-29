@@ -29,6 +29,14 @@ export interface TurnResponse {
    * Set when starting this turn cancelled a running one.
    */
   cancelled_turn_id?: string;
+  /**
+   * `turn` when a runtime turn started; `confirmed`/`rejected` when the text was a confirmation phrase applied to the pending proposal instead.
+   */
+  handled?: "turn" | "confirmed" | "rejected";
+  /**
+   * Set with `confirmed`/`rejected`.
+   */
+  proposal_id?: string;
   [k: string]: unknown;
 }
 export interface CancelRequest {

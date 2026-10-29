@@ -15,12 +15,16 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 
+	"github.com/hejijunhao/corellia/backend/internal/actions"
 	"github.com/hejijunhao/corellia/backend/internal/config"
 	"github.com/hejijunhao/corellia/backend/internal/contract"
+	"github.com/hejijunhao/corellia/backend/internal/decision"
 	"github.com/hejijunhao/corellia/backend/internal/httpsrv"
 	"github.com/hejijunhao/corellia/backend/internal/runtime"
 	"github.com/hejijunhao/corellia/backend/internal/runtime/local"
 	"github.com/hejijunhao/corellia/backend/internal/session"
+	"github.com/hejijunhao/corellia/backend/internal/tools"
+	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
 )
 
 // Set via -ldflags "-X main.version=... -X main.commit=...".
@@ -55,10 +59,18 @@ func main() {
 	rt := selectRuntime(cfg)
 	slog.Info("runtime selected", "runtime", rt.Name(), "requested", cfg.Runtime)
 
+	toolReg := tools.NewRegistry()
+	builtin.Register(toolReg, builtin.Options{})
+	gate := actions.New(toolReg, 2*time.Minute, time.Now)
+	slog.Info("tools registered", "tools", toolReg.Names())
+
 	sess := session.New(session.Options{
 		AgentName: cfg.AgentName,
 		Runtime:   rt,
 		Registry:  reg,
+		Tools:     toolReg,
+		Gate:      gate,
+		Decider:   decision.NewRules(),
 	})
 	defer sess.Close()
 

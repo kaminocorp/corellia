@@ -43,6 +43,19 @@
         "cancelled_turn_id": {
           "type": "string",
           "description": "Set when starting this turn cancelled a running one."
+        },
+        "handled": {
+          "type": "string",
+          "enum": [
+            "turn",
+            "confirmed",
+            "rejected"
+          ],
+          "description": "`turn` when a runtime turn started; `confirmed`/`rejected` when the text was a confirmation phrase applied to the pending proposal instead."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Set with `confirmed`/`rejected`."
         }
       }
     },

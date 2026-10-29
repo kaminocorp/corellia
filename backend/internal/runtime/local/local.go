@@ -7,7 +7,9 @@ package local
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -153,7 +155,7 @@ func (r *Runtime) answer(ctx context.Context, e *emitter, turn runtime.Turn) {
 	case hasAny(text, "remind me", "reminder"):
 		r.reminderScenario(e, turn)
 	case hasAny(text, "weather"):
-		r.weatherScenario(e)
+		r.weatherScenario(e, turn)
 	default:
 		e.text(fmt.Sprintf("I heard: \"%s\". The local runtime only knows a few scripted replies; connect a cloud runtime for real answers.", strings.TrimSpace(turn.Text)))
 	}
@@ -278,19 +280,54 @@ func (r *Runtime) scheduleScenario(e *emitter, turn runtime.Turn) {
 	e.text("Three things today: standup, the design review at eleven, and a call with Ana at half past three.")
 }
 
+var atRe = regexp.MustCompile(`\b([01]?\d|2[0-3]):([0-5]\d)\b`)
+
 func (r *Runtime) reminderScenario(e *emitter, turn runtime.Turn) {
-	p := &runtime.Proposal{
-		ID:    e.nextID("p"),
-		Tool:  "set_reminder",
-		Args:  m{"text": strings.TrimSpace(turn.Text), "at": "17:00"},
-		Label: "Set a reminder for 17:00",
-		Risk:  "low",
+	at := "17:00"
+	if mm := atRe.FindStringSubmatch(turn.Text); mm != nil {
+		at = fmt.Sprintf("%02s:%s", mm[1], mm[2])
+	}
+	args := m{"text": strings.TrimSpace(turn.Text), "at": at}
+	p := &runtime.Proposal{ID: e.nextID("p"), Tool: "set_reminder", Args: args, Label: "Set a reminder for " + at, Risk: "low"}
+	if turn.Context.Tools != nil {
+		callID := e.nextID("call")
+		e.send(runtime.Event{Kind: runtime.EventToolCall, CallID: callID, Tool: "set_reminder", Args: args})
+		res, err := turn.Context.Tools.Call(e.ctx, "set_reminder", args)
+		if errors.Is(err, runtime.ErrRequiresConfirm) && res.Proposal != nil {
+			p = res.Proposal
+		}
+		e.send(runtime.Event{Kind: runtime.EventToolResult, CallID: callID, Tool: "set_reminder", Result: &runtime.ToolResult{Content: res.Content}})
 	}
 	e.send(runtime.Event{Kind: runtime.EventProposal, Proposal: p})
-	e.text("I can set that reminder for five o'clock. Say \"do it\" or press Enter to confirm.")
+	e.text(fmt.Sprintf("I can set that reminder for %s. Say \"do it\" or press Enter to confirm.", at))
 }
 
-func (r *Runtime) weatherScenario(e *emitter) {
+func (r *Runtime) weatherScenario(e *emitter, turn runtime.Turn) {
+	if turn.Context.Tools != nil {
+		callID := e.nextID("call")
+		args := m{"place": "Lisbon"}
+		e.send(runtime.Event{Kind: runtime.EventToolCall, CallID: callID, Tool: "get_weather", Args: args})
+		res, err := turn.Context.Tools.Call(e.ctx, "get_weather", args)
+		if err == nil {
+			var data struct {
+				Place       string  `json:"place"`
+				Temperature float64 `json:"temperature"`
+				Conditions  string  `json:"conditions"`
+			}
+			_ = json.Unmarshal(res.Data, &data)
+			e.send(runtime.Event{Kind: runtime.EventToolResult, CallID: callID, Tool: "get_weather", Result: &runtime.ToolResult{Content: res.Content}})
+			e.ops(
+				m{"op": "clear"},
+				m{"op": "add_node", "id": "glance", "node": node("Overlay", m{"position": "top_right"}, m{"slots": m{"content": []string{"stat"}}})},
+				m{"op": "add_node", "id": "stat", "node": node("Stat", m{"label": data.Place, "value": fmt.Sprintf("%.0f", data.Temperature), "unit": "°C", "delta": data.Conditions}, m{"ttl_ms": 60000})},
+				m{"op": "set_root", "id": "glance"},
+				m{"op": "done"},
+			)
+			e.text(res.Content + ".")
+			return
+		}
+		e.send(runtime.Event{Kind: runtime.EventToolResult, CallID: callID, Tool: "get_weather", Result: &runtime.ToolResult{Content: "unavailable: " + err.Error()}})
+	}
 	e.ops(
 		m{"op": "clear"},
 		m{"op": "add_node", "id": "glance", "node": node("Overlay", m{"position": "top_right"}, m{"slots": m{"content": []string{"stat"}}})},
@@ -298,5 +335,5 @@ func (r *Runtime) weatherScenario(e *emitter) {
 		m{"op": "set_root", "id": "glance"},
 		m{"op": "done"},
 	)
-	e.text("Twenty-one degrees and clear. That's a sample value; the weather tool arrives in a later phase.")
+	e.text("Twenty-one degrees and clear. That's a sample value; connect the weather tool for real data.")
 }

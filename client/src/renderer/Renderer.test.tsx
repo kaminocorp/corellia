@@ -74,3 +74,24 @@ describe("Stage", () => {
     expect(container.querySelector("[data-placement]")?.getAttribute("data-placement")).toBe("none");
   });
 });
+
+describe("floating overlays", () => {
+  it("renders unreferenced overlays beside the root and hotkeys their actions", () => {
+    const spec = build([
+      { op: "add_node", id: "main", node: { type: "Card", props: { title: "Main" } } },
+      { op: "set_root", id: "main" },
+      { op: "set_action", id: "yes", action: { kind: "tool", tool: "confirm_proposal", args: { proposal_id: "p1" } } },
+      { op: "set_action", id: "no", action: { kind: "tool", tool: "reject_proposal", args: { proposal_id: "p1" } } },
+      { op: "add_node", id: "confirm_p1_card", node: { type: "Confirm", props: { proposal_id: "p1", title: "Set a reminder" }, actions: { confirm: { id: "yes", label: "Do it", hotkey: "enter" }, reject: { id: "no", label: "Cancel", hotkey: "escape" } } } },
+      { op: "add_node", id: "confirm_p1", node: { type: "Overlay", props: { position: "bottom_right" }, slots: { content: ["confirm_p1_card"] } } },
+    ]);
+    const fire = vi.fn();
+    const { container } = render(<Renderer spec={spec} fire={fire} />);
+    expect(screen.getByText("Main")).toBeInTheDocument();
+    expect(screen.getByText("Set a reminder")).toBeInTheDocument();
+    expect(container.querySelector('[data-floating="confirm_p1"]')).not.toBeNull();
+    expect(screen.getByText("Enter").tagName).toBe("KBD");
+    screen.getByText("Do it").parentElement!.click();
+    expect(fire).toHaveBeenCalledWith("yes", "confirm_p1_card");
+  });
+});

@@ -48,7 +48,9 @@ export function assignHotkeys(spec: UISpec): Map<string, ResolvedAction> {
     }
     for (const children of Object.values(n.slots ?? {})) for (const c of children ?? []) visit(c, seen);
   };
-  if (spec.root) visit(spec.root, new Set());
+  const seen = new Set<string>();
+  if (spec.root) visit(spec.root, seen);
+  for (const id of floatingOverlays(spec)) visit(id, seen);
   let digit = 1;
   for (const { ref } of pending) {
     if (!ref.hotkey) {
@@ -62,6 +64,22 @@ export function assignHotkeys(spec: UISpec): Map<string, ResolvedAction> {
     out.set(ref.id, ref);
   }
   return out;
+}
+
+/**
+ * Floating overlays: `Overlay` nodes that no slot references and that are
+ * not the root (REDUCER.md). The session uses them for confirmation,
+ * reply and proactive cards. Sorted by id for a stable order.
+ */
+export function floatingOverlays(spec: UISpec): string[] {
+  const referenced = new Set<string>();
+  for (const n of Object.values(spec.nodes)) {
+    for (const children of Object.values(n.slots ?? {})) for (const c of children ?? []) referenced.add(c);
+  }
+  return Object.entries(spec.nodes)
+    .filter(([id, n]) => n.type === "Overlay" && id !== spec.root && !referenced.has(id))
+    .map(([id]) => id)
+    .sort();
 }
 
 export type Placement = "none" | "glance" | "panel" | "full";

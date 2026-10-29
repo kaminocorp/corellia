@@ -4,8 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/hejijunhao/corellia/backend/internal/actions"
+	"github.com/hejijunhao/corellia/backend/internal/tools"
+	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
 
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/contract/gen"
@@ -239,10 +245,13 @@ func TestProposalRecorded(t *testing.T) {
 	defer unsub()
 	id, _, _ := s.StartTurn("remind me to call Ana", runtime.SourceVoice)
 	evs := drainUntil(t, ch, "turn_done", id)
-	if evs[len(evs)-1]["modality"] != "voice" {
-		t.Fatalf("modality = %v", evs[len(evs)-1]["modality"])
+	if evs[len(evs)-1]["modality"] != "both" {
+		t.Fatalf("modality = %v (long text replies get a text card)", evs[len(evs)-1]["modality"])
 	}
 	s.WaitTurn(id)
+	if _, ok := s.Spec().Nodes["reply_card"]; !ok {
+		t.Fatal("reply card missing")
+	}
 	if p := s.PendingProposals(); len(p) != 1 || p[0].Tool != "set_reminder" || !p[0].ExpiresAt.Equal(now.Add(2*time.Minute)) {
 		t.Fatalf("pending = %+v", p)
 	}
@@ -347,5 +356,156 @@ func TestLocalOpsAndActions(t *testing.T) {
 	last := tr[len(tr)-2]
 	if last.Text != "hello" || *last.Source != "action" {
 		t.Fatalf("send_message turn = %+v", last)
+	}
+}
+
+func gated(t *testing.T) (*Session, *tools.Registry, *builtin.InMemory) {
+	t.Helper()
+	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.UTC)
+	store := builtin.NewInMemory()
+	reg := tools.NewRegistry()
+	reg.NewProposalID = func() string { return "p_fixed" }
+	builtin.Register(reg, builtin.Options{Now: func() time.Time { return now }, Location: time.UTC, Memory: store, Reminders: store,
+		HTTP: &http.Client{Timeout: time.Millisecond, Transport: failingTransport{}}})
+	g := actions.New(reg, time.Minute, func() time.Time { return now })
+	s := New(Options{Registry: reg0(t), Runtime: &local.Runtime{}, Tools: reg, Gate: g, Now: func() time.Time { return now }})
+	t.Cleanup(s.Close)
+	return s, reg, store
+}
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("network disabled in tests")
+}
+
+func reg0(t *testing.T) *contract.Registry { return reg(t) }
+
+func TestProposeConfirmFlow(t *testing.T) {
+	s, _, store := gated(t)
+	ch, unsub := s.Subscribe(0)
+	defer unsub()
+	out, err := s.Handle("remind me to call Ana at 17:00", runtime.SourceVoice)
+	if err != nil || out.Handled != "turn" {
+		t.Fatalf("handle = %+v %v", out, err)
+	}
+	statuses := map[string]bool{}
+	note := func(evs []map[string]any) {
+		for _, e := range evs {
+			if e["type"] == "proposal" {
+				statuses[e["status"].(string)] = true
+			}
+		}
+	}
+	note(drainUntil(t, ch, "turn_done", out.TurnID))
+	s.WaitTurn(out.TurnID)
+	spec := s.Spec()
+	if _, ok := spec.Nodes["confirm_p_fixed"]; !ok {
+		t.Fatalf("confirm card missing: %v", spec.Nodes)
+	}
+	if len(s.Snapshot()["pending_proposals"].([]gen.Proposal)) != 1 {
+		t.Fatal("snapshot lacks the proposal")
+	}
+	// A confirmation phrase confirms instead of starting a turn.
+	out, err = s.Handle("yes, do it!", runtime.SourceVoice)
+	if err != nil || out.Handled != "confirmed" || out.ProposalID != "p_fixed" {
+		t.Fatalf("handle = %+v %v", out, err)
+	}
+	note(drainUntil(t, ch, "speech", ""))
+	if !statuses["pending"] || !statuses["confirmed"] || !statuses["executed"] {
+		t.Fatalf("statuses = %v", statuses)
+	}
+	if rs := store.Reminders(); len(rs) != 1 || rs[0].Text != "remind me to call Ana at 17:00" {
+		t.Fatalf("reminders = %+v", rs)
+	}
+	spec = s.Spec()
+	if _, ok := spec.Nodes["confirm_p_fixed"]; ok {
+		t.Fatal("confirm card not removed")
+	}
+	if _, ok := spec.Nodes["status_reminder"]; !ok {
+		t.Fatal("reminder status card missing")
+	}
+	if len(s.PendingProposals()) != 0 {
+		t.Fatal("proposal still pending")
+	}
+	// A second confirmation phrase with nothing pending is a normal turn.
+	out, _ = s.Handle("ok", runtime.SourceKeyboard)
+	if out.Handled != "turn" {
+		t.Fatalf("handle = %+v", out)
+	}
+}
+
+func TestRejectAndExpireFlow(t *testing.T) {
+	s, _, store := gated(t)
+	out, _ := s.Handle("remind me to call Ana", runtime.SourceKeyboard)
+	s.WaitTurn(out.TurnID)
+	if out, err := s.Handle("no", runtime.SourceVoice); err != nil || out.Handled != "rejected" {
+		t.Fatalf("reject = %+v %v", out, err)
+	}
+	if len(store.Reminders()) != 0 || len(s.PendingProposals()) != 0 {
+		t.Fatal("reject executed or left the proposal")
+	}
+	if _, ok := s.Spec().Nodes["confirm_p_fixed"]; ok {
+		t.Fatal("card not removed on reject")
+	}
+	// Expiry: the gate clock is fixed, so use a gate with a tiny TTL.
+	s2, reg2, _ := gated(t)
+	_ = reg2
+	s2.o.Gate = actions.New(reg2, time.Nanosecond, time.Now)
+	out, _ = s2.Handle("remind me", runtime.SourceKeyboard)
+	s2.WaitTurn(out.TurnID)
+	time.Sleep(time.Millisecond)
+	if n := s2.ExpireProposals(); n != 1 {
+		t.Fatalf("expired %d", n)
+	}
+	if _, ok := s2.Spec().Nodes["confirm_p_fixed"]; ok {
+		t.Fatal("card not removed on expiry")
+	}
+}
+
+func TestFireActionToolAndProposeKinds(t *testing.T) {
+	s, _, _ := gated(t)
+	out, _ := s.Handle("show me a map of Lisbon", runtime.SourceKeyboard)
+	s.WaitTurn(out.TurnID)
+	// The map card's Navigate action is a propose of open_directions with a bound arg.
+	if err := s.FireAction("nav", "card"); err != nil {
+		t.Fatalf("propose action: %v", err)
+	}
+	p := s.PendingProposals()
+	if len(p) != 1 || p[0].Tool != "open_directions" {
+		t.Fatalf("pending = %+v", p)
+	}
+	to, _ := p[0].Args["to"].([]any)
+	if len(to) != 2 {
+		t.Fatalf("bound arg not resolved: %v", p[0].Args)
+	}
+	// Confirm via the Enter action wired on the card.
+	if err := s.FireAction("confirm_p_fixed_yes", ""); err != nil {
+		t.Fatalf("confirm action: %v", err)
+	}
+	spec := s.Spec()
+	if spec.Root == nil || *spec.Root != "route_map" {
+		t.Fatalf("directions not rendered (routing falls back to a straight line): root=%v", spec.Root)
+	}
+	// A plain tool action runs immediately.
+	if err := s.publishLocalOp(map[string]any{"op": "set_action", "id": "t", "action": map[string]any{"kind": "tool", "tool": "get_time", "args": map[string]any{}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FireAction("t", ""); err != nil {
+		t.Fatal(err)
+	}
+	tr := s.Snapshot()["transcript"].([]gen.TranscriptEntry)
+	if last := tr[len(tr)-1]; last.Role != "agent" || !strings.Contains(last.Text, "14:00") {
+		t.Fatalf("tool result not spoken: %+v", last)
+	}
+}
+
+func TestLocalRuntimeUsesRegistryForTime(t *testing.T) {
+	s, _, _ := gated(t)
+	out, _ := s.Handle("what time is it", runtime.SourceKeyboard)
+	s.WaitTurn(out.TurnID)
+	tr := s.Snapshot()["transcript"].([]gen.TranscriptEntry)
+	if !strings.Contains(tr[len(tr)-1].Text, "14:00 on Thursday 29 October 2026") {
+		t.Fatalf("reply = %q", tr[len(tr)-1].Text)
 	}
 }

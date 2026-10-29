@@ -73,9 +73,10 @@ type ToolDefinition struct {
 
 // ToolResult is what a tool returned.
 type ToolResult struct {
-	Content  string          `json:"content"`            // text for the model
-	Data     json.RawMessage `json:"data,omitempty"`     // structured result for bindings
-	Proposal *Proposal       `json:"proposal,omitempty"` // set when confirmation is required
+	Content  string            `json:"content"`            // text for the model
+	Data     json.RawMessage   `json:"data,omitempty"`     // structured result for bindings
+	Ops      []json.RawMessage `json:"ops,omitempty"`      // spec ops presenting the result (applied by the session)
+	Proposal *Proposal         `json:"proposal,omitempty"` // set when confirmation is required
 }
 
 // Proposal is a side effect awaiting confirmation (VISION.md 5.6).

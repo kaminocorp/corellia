@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applyOps, emptySpec, type SpecOp } from "../contract";
-import { assignHotkeys, placement, resolveNode, withDefaults } from "./resolve";
+import { assignHotkeys, floatingOverlays, placement, resolveNode, withDefaults } from "./resolve";
 
 const build = (ops: SpecOp[]) => applyOps(emptySpec(), ops);
 
@@ -42,5 +42,19 @@ describe("placement", () => {
     expect(placement(build([{ op: "add_node", id: "s", node: { type: "Split", props: {} } }, { op: "set_root", id: "s" }]))).toBe("full");
     expect(placement(build([{ op: "add_node", id: "c", node: { type: "Card", props: {} } }, { op: "set_root", id: "c" }]))).toBe("panel");
     expect(placement(build([{ op: "set_root", id: "ghost" }]))).toBe("none");
+  });
+});
+
+describe("floatingOverlays", () => {
+  it("lists overlays that are neither root nor referenced", () => {
+    const spec = build([
+      { op: "add_node", id: "root", node: { type: "Overlay", props: {}, slots: { content: ["inner"] } } },
+      { op: "add_node", id: "inner", node: { type: "Overlay", props: {} } },
+      { op: "add_node", id: "b", node: { type: "Overlay", props: {} } },
+      { op: "add_node", id: "a", node: { type: "Overlay", props: {} } },
+      { op: "add_node", id: "card", node: { type: "Card", props: {} } },
+      { op: "set_root", id: "root" },
+    ]);
+    expect(floatingOverlays(spec)).toEqual(["a", "b"]);
   });
 });

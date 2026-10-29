@@ -15,8 +15,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hejijunhao/corellia/backend/internal/actions"
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/contract/gen"
+	"github.com/hejijunhao/corellia/backend/internal/decision"
 	"github.com/hejijunhao/corellia/backend/internal/runtime"
 	"github.com/hejijunhao/corellia/backend/internal/uispec"
 )
@@ -28,6 +30,12 @@ type Options struct {
 	Runtime   runtime.AgentRuntime
 	Registry  *contract.Registry
 	Tools     runtime.ToolCaller
+	// Gate holds proposals (nil: proposals are recorded but not confirmable).
+	Gate *actions.Gate
+	// Decider chooses modality, speech and timing (nil: decision.NewRules()).
+	Decider decision.Decider
+	// ExpireEvery is the proposal expiry sweep interval (0: 5s).
+	ExpireEvery time.Duration
 	// Now is the wall clock; defaults to time.Now.
 	Now func() time.Time
 	// HistoryLimit is how many transcript entries a runtime sees.
@@ -106,6 +114,12 @@ func New(o Options) *Session {
 	if o.TTS == "" {
 		o.TTS = "none"
 	}
+	if o.Decider == nil {
+		o.Decider = decision.NewRules()
+	}
+	if o.ExpireEvery <= 0 {
+		o.ExpireEvery = 5 * time.Second
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{
 		o:         o,
@@ -122,6 +136,9 @@ func New(o Options) *Session {
 		s.bus.OnInvalid = func(ev map[string]any, err error) {
 			o.Logger.Error("session: dropped off-contract event", "type", ev["type"], "err", err)
 		}
+	}
+	if o.Gate != nil {
+		go s.expireLoop(o.ExpireEvery)
 	}
 	return s
 }
@@ -163,6 +180,11 @@ func (s *Session) Snapshot() map[string]any {
 	for _, p := range s.proposals {
 		if p.ExpiresAt.After(now) {
 			pending = append(pending, p.Proposal)
+		}
+	}
+	if s.o.Gate != nil {
+		for _, p := range s.o.Gate.Pending() {
+			pending = append(pending, toGen(p))
 		}
 	}
 	transcript := s.transcript
@@ -282,13 +304,23 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 		if text != "" {
 			s.appendTranscriptLocked(gen.TranscriptEntry{Role: gen.TranscriptEntryRoleAgent, Text: text, Ts: s.o.Now(), TurnID: ptr(gen.TurnID(turn.ID))})
 		}
+		rootFit := s.rootFitLocked()
+		busy := s.spec.Root != nil
 		s.mu.Unlock()
-		if text != "" && status != gen.TurnDoneEventStatusCancelled {
-			s.bus.Publish("speech", map[string]any{"turn_id": turn.ID, "text": text, "final": true})
+
+		d := s.o.Decider.Decide(decision.Input{
+			Source: turn.Source, UserText: turn.Text, ReplyText: text, SpecChanged: specTouched,
+			RootFit: rootFit, ScreenBusy: busy, Now: s.o.Now(),
+		})
+		if status != gen.TurnDoneEventStatusCancelled && d.Respond {
+			if d.AutoCard && text != "" {
+				s.showReplyCard(text, d.AutoCardTTL)
+			}
+			s.publishSpeech(turn.ID, d.Speech)
 		}
-		modality := "voice"
-		if specTouched {
-			modality = "both"
+		modality := string(d.Modality)
+		if status == gen.TurnDoneEventStatusCancelled {
+			modality = string(decision.ModalityNone)
 		}
 		s.bus.Publish("turn_done", map[string]any{"turn_id": turn.ID, "status": status, "text": text, "modality": modality})
 		s.bus.Publish("state", map[string]any{"state": gen.AgentStateIdle, "turn_id": turn.ID})
@@ -329,9 +361,16 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 				res["summary"] = truncate(ev.Result.Content, 200)
 			}
 			s.bus.Publish("tool_result", res)
+			if ev.Result != nil {
+				for _, raw := range ev.Result.Ops {
+					if s.applyOp(turn.ID, raw) {
+						specTouched = true
+					}
+				}
+			}
 		case runtime.EventProposal:
 			if ev.Proposal != nil {
-				s.addProposal(turn.ID, *ev.Proposal)
+				s.propose(turn.ID, *ev.Proposal)
 			}
 		case runtime.EventError:
 			msg := "unknown error"
@@ -360,25 +399,25 @@ func (s *Session) setState(st gen.AgentState, turnID string) {
 	s.mu.Lock()
 	s.state = st
 	s.mu.Unlock()
-	s.bus.Publish("state", map[string]any{"state": st, "turn_id": turnID})
+	s.bus.Publish("state", withTurn(map[string]any{"state": st}, turnID))
 }
 
 // applyOp validates and applies one op; invalid ops become non-fatal
 // error events and are dropped. Returns true if the spec changed.
 func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 	if s.o.Registry == nil {
-		s.bus.Publish("error", map[string]any{"turn_id": turnID, "code": "no_registry", "message": "spec ops need a contract registry"})
+		s.bus.Publish("error", withTurn(map[string]any{"code": "no_registry", "message": "spec ops need a contract registry"}, turnID))
 		return false
 	}
 	op, err := s.o.Registry.DecodeOp(raw)
 	if err != nil {
-		s.bus.Publish("error", map[string]any{"turn_id": turnID, "code": "invalid_op", "message": err.Error()})
+		s.bus.Publish("error", withTurn(map[string]any{"code": "invalid_op", "message": err.Error()}, turnID))
 		return false
 	}
 	s.mu.Lock()
 	if e := s.v.CheckOp(&s.spec, op); e != nil {
 		s.mu.Unlock()
-		s.bus.Publish("error", map[string]any{"turn_id": turnID, "code": e.Code, "message": e.Error()})
+		s.bus.Publish("error", withTurn(map[string]any{"code": e.Code, "message": e.Error()}, turnID))
 		return false
 	}
 	if err := uispec.Apply(&s.spec, op); err != nil {
@@ -388,7 +427,7 @@ func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 		if errors.As(err, &re) {
 			code = re.Code
 		}
-		s.bus.Publish("error", map[string]any{"turn_id": turnID, "code": code, "message": err.Error()})
+		s.bus.Publish("error", withTurn(map[string]any{"code": code, "message": err.Error()}, turnID))
 		return false
 	}
 	var issues []uispec.Error
@@ -398,9 +437,9 @@ func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 	s.mu.Unlock()
 	var opMap map[string]any
 	_ = json.Unmarshal(raw, &opMap)
-	s.bus.Publish("spec_op", map[string]any{"turn_id": turnID, "op": opMap})
+	s.bus.Publish("spec_op", withTurn(map[string]any{"op": opMap}, turnID))
 	for _, is := range issues {
-		s.bus.Publish("error", map[string]any{"turn_id": turnID, "code": is.Code, "message": is.Error()})
+		s.bus.Publish("error", withTurn(map[string]any{"code": is.Code, "message": is.Error()}, turnID))
 	}
 	return true
 }
@@ -429,12 +468,18 @@ func (s *Session) addProposal(turnID string, p runtime.Proposal) {
 	s.bus.Publish("proposal", map[string]any{"turn_id": turnID, "proposal": gp, "status": "pending"})
 }
 
-// PendingProposals lists unexpired proposals.
+// PendingProposals lists unexpired proposals (gate first, then any
+// recorded without a gate).
 func (s *Session) PendingProposals() []gen.Proposal {
+	var out []gen.Proposal
+	if s.o.Gate != nil {
+		for _, p := range s.o.Gate.Pending() {
+			out = append(out, toGen(p))
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.o.Now()
-	var out []gen.Proposal
 	for _, p := range s.proposals {
 		if p.ExpiresAt.After(now) {
 			out = append(out, p.Proposal)
@@ -552,7 +597,90 @@ func (s *Session) FireAction(actionID string, nodeID string) error {
 		}
 		_, _, err := s.StartTurn(*action.Message, runtime.SourceAction)
 		return err
+	case gen.ActionKindTool:
+		if action.Tool == nil {
+			return ErrActionNotFound
+		}
+		args := s.resolveArgs(map[string]any(action.Args))
+		switch *action.Tool {
+		case "confirm_proposal":
+			id, _ := args["proposal_id"].(string)
+			return s.Confirm(id, runtime.SourceKeyboard)
+		case "reject_proposal":
+			id, _ := args["proposal_id"].(string)
+			return s.Reject(id, runtime.SourceKeyboard)
+		}
+		return s.runTool(*action.Tool, args)
+	case gen.ActionKindPropose:
+		if action.Tool == nil || s.o.Tools == nil || s.o.Gate == nil {
+			return ErrActionUnsupported
+		}
+		reg, ok := s.o.Tools.(interface {
+			Proposal(name string, args map[string]any) (runtime.Proposal, error)
+		})
+		if !ok {
+			return ErrActionUnsupported
+		}
+		p, err := reg.Proposal(*action.Tool, s.resolveArgs(map[string]any(action.Args)))
+		if err != nil {
+			return err
+		}
+		if action.Risk != "" {
+			p.Risk = string(action.Risk)
+		}
+		s.propose("", p)
+		return nil
 	default:
 		return ErrActionUnsupported
+	}
+}
+
+// rootFitLocked returns the fit class of the root component ("" when empty).
+func (s *Session) rootFitLocked() string {
+	if s.spec.Root == nil || s.o.Registry == nil {
+		return ""
+	}
+	n, ok := s.spec.Nodes[*s.spec.Root]
+	if !ok {
+		return ""
+	}
+	if n.Type == "Overlay" {
+		return "glance"
+	}
+	def, ok := s.o.Registry.Component(string(n.Type))
+	if !ok {
+		return ""
+	}
+	hasFull, hasGlance := false, false
+	for _, f := range def.Fit {
+		if f == gen.FitFull {
+			hasFull = true
+		}
+		if f == gen.FitGlance {
+			hasGlance = true
+		}
+	}
+	if hasFull && !hasGlance {
+		return "full"
+	}
+	return "panel"
+}
+
+// showReplyCard renders the reply text as a floating glance card.
+func (s *Session) showReplyCard(text string, ttl time.Duration) {
+	ttlMs := int(ttl / time.Millisecond)
+	if ttlMs < 1000 {
+		ttlMs = 1000
+	}
+	ops := []map[string]any{
+		{"op": "add_node", "id": "reply_card_text", "node": map[string]any{"type": "Markdown", "props": map[string]any{"text": truncate(text, 1200), "size": "md"}}},
+		{"op": "add_node", "id": "reply_card_body", "node": map[string]any{"type": "Card", "props": map[string]any{"accent": "primary"}, "slots": map[string]any{"body": []string{"reply_card_text"}}, "ttl_ms": ttlMs}},
+		{"op": "add_node", "id": "reply_card", "node": map[string]any{"type": "Overlay", "props": map[string]any{"position": "top_right"}, "slots": map[string]any{"content": []string{"reply_card_body"}}, "ttl_ms": ttlMs}},
+	}
+	for _, op := range ops {
+		if err := s.publishLocalOp(op); err != nil {
+			s.o.Logger.Error("session: reply card", "err", err)
+			return
+		}
 	}
 }

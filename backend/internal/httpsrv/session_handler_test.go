@@ -209,3 +209,17 @@ func TestActionAndScreenEndpoints(t *testing.T) {
 		t.Fatal("not cleared")
 	}
 }
+
+func TestConfirmEndpoints(t *testing.T) {
+	h, _ := sessionServer(t)
+	if rec := post(h, "/api/action/confirm", `{"proposal_id":"x"}`); rec.Code != 501 {
+		t.Fatalf("confirm without gate: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := post(h, "/api/action/reject", `{}`); rec.Code != 400 {
+		t.Fatalf("reject without id: %d", rec.Code)
+	}
+	rec := post(h, "/api/turn", `{"text":"hello"}`)
+	if rec.Code != 202 || !strings.Contains(rec.Body.String(), `"handled":"turn"`) {
+		t.Fatalf("turn: %d %s", rec.Code, rec.Body.String())
+	}
+}
