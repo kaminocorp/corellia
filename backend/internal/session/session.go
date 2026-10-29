@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/hejijunhao/corellia/backend/internal/actions"
+	"github.com/hejijunhao/corellia/backend/internal/catalog"
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/contract/gen"
 	"github.com/hejijunhao/corellia/backend/internal/decision"
@@ -57,6 +58,8 @@ type Session struct {
 	o   Options
 	bus *Bus
 	v   *uispec.Validator
+
+	catalogDesc string
 
 	mu         sync.Mutex
 	state      gen.AgentState
@@ -132,6 +135,7 @@ func New(o Options) *Session {
 	}
 	if o.Registry != nil {
 		s.v = uispec.NewValidator(o.Registry)
+		s.catalogDesc = catalog.Describe(o.Registry, nil)
 		s.bus.Validate = func(ev map[string]any) error { return o.Registry.ValidateEvent(ev) }
 		s.bus.OnInvalid = func(ev map[string]any, err error) {
 			o.Logger.Error("session: dropped off-contract event", "type", ev["type"], "err", err)
@@ -243,6 +247,7 @@ func (s *Session) StartTurn(text string, source runtime.Source) (turnID string, 
 	now := s.o.Now()
 	s.appendTranscriptLocked(gen.TranscriptEntry{Role: gen.TranscriptEntryRoleUser, Text: text, Ts: now, TurnID: ptr(gen.TurnID(turnID)), Source: ptr(gen.TranscriptEntrySource(source))})
 	history := s.historyLocked()
+	screen := s.screenSummaryLocked()
 	ctx, cancel := context.WithCancel(s.baseCtx)
 	at := &activeTurn{id: turnID, cancel: cancel, done: make(chan struct{})}
 	s.active = at
@@ -257,7 +262,7 @@ func (s *Session) StartTurn(text string, source runtime.Source) (turnID string, 
 		Text:    text,
 		Source:  source,
 		History: history,
-		Context: runtime.Context{AgentName: s.o.AgentName, Tools: s.o.Tools, Now: s.o.Now},
+		Context: runtime.Context{AgentName: s.o.AgentName, Tools: s.o.Tools, Now: s.o.Now, CatalogDescription: s.catalogDesc, ScreenSummary: screen},
 	}
 	go s.run(ctx, at, turn)
 	return turnID, cancelled, nil
@@ -633,6 +638,18 @@ func (s *Session) FireAction(actionID string, nodeID string) error {
 	default:
 		return ErrActionUnsupported
 	}
+}
+
+// screenSummaryLocked describes what is on screen for the runtime prompt.
+func (s *Session) screenSummaryLocked() string {
+	if s.spec.Root == nil {
+		return ""
+	}
+	n, ok := s.spec.Nodes[*s.spec.Root]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("a %s with %d nodes (root id %q)", n.Type, len(s.spec.Nodes), *s.spec.Root)
 }
 
 // rootFitLocked returns the fit class of the root component ("" when empty).

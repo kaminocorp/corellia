@@ -36,6 +36,20 @@ type Config struct {
 	// present and falls back to local (Phase 7 adds the cloud ones).
 	Runtime string `env:"CORELLIA_RUNTIME" envDefault:"auto"`
 
+	// AnthropicAPIKey enables the anthropic runtime.
+	AnthropicAPIKey string `env:"ANTHROPIC_API_KEY"`
+	// OpenAIAPIKey / OpenAIBaseURL enable the openai-compatible runtime
+	// (DeepSeek: OPENAI_BASE_URL=https://api.deepseek.com/v1).
+	OpenAIAPIKey  string `env:"OPENAI_API_KEY"`
+	OpenAIBaseURL string `env:"OPENAI_BASE_URL"`
+	// Model overrides the cloud runtime's model id (CORELLIA_MODEL).
+	Model string `env:"CORELLIA_MODEL"`
+	// Effort for the anthropic runtime: low (default), medium, high, xhigh, max.
+	Effort string `env:"CORELLIA_EFFORT" envDefault:"low"`
+	// HermesURL / HermesToken point at the Hermes chat sidecar.
+	HermesURL   string `env:"CORELLIA_HERMES_URL"`
+	HermesToken string `env:"CORELLIA_HERMES_TOKEN"`
+
 	// DevOrigins are extra origins allowed by CORS (the Vite dev server by
 	// default). Comma-separated. The Vite proxy makes this unnecessary in
 	// the default dev setup; it exists for running the client from another
@@ -67,6 +81,11 @@ func (c Config) Validate() error {
 	case "auto", "local", "anthropic", "openai", "hermes":
 	default:
 		return fmt.Errorf("config: CORELLIA_RUNTIME %q is not one of auto|local|anthropic|openai|hermes", c.Runtime)
+	}
+	switch c.Effort {
+	case "low", "medium", "high", "xhigh", "max":
+	default:
+		return fmt.Errorf("config: CORELLIA_EFFORT %q is not one of low|medium|high|xhigh|max", c.Effort)
 	}
 	if t := c.DeviceToken; t != "" && len(t) < 16 {
 		return fmt.Errorf("config: CORELLIA_DEVICE_TOKEN must be at least 16 characters when set")

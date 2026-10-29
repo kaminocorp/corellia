@@ -245,7 +245,7 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 4 Component library and renderer | done 2026-10-29 | [`../completions/phase-04-component-library-and-renderer.md`](../completions/phase-04-component-library-and-renderer.md) | 0.15.4 |
 | 5 3D agent | done 2026-10-29 | [`../completions/phase-05-3d-agent.md`](../completions/phase-05-3d-agent.md) | 0.15.5 |
 | 6 Decision layer, actions, tools | done 2026-10-29 | [`../completions/phase-06-decision-actions-tools.md`](../completions/phase-06-decision-actions-tools.md) | 0.15.6 |
-| 7 Cloud runtimes and spike | pending | | |
+| 7 Cloud runtimes and spike | done 2026-10-29 | [`../completions/phase-07-cloud-runtimes-and-spike.md`](../completions/phase-07-cloud-runtimes-and-spike.md) | 0.15.7 |
 | 8 Voice | pending | | |
 | 9 Memory, persistence, proactivity | pending | | |
 | 10 Display box, hardening, docs | pending | | |

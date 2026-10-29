@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)](#0157---phase-7-cloud-runtimes-anthropic-streaming--tool-use-openai-compatibledeepseek-hermes-sidecar-deepseek-harness-stub--runtime-selector--runtime-spike-2026-10-29)
 - [0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)](#0156---phase-6-decision-layer-rules--proposeconfirm-gate--tool-registry-with-built-ins-time-geocode-weather-memory-reminders-directions-show_ui--confirm-cards-and-phrases-2026-10-29)
 - [0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)](#0155---phase-5-3d-agent-r3f-nebula-state-machine-audio-hook-adaptive-resolution-fallback-stats-overlay-2026-10-29)
 - [0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)](#0154---phase-4-component-library-15-components--renderer-bindings-hotkeys-decay-placement--catalog-describerank--action-and-screen-endpoints-2026-10-29)
@@ -88,6 +89,25 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)
+
+Roadmap Phase 7. Full notes: [`completions/phase-07-cloud-runtimes-and-spike.md`](completions/phase-07-cloud-runtimes-and-spike.md).
+
+### Added
+
+- **`runtime/anthropic`**: Claude via the Anthropic Go SDK (beta Messages API): streaming text, manual tool loop over the registry, `show_ui` → spec ops, effort (`CORELLIA_EFFORT`, default low), server-side refusal fallbacks on by default, model `claude-opus-5-5` by default.
+- **`runtime/openaicompat`**: streaming chat completions with function tools for any OpenAI-shaped endpoint (DeepSeek: `OPENAI_BASE_URL=https://api.deepseek.com/v1`).
+- **`runtime/hermes`**: sidecar `/chat` adapter with session priming and fenced ```corellia-ui``` ops. **`runtime/deepseek`**: `NotImplemented` stub for the OpenWorld harness.
+- **`runtime/prompt`** (shared system prompt) and **`runtime/toolexec`** (tool execution with proposal and op events). **`runtime/rtselect`** resolves `CORELLIA_RUNTIME` (`auto` by credentials). Config vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `CORELLIA_MODEL`, `CORELLIA_EFFORT`, `CORELLIA_HERMES_URL`, `CORELLIA_HERMES_TOKEN`.
+- **`cmd/runtime-spike`** runs the VISION 7 script and writes a report; `docs/executing/spikes/local-2026-10-29.md` committed.
+- Fixture-driven tests for all three wire formats; shared `rttest` doubles.
+
+### Edited
+
+- Session passes the catalog description and a screen summary to runtimes. `.env.example` documents the runtime variables.
+
+---
 
 ## 0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)
 

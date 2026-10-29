@@ -20,8 +20,7 @@ import (
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/decision"
 	"github.com/hejijunhao/corellia/backend/internal/httpsrv"
-	"github.com/hejijunhao/corellia/backend/internal/runtime"
-	"github.com/hejijunhao/corellia/backend/internal/runtime/local"
+	"github.com/hejijunhao/corellia/backend/internal/runtime/rtselect"
 	"github.com/hejijunhao/corellia/backend/internal/session"
 	"github.com/hejijunhao/corellia/backend/internal/tools"
 	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
@@ -56,8 +55,12 @@ func main() {
 	}
 	slog.Info("contract loaded", "components", len(reg.ComponentNames()))
 
-	rt := selectRuntime(cfg)
-	slog.Info("runtime selected", "runtime", rt.Name(), "requested", cfg.Runtime)
+	rt, detail, err := rtselect.Select(cfg)
+	if err != nil {
+		slog.Error("runtime", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("runtime selected", "runtime", rt.Name(), "requested", cfg.Runtime, "detail", detail)
 
 	toolReg := tools.NewRegistry()
 	builtin.Register(toolReg, builtin.Options{})
@@ -104,18 +107,5 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown", "err", err)
-	}
-}
-
-// selectRuntime resolves CORELLIA_RUNTIME. Until Phase 7 only the local
-// runtime exists; `auto` and any cloud name fall back to it with a log line
-// rather than failing, so a configured box keeps working without keys.
-func selectRuntime(cfg config.Config) runtime.AgentRuntime {
-	switch cfg.Runtime {
-	case "local", "auto":
-		return local.New()
-	default:
-		slog.Warn("runtime not available yet, using local", "requested", cfg.Runtime)
-		return local.New()
 	}
 }
