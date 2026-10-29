@@ -16,7 +16,11 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 
 	"github.com/hejijunhao/corellia/backend/internal/config"
+	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/httpsrv"
+	"github.com/hejijunhao/corellia/backend/internal/runtime"
+	"github.com/hejijunhao/corellia/backend/internal/runtime/local"
+	"github.com/hejijunhao/corellia/backend/internal/session"
 )
 
 // Set via -ldflags "-X main.version=... -X main.commit=...".
@@ -41,9 +45,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	reg, err := contract.Load()
+	if err != nil {
+		slog.Error("contract", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("contract loaded", "components", len(reg.ComponentNames()))
+
+	rt := selectRuntime(cfg)
+	slog.Info("runtime selected", "runtime", rt.Name(), "requested", cfg.Runtime)
+
+	sess := session.New(session.Options{
+		AgentName: cfg.AgentName,
+		Runtime:   rt,
+		Registry:  reg,
+	})
+	defer sess.Close()
+
 	handler := httpsrv.New(httpsrv.Deps{
-		Config: cfg,
-		Build:  httpsrv.BuildInfo{Version: version, Commit: commit},
+		Config:  cfg,
+		Build:   httpsrv.BuildInfo{Version: version, Commit: commit},
+		Session: httpsrv.NewSessionHandler(sess, reg),
+		Events:  httpsrv.NewEventsHandler(sess),
 	})
 
 	srv := &http.Server{
@@ -69,5 +92,18 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown", "err", err)
+	}
+}
+
+// selectRuntime resolves CORELLIA_RUNTIME. Until Phase 7 only the local
+// runtime exists; `auto` and any cloud name fall back to it with a log line
+// rather than failing, so a configured box keeps working without keys.
+func selectRuntime(cfg config.Config) runtime.AgentRuntime {
+	switch cfg.Runtime {
+	case "local", "auto":
+		return local.New()
+	default:
+		slog.Warn("runtime not available yet, using local", "requested", cfg.Runtime)
+		return local.New()
 	}
 }

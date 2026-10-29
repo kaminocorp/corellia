@@ -28,6 +28,10 @@ type Deps struct {
 	Build  BuildInfo
 	// Now is injectable for tests; defaults to time.Now.
 	Now func() time.Time
+	// Session routes. Nil leaves them unmounted (the health and static
+	// routes still work), which the Phase 1 tests rely on.
+	Session *SessionHandler
+	Events  http.Handler
 }
 
 // New builds the root http.Handler.
@@ -61,6 +65,15 @@ func New(d Deps) http.Handler {
 				"version":    d.Build.Version,
 			})
 		})
+		if d.Session != nil {
+			r.Get("/session", d.Session.GetSession)
+			r.Post("/turn", d.Session.PostTurn)
+			r.Post("/turn/cancel", d.Session.PostCancel)
+			r.Get("/catalog", d.Session.GetCatalog)
+		}
+		if d.Events != nil {
+			r.Get("/events", d.Events.ServeHTTP)
+		}
 		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
 		})

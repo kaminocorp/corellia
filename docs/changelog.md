@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)](#0153---phase-3-agentruntime-seam--local-runtime--session-with-sse-event-stream--client-session-store-2026-10-29)
 - [0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)](#0152---phase-2-shared-contract-json-schemas--v1-catalog--gots-codegen--validators--reducers-with-shared-fixtures-2026-10-29)
 - [0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)](#0151---phase-1-legacy-control-plane-removed--go-backend-skeleton-device-token-static-client--vite-client-skeleton-2026-10-29)
 - [0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)](#0150---vision-roadmap-ten-phase-implementation-plan--section-11-defaults-2026-10-29)
@@ -84,6 +85,23 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)
+
+Roadmap Phase 3. Full notes: [`completions/phase-03-session-events-local-runtime.md`](completions/phase-03-session-events-local-runtime.md).
+
+### Added
+
+- **`backend/internal/runtime`**: the `AgentRuntime` interface and event/tool types (the only seam to any model or harness). **`runtime/local`**: keyless scripted runtime (time with tool call, map of a city, table, chart, schedule, weather, reminder proposal, clear) emitting streamed text and valid spec ops.
+- **`backend/internal/session`**: event bus (seq numbers, replay, fan-out, on-contract validation) and the session (transcript, spec, agent state, proposals, one active turn with cancel-on-new-input, validated op application, `speech` and `turn_done` events).
+- **HTTP API**: `GET /api/session`, `POST /api/turn`, `POST /api/turn/cancel`, `GET /api/catalog`, `GET /api/events` (SSE with snapshot, replay via `Last-Event-ID`, heartbeats). `CORELLIA_RUNTIME` config var.
+- **Client**: device-token auth helpers, turn API, session store with the shared reducer, `EventSource` stream with per-event contract validation, transcript pane, agent-state header, `Esc` cancel, `?debug=1` pane.
+
+### Edited
+
+- `cmd/api/main.go` wires contract, runtime, session and handlers. `httpsrv.Deps` gains `Session` and `Events`.
+
+---
 
 ## 0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)
 

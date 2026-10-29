@@ -10,7 +10,7 @@ func TestLoadDefaults(t *testing.T) {
 		t.Setenv(k, "")
 	}
 	// t.Setenv to "" still counts as set for caarlos0/env; unset explicitly.
-	for _, k := range []string{"PORT", "CORELLIA_DEVICE_TOKEN", "CORELLIA_CLIENT_DIR", "CORELLIA_DATA_DIR", "CORELLIA_AGENT_NAME", "CORELLIA_DEV_ORIGINS"} {
+	for _, k := range []string{"PORT", "CORELLIA_DEVICE_TOKEN", "CORELLIA_CLIENT_DIR", "CORELLIA_DATA_DIR", "CORELLIA_AGENT_NAME", "CORELLIA_DEV_ORIGINS", "CORELLIA_RUNTIME"} {
 		unsetenv(t, k)
 	}
 	cfg, err := Load()
@@ -23,6 +23,9 @@ func TestLoadDefaults(t *testing.T) {
 	if !cfg.DevMode() {
 		t.Errorf("DevMode = false, want true with no token")
 	}
+	if cfg.Runtime != "auto" {
+		t.Errorf("Runtime = %q", cfg.Runtime)
+	}
 	if cfg.AgentName != "Corellia" {
 		t.Errorf("AgentName = %q", cfg.AgentName)
 	}
@@ -32,7 +35,7 @@ func TestLoadDefaults(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	base := Config{Port: 8080, AgentName: "Corellia"}
+	base := Config{Port: 8080, AgentName: "Corellia", Runtime: "auto"}
 	cases := []struct {
 		name    string
 		mutate  func(*Config)
@@ -44,6 +47,8 @@ func TestValidate(t *testing.T) {
 		{"blank name", func(c *Config) { c.AgentName = "  " }, "AGENT_NAME"},
 		{"short token", func(c *Config) { c.DeviceToken = "short" }, "DEVICE_TOKEN"},
 		{"long token ok", func(c *Config) { c.DeviceToken = strings.Repeat("x", 32) }, ""},
+		{"bad runtime", func(c *Config) { c.Runtime = "deepseek" }, "CORELLIA_RUNTIME"},
+		{"runtime local", func(c *Config) { c.Runtime = "local" }, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

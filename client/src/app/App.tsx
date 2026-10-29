@@ -1,51 +1,72 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { CommandInput } from "./CommandInput";
 import { ConnectionIndicator } from "./ConnectionIndicator";
-import { fetchHealth, type Health } from "../session/health";
+import { DebugPane } from "./DebugPane";
+import { Transcript } from "./Transcript";
+import { cancelTurn, sendTurn } from "../session/api";
+import { fetchHealth } from "../session/health";
+import { sessionStore, useSessionState } from "../session/store";
+import { SessionStream } from "../session/stream";
 
 /**
- * Phase 1 shell: a black full-screen page with the always-focused command
- * input and a connection indicator. Later phases mount the 3D agent, the
- * generated-UI renderer, the transcript and the mic indicator here.
+ * The display shell. Phase 3: header (name, connection, agent state), a
+ * placeholder focal area, the transcript and the always-focused input.
+ * Later phases mount the 3D agent and the generated-UI renderer here.
  */
 export function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [lastLine, setLastLine] = useState<string>("");
+  const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const debug = params.get("debug") === "1";
+  const [devMode, setDevMode] = useState(false);
+  const { connection, agentName, agentState, activeTurnId } = useSessionState((s) => ({
+    connection: s.connection,
+    agentName: s.agentName,
+    agentState: s.agentState,
+    activeTurnId: s.activeTurnId,
+  }));
 
   useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      const h = await fetchHealth();
-      if (!cancelled) setHealth(h);
-    };
-    void tick();
-    const id = window.setInterval(tick, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
+    const stream = new SessionStream(sessionStore);
+    stream.connect();
+    void fetchHealth().then((h) => setDevMode(h?.dev_mode ?? false));
+    return () => stream.disconnect();
   }, []);
+
+  const onSubmit = (text: string) => {
+    sendTurn(text, "keyboard").catch((e: Error) => sessionStore.addError("send_failed", e.message));
+  };
+  const onCancel = () => {
+    if (activeTurnId) cancelTurn().catch(() => {});
+  };
 
   return (
     <main className="relative flex h-full w-full flex-col items-center justify-center">
-      <header className="absolute top-4 left-5 flex items-center gap-3 font-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
-        <span>Corellia</span>
-        <ConnectionIndicator health={health} />
+      <header className="absolute top-4 left-5 flex items-center gap-4 font-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
+        <span>{agentName}</span>
+        <ConnectionIndicator status={connection} devMode={devMode} />
+        <span data-testid="agent-state" className={agentState === "idle" ? "" : "text-foreground"}>
+          {agentState}
+        </span>
       </header>
 
-      <section className="flex flex-col items-center gap-6">
+      <section className="flex flex-col items-center gap-6" aria-hidden>
         <div
-          aria-hidden
-          className="h-40 w-40 rounded-full border border-border opacity-60"
-          style={{ boxShadow: "0 0 80px hsl(142 71% 45% / 0.15) inset" }}
+          className="h-40 w-40 rounded-full border border-border transition-opacity duration-500"
+          style={{
+            opacity: agentState === "idle" ? 0.5 : 1,
+            boxShadow: `0 0 80px var(--color-state-${agentState}) inset`,
+          }}
         />
-        <p className="font-mono text-sm text-muted-foreground">{lastLine || "Type and press Enter."}</p>
       </section>
 
       <footer className="absolute bottom-6 w-full max-w-3xl px-6">
-        <CommandInput onSubmit={(text) => setLastLine(`You said: ${text}`)} />
+        <div className="mb-4">
+          <Transcript />
+        </div>
+        <CommandInput onSubmit={onSubmit} onEscapeEmpty={onCancel} />
       </footer>
+
+      {debug && <DebugPane />}
     </main>
   );
 }

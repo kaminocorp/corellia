@@ -31,6 +31,11 @@ type Config struct {
 	// AgentName is the product-facing name of the agent.
 	AgentName string `env:"CORELLIA_AGENT_NAME" envDefault:"Corellia"`
 
+	// Runtime selects the AgentRuntime: auto, local, anthropic, openai or
+	// hermes. `auto` picks the first cloud runtime whose credentials are
+	// present and falls back to local (Phase 7 adds the cloud ones).
+	Runtime string `env:"CORELLIA_RUNTIME" envDefault:"auto"`
+
 	// DevOrigins are extra origins allowed by CORS (the Vite dev server by
 	// default). Comma-separated. The Vite proxy makes this unnecessary in
 	// the default dev setup; it exists for running the client from another
@@ -57,6 +62,11 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.AgentName) == "" {
 		return fmt.Errorf("config: CORELLIA_AGENT_NAME must not be blank")
+	}
+	switch c.Runtime {
+	case "auto", "local", "anthropic", "openai", "hermes":
+	default:
+		return fmt.Errorf("config: CORELLIA_RUNTIME %q is not one of auto|local|anthropic|openai|hermes", c.Runtime)
 	}
 	if t := c.DeviceToken; t != "" && len(t) < 16 {
 		return fmt.Errorf("config: CORELLIA_DEVICE_TOKEN must be at least 16 characters when set")

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 type Props = {
   onSubmit: (text: string) => void;
+  /** Escape with an empty input (used to cancel the running turn). */
+  onEscapeEmpty?: () => void;
   placeholder?: string;
 };
 
@@ -10,7 +12,7 @@ type Props = {
  * whenever a printable key is pressed anywhere on the page (VISION 3,
  * "keyboard chat, always focused, no click needed").
  */
-export function CommandInput({ onSubmit, placeholder = "Say something…" }: Props) {
+export function CommandInput({ onSubmit, onEscapeEmpty, placeholder = "Say something…" }: Props) {
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
 
@@ -46,6 +48,7 @@ export function CommandInput({ onSubmit, placeholder = "Say something…" }: Pro
       e.preventDefault();
     }
     if (e.key === "Escape") {
+      if (value === "") onEscapeEmpty?.();
       setValue("");
     }
   };

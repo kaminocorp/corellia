@@ -1,17 +1,27 @@
-import type { Health } from "../session/health";
+import type { ConnectionStatus } from "../session/store";
 
-export function ConnectionIndicator({ health }: { health: Health | null }) {
-  const online = health?.ok === true;
+const LABEL: Record<ConnectionStatus, string> = {
+  connecting: "connecting",
+  online: "online",
+  reconnecting: "reconnecting",
+  offline: "offline",
+};
+
+export function ConnectionIndicator({ status, devMode }: { status: ConnectionStatus; devMode?: boolean }) {
+  const online = status === "online";
   return (
     <span className="flex items-center gap-2" data-testid="connection">
       <span
         aria-hidden
         className={
           "inline-block h-2 w-2 rounded-full " +
-          (online ? "bg-primary animate-telemetry" : "bg-destructive")
+          (online ? "bg-primary animate-telemetry" : status === "offline" ? "bg-destructive" : "bg-state-thinking animate-telemetry")
         }
       />
-      <span>{online ? `online${health?.dev_mode ? " · dev" : ""}` : "offline"}</span>
+      <span>
+        {LABEL[status]}
+        {online && devMode ? " · dev" : ""}
+      </span>
     </span>
   );
 }
