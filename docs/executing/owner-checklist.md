@@ -1,6 +1,6 @@
 # Owner checklist: the two runs only you can do
 
-**Why this exists.** Everything in Corellia that can be verified without an API key or a microphone has been (Phase 13, [`review-2026-10-30.md`](review-2026-10-30.md)). Two things cannot: a live model (review item 2) and voice on a real Mac (item 6). This is the whole list, in order, with what to record. Budget: about an hour. Do it on the Mac you will use, in Chrome.
+**Why this exists.** Everything in Corellia that can be verified without an API key or a microphone has been (Phases 13 and 14, [`review-2026-10-30.md`](review-2026-10-30.md) and [`review-2026-10-30-round3.md`](review-2026-10-30-round3.md)). Two things cannot: a live model (review item 2) and voice on a real Mac (item 6). This is the whole list, in order, with what to record. Budget: about an hour. Do it on the Mac you will use, in Chrome.
 
 Before either run:
 
@@ -14,7 +14,7 @@ pnpm check                    # must be green locally before you trust anything 
 
 ## A. Live model (review item 2, VISION 7 decision)
 
-1. **Key.** Put `ANTHROPIC_API_KEY=...` in `backend/.env` (template: [`../../.env.example`](../../.env.example)). Leave `CORELLIA_MODEL`, `CORELLIA_EFFORT` and `CORELLIA_ANTHROPIC_FALLBACKS` at their defaults for the first run.
+1. **Key.** Put `ANTHROPIC_API_KEY=...` in `backend/.env` (template: [`../../.env.example`](../../.env.example)). It is the only credential the runtime reads: the SDK's own environment and `ant auth` profiles are ignored. Leave `CORELLIA_MODEL`, `CORELLIA_EFFORT`, `CORELLIA_MAX_TOKENS` and `CORELLIA_ANTHROPIC_FALLBACKS` at their defaults for the first run.
 2. **Live check.**
    ```bash
    scripts/anthropic-live-check.sh --check-only
@@ -29,7 +29,7 @@ pnpm check                    # must be green locally before you trust anything 
    ```bash
    pnpm -C client build && cd backend && go run ./cmd/api
    ```
-   Open http://localhost:8080. The header must say the model name, not **local demo**. Try: "what's the weather in Lisbon tomorrow", "show me a table of the planets", "remind me in 2 minutes to stretch" (confirm with Enter; the reminder must fire as a card and speech), "clear". Then break one turn on purpose (switch the Wi-Fi off, or put a wrong key in `backend/.env` and restart): the apology must be one short sentence ("I can't reach the model service." or "The model service rejected my credentials."), the header must stay **online**, and the next turn after the fix must work. ("Simulate a failure" is a local-runtime intent only.)
+   Open http://localhost:8080. The header must say **anthropic** (the runtime name; `app/runtimeLabel.ts`), not **local demo**. Try: "what's the weather in Lisbon tomorrow", "show me a table of the planets", "remind me in 2 minutes to stretch" (confirm with Enter; the reminder must fire as a card and speech), "clear". Then break one turn on purpose (switch the Wi-Fi off, or put a wrong key in `backend/.env` and restart): the apology must be one short sentence ("I can't reach the model service." or "The model service rejected my credentials."), the header must stay **online**, the red error line under the transcript must stay empty (the raw provider error is in the server log and in `?debug=1`), and the next turn after the fix must work. ("Simulate a failure" is a local-runtime intent only.) If a long answer ends with "…" and "My reply was cut off before it finished", raise `CORELLIA_MAX_TOKENS` (default 64000; thinking counts toward it) and note it below.
 5. **Record.** Commit the spike report. In [`roadmap.md`](roadmap.md) section 1, fill the VISION 7 line: which runtime is the default and why (latency, spec validity, cost), and whether fallbacks stay on. One paragraph is enough.
 
 Pass criteria: the check table is all `pass`; the spike reports first speech under 2 s at `CORELLIA_EFFORT=low`; a day of normal use produces no apology you cannot explain from the server log.
@@ -41,7 +41,8 @@ Pass criteria: the check table is all `pass`; the spike reports first speech und
 Do this twice: once with headphones, once on the laptop speakers.
 
 1. **Input source.** System Settings → Keyboard → Keyboard Shortcuts → Input Sources: if "Select the previous input source" is bound to Ctrl+Space, unbind it (or Corellia's mic key will fight it). Chrome must have microphone permission for `localhost`.
-2. **Keyless first** (browser recognition and `speechSynthesis`; no `OPENAI_API_KEY`):
+2. **Keyless first** (browser recognition and `speechSynthesis`; no `OPENAI_API_KEY`). **Privacy:** keyless recognition is Chrome's `webkitSpeechRecognition`, which sends the microphone audio to Google's speech service while the mic is open; with `OPENAI_API_KEY` it goes to OpenAI instead. Nothing stays on the Mac either way (VISION 11.6). Decide which you accept before leaving the mic open for an afternoon (step 5).
+   - **Sound after a reload.** Chrome plays no speech until the first key press or click on the page. If a reminder fires before that, its card shows and the mic indicator says **press any key for sound**; the held speech plays on that key press. The display box has autoplay enabled in its kiosk flags and does not need this.
    - Ctrl+Space: the indicator goes to **listening**, Chrome shows the mic dot. Say "what time is it". The indicator shows **hearing you** while you talk, the turn runs, the answer is spoken.
    - Say "remind me in 2 minutes to stretch", then "do it": the proposal confirms by voice.
    - While the agent is speaking a long answer ("tell me a story in six sentences"), start talking: speech stops within a word and the turn is cancelled. If the agent's own voice from the speakers triggers that, set `CORELLIA_VOICE_BARGE_IN=off` and repeat: now only typing and Escape interrupt.

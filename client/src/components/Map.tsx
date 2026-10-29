@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { isTileError } from "./mapErrors";
+import { probeTile, TILE_ATTRIBUTION, TILE_URL_TEMPLATE, tileUrl } from "./mapTiles";
 import { Label, Panel } from "./primitives";
 import type { ComponentImpl } from "./types";
 
@@ -10,8 +11,10 @@ type Marker = { position: LatLng; label?: string };
 /**
  * MapLibre GL over OpenStreetMap raster tiles (keyless), darkened to fit
  * the display. Falls back to a static card when WebGL or the tiles are
- * unavailable (offline box, jsdom). Coordinates are [lat, lng] in the
- * catalog and [lng, lat] for MapLibre.
+ * unavailable (offline box, jsdom), and when the tile server refuses this
+ * client (it serves a block notice as a 200 image; see mapTiles.ts).
+ * Attribution is shown, as OSM's tile policy asks. Coordinates are
+ * [lat, lng] in the catalog and [lng, lat] for MapLibre.
  */
 export const MapView: ComponentImpl = ({ props }) => {
   const center = props.center as LatLng;
@@ -38,16 +41,16 @@ export const MapView: ComponentImpl = ({ props }) => {
           container: el.current,
           center: [center[1], center[0]],
           zoom,
-          attributionControl: false,
+          attributionControl: { compact: false },
           interactive: false,
           style: {
             version: 8,
             sources: {
               osm: {
                 type: "raster",
-                tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                tiles: [TILE_URL_TEMPLATE],
                 tileSize: 256,
-                attribution: "© OpenStreetMap contributors",
+                attribution: TILE_ATTRIBUTION,
               },
             },
             layers: [
@@ -69,6 +72,10 @@ export const MapView: ComponentImpl = ({ props }) => {
           if (!disposed) setFailed(e.error?.message ?? "map error");
         });
         m.on("load", () => {
+          // One tile, read back: the block notice is the map's failure, not a tile's.
+          void probeTile(tileUrl(center[0], center[1], zoom)).then((p) => {
+            if (p.blocked && !disposed) setFailed(p.reason ?? "tiles blocked");
+          });
           if (route.length > 1) {
             m.addSource("route", {
               type: "geojson",

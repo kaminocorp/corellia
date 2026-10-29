@@ -72,6 +72,10 @@ type Config struct {
 	Model string `env:"CORELLIA_MODEL"`
 	// Effort for the anthropic runtime: low (default), medium, high, xhigh, max.
 	Effort string `env:"CORELLIA_EFFORT" envDefault:"low"`
+	// MaxTokens caps one model response (thinking included) for the
+	// anthropic runtime; 0 means the runtime's default (64000). A reply
+	// that hits the cap is reported as cut off, not passed as complete.
+	MaxTokens int64 `env:"CORELLIA_MAX_TOKENS"`
 	// AnthropicFallbacks sends the server-side fallback beta with every
 	// request (default true). Set false if the account rejects the beta.
 	AnthropicFallbacks bool `env:"CORELLIA_ANTHROPIC_FALLBACKS" envDefault:"true"`
@@ -133,6 +137,9 @@ func (c Config) Validate() error {
 	case "auto", "local", "anthropic", "openai", "hermes":
 	default:
 		return fmt.Errorf("config: CORELLIA_RUNTIME %q is not one of auto|local|anthropic|openai|hermes", c.Runtime)
+	}
+	if c.MaxTokens < 0 {
+		return fmt.Errorf("config: CORELLIA_MAX_TOKENS must not be negative (got %d)", c.MaxTokens)
 	}
 	switch c.Effort {
 	case "low", "medium", "high", "xhigh", "max":

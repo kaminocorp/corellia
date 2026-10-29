@@ -139,6 +139,10 @@ func TestSecurityHeaders(t *testing.T) {
 	if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("X-Frame-Options") != "DENY" {
 		t.Errorf("headers = %v", rec.Header())
 	}
+	// Tiles need a Referer (origin only) or OpenStreetMap may serve its block image.
+	if got := rec.Header().Get("Referrer-Policy"); got != "strict-origin-when-cross-origin" {
+		t.Errorf("Referrer-Policy = %q", got)
+	}
 	any := contentSecurityPolicy([]string{"*"})
 	if !strings.Contains(any, "img-src 'self' data: blob: https:") {
 		t.Errorf("wildcard CSP = %s", any)

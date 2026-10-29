@@ -2,6 +2,8 @@ package session
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -82,24 +84,86 @@ func TestFailedTurnIsNotSilent(t *testing.T) {
 }
 
 func TestDescribeFailure(t *testing.T) {
-	cases := map[string]string{
-		`anthropic: POST "http://127.0.0.1:1/v1/messages": 404 Not Found {"type":"error","error":{"type":"not_found_error"}}`: "isn't available",
-		"anthropic: 529 overloaded_error":                        "overloaded",
-		"anthropic: 401 authentication_error":                    "credentials",
-		"anthropic: 429 rate_limit_error":                        "rate-limiting",
-		"anthropic: stream ended without a stop reason":          "dropped",
-		"context deadline exceeded":                              "too long",
-		"dial tcp: lookup api.anthropic.com: no such host":       "can't reach",
-		"simulated failure (local demo): the user asked for one": "simulated",
-		"something nobody anticipated":                           "couldn't tell why",
+	status := func(code int, msg string) error { return &runtime.StatusError{Status: code, Err: errors.New(msg)} }
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"404 by status", status(404, `anthropic: POST "http://127.0.0.1:1/v1/messages": 404 Not Found {"type":"error","error":{"type":"not_found_error"}}`), "isn't available"},
+		{"529 by status", status(529, "anthropic: 529 overloaded_error"), "overloaded"},
+		{"401 by status", status(401, "anthropic: 401 authentication_error"), "credentials"},
+		{"429 by status", status(429, "anthropic: 429 rate_limit_error"), "rate-limiting"},
+		{"500 by status", status(500, "anthropic: 500 api_error"), "internal error"},
+		{"400 by status", status(400, "anthropic: 400 invalid_request_error"), "rejected the request"},
+		// The request id contains "401"; the status, not the text, decides
+		// (review 2026-10-30 round 3: every failure was "credentials").
+		{"request id with 401", status(429, `anthropic: 429 {"type":"error","error":{"type":"rate_limit_error"},"request_id":"req_011CXyz4019"}`), "rate-limiting"},
+		{"request id with 401, 500", status(500, `anthropic: 500 {"request_id":"req_011CXyz4019","error":{"type":"api_error","message":"model: boom"}}`), "internal error"},
+		{"wrapped status", fmt.Errorf("start: %w", status(503, "upstream")), "overloaded"},
+		{"truncated", fmt.Errorf("anthropic: %w after 2 content blocks", runtime.ErrTruncated), "cut off"},
+		{"dropped stream", errors.New("anthropic: stream ended without a stop reason"), "dropped"},
+		{"timeout", errors.New("context deadline exceeded"), "too long"},
+		{"dns", errors.New("dial tcp: lookup api.anthropic.com: no such host"), "can't reach"},
+		{"simulated", errors.New("simulated failure (local demo): the user asked for one"), "simulated"},
+		// Bare numbers in a message without a status mean nothing.
+		{"401 in text only", errors.New("something about request req_401 happened"), "couldn't tell why"},
+		{"unknown", errors.New("something nobody anticipated"), "couldn't tell why"},
+		{"nil", nil, "couldn't tell why"},
 	}
-	for in, want := range cases {
-		if got := describeFailure(in); !strings.Contains(got, want) {
-			t.Errorf("describeFailure(%q) = %q, want it to contain %q", in, got, want)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := describeFailure(tc.err)
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("describeFailure(%v) = %q, want it to contain %q", tc.err, got, tc.want)
+			}
+			if strings.Contains(got, "http") || strings.Contains(got, "{") {
+				t.Errorf("describeFailure(%v) = %q leaks detail", tc.err, got)
+			}
+		})
+	}
+}
+
+// A reply the provider cut at the output-token cap is a failed turn with
+// the fragment spoken as its own piece, marked as cut off, and the reason
+// after it; it never passes as a completed answer (review 2026-10-30
+// round 3, item 5).
+func TestTruncatedReplyIsCutOffNotComplete(t *testing.T) {
+	rt := &scripted{events: []runtime.Event{
+		{Kind: runtime.EventTextDelta, Text: "The answer you asked for is that the"},
+		{Kind: runtime.EventError, Err: fmt.Errorf("anthropic: %w after 1 content blocks (max_tokens 64000)", runtime.ErrTruncated), Fatal: true},
+	}}
+	s := New(Options{Registry: reg(t), Runtime: rt})
+	defer s.Close()
+	ch, unsub := s.Subscribe(0)
+	defer unsub()
+	id, _, _ := s.StartTurn("x", runtime.SourceKeyboard)
+	evs := drainUntil(t, ch, "turn_done", id)
+	var speech []string
+	var done map[string]any
+	for _, e := range evs {
+		switch e["type"] {
+		case "speech":
+			speech = append(speech, e["text"].(string))
+		case "turn_done":
+			done = e
 		}
-		if got := describeFailure(in); strings.Contains(got, "http") || strings.Contains(got, "{") {
-			t.Errorf("describeFailure(%q) = %q leaks detail", in, got)
-		}
+	}
+	if done["status"] != "failed" {
+		t.Fatalf("status = %v (a max_tokens stop passed as complete)", done["status"])
+	}
+	text, _ := done["text"].(string)
+	if !strings.HasPrefix(text, "The answer you asked for is that the…") || !strings.Contains(text, "cut off") {
+		t.Fatalf("turn_done text = %q", text)
+	}
+	if len(speech) < 2 {
+		t.Fatalf("speech = %v, want the fragment and the apology as separate pieces", speech)
+	}
+	if !strings.HasSuffix(speech[0], "the…") || strings.Contains(speech[0], "Sorry") {
+		t.Fatalf("first piece = %q: the fragment must not be glued to the apology", speech[0])
+	}
+	if joined := strings.Join(speech[1:], " "); !strings.Contains(joined, "Sorry") || !strings.Contains(joined, "cut off") {
+		t.Fatalf("apology pieces = %v", speech[1:])
 	}
 }
 
@@ -117,7 +181,9 @@ type boom struct{}
 
 func (boom) Error() string { return "boom: upstream HTTP 500" }
 
-var errBoom = boom{}
+// errBoom carries its status as a value: the message alone no longer
+// classifies a failure.
+var errBoom = &runtime.StatusError{Status: 500, Err: boom{}}
 
 func TestImageHostAllowlist(t *testing.T) {
 	rt := &scripted{events: []runtime.Event{

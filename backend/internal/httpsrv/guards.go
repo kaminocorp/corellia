@@ -176,7 +176,12 @@ func securityHeaders(cfg config.Config) func(http.Handler) http.Handler {
 			h.Set("Content-Security-Policy", csp)
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("X-Frame-Options", "DENY")
-			h.Set("Referrer-Policy", "no-referrer")
+			// Cross-origin requests carry the origin only: OpenStreetMap's tile
+			// policy asks for a Referer to identify the application, and
+			// serves an "access blocked" image (HTTP 200) to anonymous heavy
+			// clients. Same-origin requests still get the full URL; nothing
+			// in the path or query is secret (the token travels in a header).
+			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 			h.Set("Permissions-Policy", "camera=(), geolocation=(), microphone=(self), payment=()")
 			h.Set("Cross-Origin-Opener-Policy", "same-origin")
 			next.ServeHTTP(w, r)

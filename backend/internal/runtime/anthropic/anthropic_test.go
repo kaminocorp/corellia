@@ -3,6 +3,7 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -175,6 +176,60 @@ func TestRefusalAndHTTPError(t *testing.T) {
 	evs = rttest.Collect(mustStart(t, rt, turn(nil)))
 	if evs[0].Kind != runtime.EventError || !evs[0].Fatal {
 		t.Fatalf("http error not surfaced: %v", rttest.Kinds(evs))
+	}
+	// The status travels as a value, so the session classifies by it and
+	// not by the text (which keeps the URL and body for the log).
+	var se *runtime.StatusError
+	if !errors.As(evs[0].Err, &se) || se.Status != 500 {
+		t.Fatalf("error = %v, want a StatusError 500", evs[0].Err)
+	}
+	if !strings.Contains(evs[0].Err.Error(), "boom") {
+		t.Fatalf("error text lost the body: %v", evs[0].Err)
+	}
+}
+
+// A reply stopped by max_tokens is a fragment, and a tool_use block cut
+// the same way has incomplete input: both are failures the user hears
+// about, never a completed turn or a silently dropped call (review
+// 2026-10-30 round 3, item 5).
+func TestMaxTokensIsTruncation(t *testing.T) {
+	tools := &rttest.Tools{}
+	srv, _ := server(t, func(n int, w http.ResponseWriter) {
+		if n == 1 {
+			textStream(w, "Half a sent", "max_tokens")
+			return
+		}
+		sse(w, "message_start", `{"type":"message_start","message":{"id":"m","type":"message","role":"assistant","model":"x","content":[],"stop_reason":null,"usage":{"input_tokens":1,"output_tokens":1}}}`)
+		sse(w, "content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_1","name":"show_ui","input":{}}}`)
+		sse(w, "content_block_delta", `{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"ops\":[{\"op\":\"clear\"}"}}`)
+		sse(w, "content_block_stop", `{"type":"content_block_stop","index":0}`)
+		sse(w, "message_delta", `{"type":"message_delta","delta":{"stop_reason":"max_tokens","stop_sequence":null},"usage":{"output_tokens":5}}`)
+		sse(w, "message_stop", `{"type":"message_stop"}`)
+	})
+	rt := New(Options{APIKey: "k", BaseURL: srv.URL, MaxTokens: 50})
+	for round := 1; round <= 2; round++ {
+		evs := rttest.Collect(mustStart(t, rt, turn(tools)))
+		var fatal *runtime.Event
+		for i := range evs {
+			if evs[i].Kind == runtime.EventError && evs[i].Fatal {
+				fatal = &evs[i]
+			}
+			if evs[i].Kind == runtime.EventToolCall {
+				t.Fatalf("round %d: a tool call cut by max_tokens ran: %v", round, rttest.Kinds(evs))
+			}
+		}
+		if fatal == nil {
+			t.Fatalf("round %d: max_tokens ended %v without a fatal error", round, rttest.Kinds(evs))
+		}
+		if !errors.Is(fatal.Err, runtime.ErrTruncated) || !strings.Contains(fatal.Err.Error(), "max_tokens 50") {
+			t.Fatalf("round %d: error = %v", round, fatal.Err)
+		}
+		if round == 1 && rttest.Text(evs) != "Half a sent" {
+			t.Fatalf("partial text = %q", rttest.Text(evs))
+		}
+	}
+	if len(tools.Calls) != 0 {
+		t.Fatalf("tool ran on a cut call: %v", tools.Calls)
 	}
 }
 

@@ -173,7 +173,7 @@ func (r *Runtime) stream(ctx context.Context, msgs []message, tools []map[string
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return message{}, fmt.Errorf("openai: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		return message{}, &runtime.StatusError{Status: resp.StatusCode, Err: fmt.Errorf("openai: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))}
 	}
 	assistant := message{Role: "assistant"}
 	calls := map[int]*toolCall{}

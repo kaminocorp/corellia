@@ -131,7 +131,7 @@ func TestContractRecordedTurn(t *testing.T) {
 	if !strings.Contains(reqs[0].Headers["anthropic-beta"], "server-side-fallback-2026-07-01") || first["fallbacks"] != "default" {
 		t.Fatalf("fallback beta not sent: headers=%v fallbacks=%v", reqs[0].Headers, first["fallbacks"])
 	}
-	if first["stream"] != true || first["model"] != "claude-opus-5-5" || first["max_tokens"] != float64(4096) {
+	if first["stream"] != true || first["model"] != "claude-opus-5-5" || first["max_tokens"] != float64(DefaultMaxTokens) {
 		t.Fatalf("stream/model/max_tokens = %v %v %v", first["stream"], first["model"], first["max_tokens"])
 	}
 	if _, has := first["thinking"]; has {

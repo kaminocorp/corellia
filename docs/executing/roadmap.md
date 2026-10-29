@@ -1,6 +1,6 @@
 # Corellia vision implementation roadmap
 
-**Status:** Phase 13 (beta readiness: the round-2 review's blocking gaps that need no key or microphone) done on 2026-10-29. Phases 11 and 12 (review fixes; verifiable cloud runtime, streamed speech, strict CSP) were done the same day, as were Phases 0-10. The second independent review ([`review-2026-10-30.md`](review-2026-10-30.md)) rated `0c40505` an alpha; after Phase 13 what stands between the build and a beta is the owner's two runs in [`owner-checklist.md`](owner-checklist.md) (live model, Mac microphone). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
+**Status:** Phase 13 (beta readiness: the round-2 review's blocking gaps that need no key or microphone) done on 2026-10-29. Phases 11 and 12 (review fixes; verifiable cloud runtime, streamed speech, strict CSP) were done the same day, as were Phases 0-10. The second independent review ([`review-2026-10-30.md`](review-2026-10-30.md)) rated `0c40505` an alpha; the third ([`review-2026-10-30-round3.md`](review-2026-10-30-round3.md), against `1368df5`) found Phase 13 holding and called the build "alpha, at the beta threshold" with three cheap defects left, fixed in Phase 14. What stands between the build and a beta is the owner's two runs in [`owner-checklist.md`](owner-checklist.md) (live model, Mac microphone). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
 **Scope:** implement [`../VISION.md`](../VISION.md) end to end: an always-on personal agent workspace (3D agent, keyboard + voice, generated UI from a closed catalog, propose/confirm actions, decision layer, swappable agent runtime, display-box deployment).
 **Branch:** all work on `feat/vision-implementation`, pushed only to that branch. No merges, no PRs, no deploys.
 **Companion records:** one `docs/completions/phase-NN-<name>.md` per completed phase, one `docs/changelog.md` entry per phase.
@@ -254,9 +254,23 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 - **Dependencies:** Phase 12.
 - **Acceptance:** `pnpm check` green here and in CI (all four jobs); the five smoke tests pass in real Chromium, including the failing-turn step; the review's items 1, 3, 4, 5, 7 and 8 have a test each.
 
+### Phase 14: Round-3 review fixes
+
+- **Scope:** the three blocking defects of the third independent review ([`review-2026-10-30-round3.md`](review-2026-10-30-round3.md), against `1368df5`, verdict "alpha, at the beta threshold") and its non-blocking items that need no key or microphone. The owner-only runs stay in the checklist. Added after Phase 13; the review is committed with this phase.
+- **Deliverables:**
+  - **Item 3, the transcript over full visuals.** The display publishes the footer's measured extent as a CSS variable (`--footer-h`, a `ResizeObserver` on the footer and the root); the Stage ends its panel and full zones above it instead of at a fixed `bottom-36`. While a panel or full visual is up the transcript keeps two entries. Two smoke-test steps measure zone against footer and transcript at 1440×790 and 1920×1080.
+  - **Item 4, the error line.** Outside `?debug=1` the error line shows only the client's own failures (a send, an action, a clear, the 3D agent) in plain words; a failed turn has its apology and status card, and a rejected op is routine. With `?debug=1` every error shows raw. The smoke test asserts both.
+  - **Item 5, `max_tokens`.** The Anthropic runtime treats `stop_reason: max_tokens` as `runtime.ErrTruncated` (fatal): the partial is spoken with "…", then "My reply was cut off before it finished"; a tool call cut the same way never runs and the user is told. The default cap is 64000 (`anthropic.DefaultMaxTokens`, the SDK's streaming guidance; thinking counts toward it on Opus 5.5) and `CORELLIA_MAX_TOKENS` overrides it. The request goldens were regenerated for the new cap.
+  - **Failure classification by status.** `runtime.StatusError` carries the provider's HTTP status through the seam (Anthropic and OpenAI-compatible runtimes); `describeFailure` classifies by it and uses substrings only for errors without one, so a request id containing "401" no longer makes every failure "rejected my credentials". A cut-off fragment is spoken as its own piece (no more "the Sorry, that didn't…").
+  - **Tiles.** The page's `Referrer-Policy` is `strict-origin-when-cross-origin` (OSM's tile policy asks for a Referer); the Map shows OSM attribution; after load it reads one tile back and recognises OSM's "access blocked" image (served as HTTP 200: `Cache-Control: no-cache`, a fixed SHA-256) and falls back to the card with the reason.
+  - **Sound after a reload.** A backend that the browser refuses before a user gesture (speechSynthesis `not-allowed`, a suspended `AudioContext`) reports `SpeechBlockedError`; the player holds the pieces, the mic indicator says "press any key for sound", and the first key press or click plays them.
+  - **Docs.** Owner checklist: A4 names the runtime label (`anthropic`), the keyless path's audio goes to Google, the sound hint, `CORELLIA_MAX_TOKENS`; README says the same about keyless voice; `runtime-check`'s no-key diagnosis no longer points at `ant auth status`.
+- **Dependencies:** Phase 13.
+- **Acceptance:** `pnpm check` green; seven smoke tests in real Chromium; a test for each blocking item (overlap measured in the browser, error line in vitest and the browser, `max_tokens` in the runtime and the session) and for the status classification, the tile probe and the held speech.
+
 ## 4. Versioning and records
 
-- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11), 0.15.12 (Phase 12) and 0.15.13 (Phase 13).
+- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11), 0.15.12 (Phase 12), 0.15.13 (Phase 13) and 0.15.14 (Phase 14).
 - Completion notes: `docs/completions/phase-NN-<name>.md` with sections: Summary, What was built, Design decisions, Files changed, How to run, How to test, Known gaps, Follow-ups.
 - Commits: one per phase at minimum, conventional subject `phase N: <name>`; pushed to `origin/feat/vision-implementation` only.
 
@@ -288,3 +302,4 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 11 Review fixes | done 2026-10-29 | [`../completions/phase-11-review-fixes.md`](../completions/phase-11-review-fixes.md) | 0.15.11 |
 | 12 Verifiable cloud runtime, streamed speech, strict CSP, review items | done 2026-10-29 | [`../completions/phase-12-cloud-runtime-speech-csp.md`](../completions/phase-12-cloud-runtime-speech-csp.md) | 0.15.12 |
 | 13 Beta readiness (round-2 review) | done 2026-10-29 | [`../completions/phase-13-beta-readiness.md`](../completions/phase-13-beta-readiness.md) | 0.15.13 |
+| 14 Round-3 review fixes | done 2026-10-29 | [`../completions/phase-14-round-3-review-fixes.md`](../completions/phase-14-round-3-review-fixes.md) | 0.15.14 |

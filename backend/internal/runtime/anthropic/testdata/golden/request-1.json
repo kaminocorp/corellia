@@ -1,7 +1,7 @@
 {
   "body": {
     "fallbacks": "default",
-    "max_tokens": 4096,
+    "max_tokens": 64000,
     "messages": [
       {
         "content": [

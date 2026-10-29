@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)](#01514---phase-14-round-3-review-fixes-footer-aware-layout-no-transcript-over-visuals--plain-words-error-line--max_tokens--cut-off-cap-64000-corellia_max_tokens--failures-classified-by-http-status--osm-attribution-referer-and-block-detection--held-speech-until-a-gesture--owner-checklist-corrections-2026-10-29)
 - [0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)](#01513---phase-13-beta-readiness-session_error-event-no-false-offline-banner--mic-open-race--speech-abortdeadline--failures-in-plain-words--truncated-stream--error--ci-pinned-go-jsonschema-ubuntu-2404--overlay-stacking--owner-checklist-2026-10-29)
 - [0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)](#01512---phase-12-anthropic-contract-goldens--live-check-runtime-check--streamed-speech-per-sentence--precompiled-validators-no-unsafe-eval--proposal-stack-digit-grace-period-keyboard-scroll-barge-in-setting-ptt-flush-2026-10-29)
 - [0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)](#01511---phase-11-review-fixes-stable-store-selectors--browser-smoke-test-playwright--enterproposal-fix--dev-mode-request-guards-and-csp--visible-failures--reconnecttoken-prompt--ci-2026-10-29)
@@ -95,6 +96,37 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)
+
+Roadmap Phase 14: the three blocking defects of the third independent review ([`executing/review-2026-10-30-round3.md`](executing/review-2026-10-30-round3.md), against `1368df5`, verdict "alpha, at the beta threshold") and its non-blocking items that need no key or microphone. Full notes: [`completions/phase-14-round-3-review-fixes.md`](completions/phase-14-round-3-review-fixes.md). The owner-only runs stay in [`executing/owner-checklist.md`](executing/owner-checklist.md).
+
+### Added
+
+- **`runtime.StatusError`** and **`runtime.ErrTruncated`** on the AgentRuntime seam: the provider's HTTP status travels as a value (Anthropic and OpenAI-compatible runtimes), and a reply stopped at the output-token cap is a typed failure.
+- **`CORELLIA_MAX_TOKENS`** (config, `.env.example`): the per-response cap for the Anthropic runtime; default `anthropic.DefaultMaxTokens` = 64000 (was 4096; thinking counts toward it on Opus 5.5).
+- **`--footer-h`**: the display publishes the footer's measured extent (`ResizeObserver`) and the Stage ends its panel and full zones above it. Two smoke-test steps measure zone against footer and transcript at 1440×790 and 1920×1080.
+- **`components/mapTiles.ts`**: tile coordinates, the OSM attribution string, and `probeTile`, which reads one tile back after load and recognises OSM's "access blocked" image (HTTP 200 with `Cache-Control: no-cache` and a fixed SHA-256).
+- **`SpeechBlockedError`** and held speech: a backend the browser refuses before a gesture (speechSynthesis `not-allowed`, a suspended `AudioContext`) hands its pieces back; the player holds them, `VoiceStatus.sound` becomes `blocked`, the mic indicator says "press any key for sound", and the first key press or click (`pointerdown` is now a gesture too) plays them.
+- `app/errorWords.ts` (`plainWords`): what the error line says for the client's own failures.
+
+### Fixed
+
+- **The transcript drew over every full-screen visual** (111-180 px at the three viewports the review measured): the zones were sized from a fixed `bottom-36`, not from the transcript. While a panel or full visual is up the transcript also keeps only two entries.
+- **The error line showed raw provider errors (URL and JSON body) for 12 s in every mode, and flagged routine `show_ui` rejections after turns that worked.** Outside `?debug=1` it now shows only client-side failures in plain words; a failed turn is its apology and status card. With `?debug=1` every error shows raw (the smoke test asserts both).
+- **A reply cut by `max_tokens` passed as complete, and a `show_ui` call cut the same way was dropped silently.** The Anthropic runtime returns `ErrTruncated`: the partial is spoken with "…", then "My reply was cut off before it finished"; the cut tool call never runs; the fragment is not fed back as history.
+- **`describeFailure` matched substrings anywhere in the raw error**: a request id `req_011CXyz4019` made every failure "rejected my credentials". Classification is by status first; substrings only for errors without one, and bare numbers no longer count.
+- **A dropped stream's half sentence was spoken glued to the apology** ("…is that the Sorry, that didn't work"): the fragment is its own piece ending in "…".
+- **OSM tiles without a Referer and without attribution**: the page's `Referrer-Policy` is `strict-origin-when-cross-origin`; the Map shows attribution; a blocked tile server falls back to the card with the reason instead of drawing the block notice as the map.
+- **Speech silent after a reload until the first key press** (a reminder that fired before any key showed its card and said nothing): held and played on the first gesture, with a hint meanwhile.
+- `cmd/runtime-check`'s no-key diagnosis suggested `ant auth status`, which cannot apply since the SDK's environment defaults are off; owner checklist step A4 said the header shows the model name (it shows the runtime name, `anthropic`).
+
+### Edited
+
+- `README.md` and the owner checklist say that keyless voice sends microphone audio to Google (Chrome's recognition service); the checklist also covers the sound hint and `CORELLIA_MAX_TOKENS`. Roadmap (status, Phase 14, progress). The round-3 review file is committed.
+- `backend/internal/runtime/anthropic/testdata/golden/request-*.json`: `max_tokens` 64000.
+
+---
 
 ## 0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)
 

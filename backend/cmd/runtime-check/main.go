@@ -229,7 +229,7 @@ func diagnose(detail string) string {
 	l := strings.ToLower(detail)
 	switch {
 	case strings.Contains(l, "401") || strings.Contains(l, "authentication") || strings.Contains(l, "invalid x-api-key") || strings.Contains(l, "needs anthropic_api_key"):
-		return "diagnosis: the API key is missing or rejected. Set ANTHROPIC_API_KEY in backend/.env (or run `ant auth status` to see which credential the SDK would use)."
+		return "diagnosis: the API key is missing or rejected. Set ANTHROPIC_API_KEY in backend/.env; it is the only credential the runtime reads (the SDK's own environment and `ant auth` profiles are ignored)."
 	case strings.Contains(l, "not_found") || strings.Contains(l, "model:") || strings.Contains(l, "unknown model"):
 		return "diagnosis: the model id is not available to this account. Set CORELLIA_MODEL to a model you can use (default claude-opus-5-5)."
 	case strings.Contains(l, "beta") || strings.Contains(l, "fallback"):

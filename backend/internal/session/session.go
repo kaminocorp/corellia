@@ -353,7 +353,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 	var reply []byte
 	specTouched := false
 	spoke := false
-	failure := ""
+	var failure error
 	// Sentences are spoken as they complete when the decider allows it
 	// (VISION 7 criterion 1); the remainder goes out with turn_done.
 	var stream *decision.SentenceStream
@@ -394,9 +394,15 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 		case status == gen.TurnDoneEventStatusFailed:
 			s.showStatusCard("That didn't work: "+describeFailure(failure), "error", 20*time.Second)
 			if stream != nil {
-				// Whatever was already said stays said; the apology follows
-				// the unspoken rest of the partial reply.
-				s.publishSpeech(turn.ID, decision.Sentences(stream.Flush()+" "+failureReply("", failure)))
+				// Whatever was already said stays said; the unspoken rest of
+				// the partial reply is its own piece, marked as cut off, and
+				// the apology follows as another.
+				var pieces []string
+				if rest := ellipsize(stream.Flush()); rest != "" {
+					pieces = decision.Sentences(rest)
+				}
+				pieces = append(pieces, decision.Sentences(failureReply("", failure))...)
+				s.publishSpeech(turn.ID, pieces)
 			} else {
 				s.publishSpeech(turn.ID, decision.Sentences(text))
 			}
@@ -426,7 +432,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 	ch, err := s.o.Runtime.Start(ctx, turn)
 	if err != nil {
 		status = gen.TurnDoneEventStatusFailed
-		failure = err.Error()
+		failure = err
 		s.bus.Publish("session_error", map[string]any{"turn_id": turn.ID, "code": "runtime_start", "message": err.Error(), "fatal": true})
 		finish()
 		return
@@ -483,7 +489,10 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 			s.bus.Publish("session_error", map[string]any{"turn_id": turn.ID, "code": "runtime", "message": msg, "fatal": ev.Fatal})
 			if ev.Fatal {
 				status = gen.TurnDoneEventStatusFailed
-				failure = msg
+				failure = ev.Err
+				if failure == nil {
+					failure = errors.New(msg)
+				}
 			}
 		case runtime.EventDone:
 		}
@@ -682,18 +691,19 @@ func truncate(s string, n int) string {
 }
 
 // failureReply is what the user sees and hears when a turn fails: the
-// partial reply, if any, followed by a short apology with the reason in
-// plain words (describeFailure); the raw error goes to the event stream
-// and the log, not to the speaker.
-func failureReply(partial, reason string) string {
+// partial reply, if any (marked as cut off), followed by a short apology
+// with the reason in plain words (describeFailure); the raw error goes to
+// the event stream and the log, not to the speaker.
+func failureReply(partial string, reason error) string {
 	apology := "Sorry, that didn't work on my side."
-	if reason != "" {
+	if reason != nil {
 		apology += " " + describeFailure(reason)
 	}
-	if strings.TrimSpace(partial) == "" {
+	p := ellipsize(partial)
+	if p == "" {
 		return apology
 	}
-	return strings.TrimSpace(partial) + "\n\n" + apology
+	return p + "\n\n" + apology
 }
 
 // checkImageHostLocked enforces Options.ImageHosts on Image nodes (an

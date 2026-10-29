@@ -43,7 +43,7 @@ func Select(cfg config.Config) (runtime.AgentRuntime, string, error) {
 			return nil, "", fmt.Errorf("runtime anthropic needs ANTHROPIC_API_KEY")
 		}
 		fallbacks := cfg.AnthropicFallbacks
-		return anthropicrt.New(anthropicrt.Options{APIKey: cfg.AnthropicAPIKey, BaseURL: cfg.AnthropicBaseURL, Model: cfg.Model, Effort: cfg.Effort, Fallbacks: &fallbacks}), "model " + orDefault(cfg.Model, "claude-opus-5-5"), nil
+		return anthropicrt.New(anthropicrt.Options{APIKey: cfg.AnthropicAPIKey, BaseURL: cfg.AnthropicBaseURL, Model: cfg.Model, Effort: cfg.Effort, MaxTokens: cfg.MaxTokens, Fallbacks: &fallbacks}), "model " + orDefault(cfg.Model, "claude-opus-5-5"), nil
 	case "openai":
 		if cfg.OpenAIAPIKey == "" && cfg.OpenAIBaseURL == "" {
 			return nil, "", fmt.Errorf("runtime openai needs OPENAI_API_KEY or OPENAI_BASE_URL")

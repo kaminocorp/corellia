@@ -94,6 +94,17 @@
   }
 }
 
+/* MapLibre attribution, kept legible on the darkened tiles (OSM asks for it). */
+.maplibregl-ctrl-attrib {
+  background: hsl(0 0% 0% / 0.55) !important;
+  color: var(--color-muted-foreground) !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-muted-foreground) !important;
+}
+
 /* MapLibre marker (the Map component creates these elements). */
 .corellia-marker {
   width: 14px;

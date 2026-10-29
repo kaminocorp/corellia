@@ -17,6 +17,11 @@ export function MicIndicator({ status }: { status: VoiceStatus }) {
       <span>{LABEL[status.mic]}</span>
       <span className="text-[0.6rem] opacity-70">{hint}</span>
       {status.speaking && <span className="text-primary">· speaking</span>}
+      {status.sound === "blocked" && (
+        <span className="text-primary normal-case tracking-normal" data-testid="sound-hint">
+          · press any key for sound
+        </span>
+      )}
       {status.stt === "none" && status.mic !== "off" && <span className="text-[0.6rem] opacity-70">· browser recognition</span>}
       {status.error && <span className="normal-case tracking-normal text-destructive">· {status.error}</span>}
     </div>

@@ -92,6 +92,26 @@ type Proposal struct {
 // ErrRequiresConfirm is returned by ToolCaller.Call for gated tools.
 var ErrRequiresConfirm = errors.New("tool requires confirmation")
 
+// StatusError wraps a failure the provider answered with an HTTP status.
+// The session classifies it by Status (401 is a credentials problem, 429
+// a rate limit, …) instead of searching the message text, where a request
+// id can contain "401" and a JSON body can contain "model:" (review
+// 2026-10-30 round 3). Err keeps the provider's full message for the log.
+type StatusError struct {
+	Status int
+	Err    error
+}
+
+func (e *StatusError) Error() string { return e.Err.Error() }
+func (e *StatusError) Unwrap() error { return e.Err }
+
+// ErrTruncated marks a reply the provider cut at the output-token cap
+// (Messages API stop_reason max_tokens): the text so far is not the whole
+// answer and a tool call in it never ran. Implementations wrap it so the
+// session can tell the user instead of passing the fragment off as
+// complete (review 2026-10-30 round 3, item 5).
+var ErrTruncated = errors.New("reply cut off at the output-token cap")
+
 // EventKind enumerates runtime events.
 type EventKind string
 

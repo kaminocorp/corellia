@@ -17,6 +17,8 @@ export type VoiceStatus = {
   stt: string;
   tts: string;
   speaking: boolean;
+  /** blocked: the browser refused to play until a key press or click (speech is held). */
+  sound: "ready" | "blocked";
   error: string | null;
 };
 
@@ -39,7 +41,7 @@ export type VoiceDeps = {
 const silent: PlayBackend = { speak: async () => {}, stop: () => {} };
 
 export class VoiceController {
-  private status: VoiceStatus = { mic: "off", mode: "toggle", stt: "none", tts: "none", speaking: false, error: null };
+  private status: VoiceStatus = { mic: "off", mode: "toggle", stt: "none", tts: "none", speaking: false, sound: "ready", error: null };
   private listeners = new Set<() => void>();
   private readonly activation = new Activation("toggle");
   readonly player: SpeechPlayer;
@@ -62,6 +64,7 @@ export class VoiceController {
     this.player = new SpeechPlayer(silent, {
       onSpeaking: (speaking) => this.patch({ speaking }),
       onError: (e) => this.patch({ error: e.message }),
+      onBlocked: (blocked) => this.patch({ sound: blocked ? "blocked" : "ready" }),
     });
   }
 
@@ -182,17 +185,25 @@ export class VoiceController {
     if (this.caps.mode === "ptt") void this.apply(this.activation.keyup({ code: "Space" }));
   }
 
-  /** Attaches key and blur listeners; returns the detach function. */
+  /** A click or tap is a user gesture too: it unlocks sound like a key press. */
+  handlePointerDown(): void {
+    this.player.prime();
+  }
+
+  /** Attaches key, pointer and blur listeners; returns the detach function. */
   attach(target: Window): () => void {
     const down = (e: KeyboardEvent) => this.handleKeyDown(e);
     const up = (e: KeyboardEvent) => this.handleKeyUp(e);
+    const pointer = () => this.handlePointerDown();
     const blur = () => this.handleBlur();
     target.addEventListener("keydown", down);
     target.addEventListener("keyup", up);
+    target.addEventListener("pointerdown", pointer);
     target.addEventListener("blur", blur);
     return () => {
       target.removeEventListener("keydown", down);
       target.removeEventListener("keyup", up);
+      target.removeEventListener("pointerdown", pointer);
       target.removeEventListener("blur", blur);
     };
   }

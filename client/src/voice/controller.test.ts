@@ -4,7 +4,7 @@ import type { SessionEvent } from "../contract";
 import type { CaptureCallbacks } from "./capture";
 import type { VoiceCapabilities } from "./capabilities";
 import { VoiceController, type VoiceDeps } from "./controller";
-import type { PlayBackend } from "./playback";
+import { SpeechBlockedError, type PlayBackend } from "./playback";
 
 function deps(over: Partial<VoiceDeps> = {}) {
   let captureCb: CaptureCallbacks | null = null;
@@ -221,5 +221,30 @@ describe("VoiceController review items (2026-10-30)", () => {
     await c.refreshCapabilities();
     expect(c.getStatus().stt).toBe("openai");
     expect(backend.stop).not.toHaveBeenCalled();
+  });
+
+  it("reports blocked sound and clears it on the first key press or click", async () => {
+    let blocked = true;
+    const backend: PlayBackend = {
+      speak: async () => {
+        if (blocked) throw new SpeechBlockedError();
+      },
+      stop: vi.fn(),
+      prime: () => {
+        blocked = false;
+      },
+    };
+    const { d } = deps({ serverSynth: () => backend });
+    const c = new VoiceController(d);
+    await c.init();
+    const detach = c.attach(window);
+    c.onStreamEvent({ type: "speech", seq: 1, ts: "", text: "Reminder: stretch.", final: true } as SessionEvent);
+    await flush();
+    expect(c.getStatus().sound).toBe("blocked");
+    expect(c.getStatus().speaking).toBe(false);
+    window.dispatchEvent(new Event("pointerdown"));
+    await flush();
+    expect(c.getStatus().sound).toBe("ready");
+    detach();
   });
 });

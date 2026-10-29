@@ -124,7 +124,7 @@ describe("App", () => {
     errors.mockRestore();
   });
 
-  it("sends a typed message and surfaces a failed turn outside debug mode", async () => {
+  it("sends a typed message and keeps the raw runtime error off the screen outside debug mode", async () => {
     const { App } = await import("./App");
     render(<App />);
     const es = FakeEventSource.instances[0];
@@ -137,6 +137,22 @@ describe("App", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(calls).toContain("POST /api/turn");
     act(() => {
+      es.emit("session_error", { type: "session_error", seq: 4, ts: "2026-10-29T10:00:01Z", turn_id: "t1", code: "runtime", message: `POST "http://x/v1/messages": 500 {"type":"error"}`, fatal: true });
+    });
+    // The transcript apology and the status card (server-side) carry the
+    // failure in plain words; the raw provider error is for ?debug=1.
+    expect(screen.queryByTestId("error-line")).toBeNull();
+    expect(screen.queryByText(/v1\/messages/)).toBeNull();
+  });
+
+  it("shows every error raw with ?debug=1", async () => {
+    window.history.replaceState({}, "", "/?debug=1");
+    const { App } = await import("./App");
+    render(<App />);
+    const es = FakeEventSource.instances[0];
+    act(() => {
+      es.onopen?.();
+      es.emit("session", snapshot);
       es.emit("session_error", { type: "session_error", seq: 4, ts: "2026-10-29T10:00:01Z", turn_id: "t1", code: "runtime", message: "upstream HTTP 500", fatal: true });
     });
     expect(screen.getByTestId("error-line")).toHaveTextContent("runtime: upstream HTTP 500");

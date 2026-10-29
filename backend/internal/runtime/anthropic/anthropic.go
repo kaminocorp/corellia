@@ -6,6 +6,7 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -26,13 +27,22 @@ type Options struct {
 	Model string
 	// Effort: low, medium, high, xhigh, max. Default low (voice latency).
 	Effort string
-	// MaxTokens per response; default 4096.
+	// MaxTokens per response; default DefaultMaxTokens. On Opus 5.5
+	// thinking is always on and counts toward this cap, so a small value
+	// cuts replies and show_ui calls mid-way (review 2026-10-30 round 3,
+	// item 5).
 	MaxTokens int64
 	// MaxToolRounds caps tool-use iterations per turn; default 8.
 	MaxToolRounds int
 	// Fallbacks enables server-side refusal fallbacks (default true).
 	Fallbacks *bool
 }
+
+// DefaultMaxTokens is the output cap when CORELLIA_MAX_TOKENS is unset: the
+// SDK guidance for streaming requests (tens of thousands), with room for
+// the thinking tokens Opus 5.5 spends before the first word. It is a
+// ceiling, not a target: a short answer costs the same as before.
+const DefaultMaxTokens int64 = 64000
 
 // Runtime implements runtime.AgentRuntime on the Claude Messages API.
 type Runtime struct {
@@ -49,7 +59,7 @@ func New(o Options) *Runtime {
 		o.Effort = "low"
 	}
 	if o.MaxTokens <= 0 {
-		o.MaxTokens = 4096
+		o.MaxTokens = DefaultMaxTokens
 	}
 	if o.MaxToolRounds <= 0 {
 		o.MaxToolRounds = 8
@@ -196,7 +206,7 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 			}
 		}
 		if err := stream.Err(); err != nil {
-			return fmt.Errorf("anthropic: %w", err)
+			return wrapErr(err)
 		}
 		if message.StopReason == "" {
 			// The connection closed before message_delta carried a stop
@@ -208,6 +218,12 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 		if message.StopReason == anthropic.BetaStopReasonRefusal {
 			emit(runtime.Event{Kind: runtime.EventTextDelta, Text: "I can't help with that one."})
 			return nil
+		}
+		if message.StopReason == anthropic.BetaStopReasonMaxTokens {
+			// The cap cut the reply: the text so far is a fragment, and a
+			// tool_use block in it (a large show_ui) has incomplete input and
+			// must not run. The session speaks the partial and says why.
+			return fmt.Errorf("anthropic: %w after %d content blocks (max_tokens %d; raise CORELLIA_MAX_TOKENS)", runtime.ErrTruncated, len(message.Content), r.o.MaxTokens)
 		}
 		if message.StopReason != anthropic.BetaStopReasonToolUse {
 			return nil
@@ -231,3 +247,15 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 }
 
 var _ = time.Second
+
+// wrapErr keeps the SDK's message (method, URL, status and body, for the
+// log) and adds the HTTP status as a typed value when the API answered,
+// so the session can classify the failure without reading the text.
+func wrapErr(err error) error {
+	wrapped := fmt.Errorf("anthropic: %w", err)
+	var ae *anthropic.Error
+	if errors.As(err, &ae) && ae.StatusCode != 0 {
+		return &runtime.StatusError{Status: ae.StatusCode, Err: wrapped}
+	}
+	return wrapped
+}

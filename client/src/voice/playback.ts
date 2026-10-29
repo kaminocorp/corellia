@@ -10,8 +10,23 @@
  * late over the next one; and every piece has a deadline, so an utterance
  * whose `onend` never fires (Chrome collects utterances held only by their
  * handlers) cannot leave the agent "speaking" forever.
+ *
+ * Before the first key press or click after a page load, Chrome's autoplay
+ * policy refuses both speechSynthesis and an AudioContext; a reminder
+ * that fires then would show its card and say nothing (review 2026-10-30
+ * round 3). A backend reports that as SpeechBlockedError; the player
+ * holds the pieces, says so through onBlocked, and plays them when
+ * prime() arrives from the first gesture.
  */
 import { setAudioLevel } from "../agent3d/audio";
+
+/** The browser refused to play before a user gesture (autoplay policy). */
+export class SpeechBlockedError extends Error {
+  constructor() {
+    super("speech blocked until a key press or click (browser autoplay policy)");
+    this.name = "SpeechBlockedError";
+  }
+}
 
 export type PlayBackend = {
   /** Plays one piece; resolves when it finishes or is stopped. `signal` aborts it after any await. */
@@ -24,6 +39,8 @@ export type PlayBackend = {
 export type PlayerCallbacks = {
   onSpeaking?: (speaking: boolean) => void;
   onError?: (err: Error) => void;
+  /** Speech is held until a gesture (true), or was released by one (false). */
+  onBlocked?: (blocked: boolean) => void;
   /** Deadline for one piece (default pieceTimeoutMs). */
   timeoutMs?: (text: string) => number;
 };
@@ -38,6 +55,8 @@ export class SpeechPlayer {
   private playing = false;
   private generation = 0;
   private current: AbortController | null = null;
+  /** Pieces the browser refused before a gesture, replayed by prime(). */
+  private held: string[] = [];
 
   constructor(
     private backend: PlayBackend,
@@ -49,9 +68,19 @@ export class SpeechPlayer {
     this.backend = b;
   }
 
-  /** Forwarded from the first key press; cheap to call repeatedly. */
+  /** Forwarded from a key press or click; cheap to call repeatedly. Releases held speech. */
   prime(): void {
     this.backend.prime?.();
+    if (this.held.length === 0) return;
+    const held = this.held;
+    this.held = [];
+    this.cb.onBlocked?.(false);
+    for (const piece of held) this.enqueue(piece);
+  }
+
+  /** Pieces waiting for a gesture. */
+  get isBlocked(): boolean {
+    return this.held.length > 0;
   }
 
   get isSpeaking(): boolean {
@@ -73,6 +102,10 @@ export class SpeechPlayer {
   stop(): void {
     this.generation++;
     this.queue = [];
+    if (this.held.length) {
+      this.held = [];
+      this.cb.onBlocked?.(false);
+    }
     this.current?.abort();
     this.current = null;
     this.backend.stop();
@@ -95,7 +128,16 @@ export class SpeechPlayer {
       try {
         await this.speakOne(piece, ac);
       } catch (e) {
-        this.cb.onError?.(e instanceof Error ? e : new Error(String(e)));
+        if (e instanceof SpeechBlockedError && gen === this.generation) {
+          // Keep this piece and the rest for the first gesture; the queue
+          // would otherwise burn through them silently.
+          const wasHeld = this.held.length > 0;
+          this.held.push(piece, ...this.queue);
+          this.queue = [];
+          if (!wasHeld) this.cb.onBlocked?.(true);
+        } else {
+          this.cb.onError?.(e instanceof Error ? e : new Error(String(e)));
+        }
       }
       if (this.current === ac) this.current = null;
     }
@@ -154,6 +196,7 @@ export class ServerTtsBackend implements PlayBackend {
   }
 
   async speak(text: string, signal?: AbortSignal): Promise<void> {
+    await this.ensureRunning();
     const data = await this.fetchAudio(text, signal);
     // stop() during the fetch: the stale sentence must not play over the
     // next one, and its meter must not be left running.
@@ -195,6 +238,18 @@ export class ServerTtsBackend implements PlayBackend {
     });
   }
 
+  /**
+   * A context created outside a gesture stays suspended, and resume()
+   * before one does not settle in Chrome: give it a moment, then report
+   * the block instead of fetching audio nobody will hear.
+   */
+  private async ensureRunning(): Promise<void> {
+    const ctx = this.context();
+    if (ctx.state !== "suspended") return;
+    await Promise.race([ctx.resume().catch(() => {}), new Promise<void>((r) => setTimeout(r, 250))]);
+    if ((ctx.state as string) === "suspended") throw new SpeechBlockedError();
+  }
+
   stop(): void {
     this.clearMeter();
     try {
@@ -224,7 +279,7 @@ export class BrowserSynthBackend implements PlayBackend {
   }
 
   speak(text: string, signal?: AbortSignal): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       if (signal?.aborted) {
         resolve();
         return;
@@ -258,7 +313,16 @@ export class BrowserSynthBackend implements PlayBackend {
         }, 33);
       };
       u.onend = finish;
-      u.onerror = finish;
+      u.onerror = (e) => {
+        // Chrome: speak() before any user gesture fails with "not-allowed".
+        if (e.error === "not-allowed") {
+          this.current = null;
+          this.resolveCurrent = null;
+          reject(new SpeechBlockedError());
+          return;
+        }
+        finish();
+      };
       window.speechSynthesis.speak(u);
     });
   }

@@ -83,11 +83,17 @@ test("gallery renders every content component", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("debug pane shows the stream and no error is logged", async ({ page }) => {
+test("debug pane shows the stream, and the raw error of a failed turn, and no error is logged", async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto("/?debug=1");
   await expect(page.getByText(/debug · seq \d+ · runtime local/)).toBeVisible();
-  await expect(page.getByLabel("Message")).toBeFocused();
+  const input = page.getByLabel("Message");
+  await expect(input).toBeFocused();
+  await input.fill("please simulate a failure");
+  await input.press("Enter");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+  // With ?debug=1 the error line carries the raw text; without it, nothing (next test).
+  await expect(page.getByTestId("error-line")).toContainText("runtime: simulated failure");
   expect(errors).toEqual([]);
 });
 
@@ -107,8 +113,12 @@ test("a failed turn is visible and spoken in plain words, and the connection sta
   const transcript = page.getByRole("list", { name: "Transcript" });
   await expect(transcript).toContainText("Sorry, that didn't work on my side. A simulated failure");
   await expect(transcript).not.toContainText("local demo): the user asked"); // the raw error is not shown or spoken
-  await expect(page.getByTestId("error-line")).toContainText("runtime: simulated failure");
+  // The status card says why in plain words; the always-on error line stays
+  // empty outside debug mode (review 2026-10-30 round 3, item 4).
   await expect(page.locator('[data-node="status_card_text"]')).toBeVisible();
+  await expect(page.locator('[data-node="status_card_text"]')).toContainText("That didn't work: A simulated failure");
+  await expect(page.getByTestId("error-line")).toHaveCount(0);
+  await expect(page.getByText(/local demo\): the user asked/)).toHaveCount(0);
   // The server's `session_error` event must not read as a connection error.
   await expect(page.getByTestId("connection")).toHaveText(/online/);
   await expect(page.getByRole("status").filter({ hasText: /connection lost|unreachable/ })).toHaveCount(0);
@@ -127,3 +137,40 @@ test("a failed turn is visible and spoken in plain words, and the connection sta
   await expect(page.getByRole("status").filter({ hasText: /connection lost|unreachable/ })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+/**
+ * A full-screen visual (a map, a table, a chart) and the transcript never
+ * share pixels, at a laptop viewport and a large one: the generated-UI zone
+ * ends above the measured footer (review 2026-10-30 round 3, item 3).
+ */
+for (const viewport of [
+  { width: 1440, height: 790 },
+  { width: 1920, height: 1080 },
+]) {
+  test(`a full visual never overlaps the transcript at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = watchConsole(page);
+    await page.goto("/");
+    const input = page.getByLabel("Message");
+    await expect(page.getByTestId("connection")).toHaveText(/online/);
+    // Fill the transcript first, then a map (Split root: full placement).
+    for (const text of ["what time is it", "what's on my schedule", "show me Lisbon on the map"]) {
+      await input.fill(text);
+      await input.press("Enter");
+      await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+    }
+    await expect(page.locator("[data-placement]")).toHaveAttribute("data-placement", "full");
+    const zone = page.getByTestId("ui-zone");
+    await expect(zone.locator("[data-node]").first()).toBeVisible();
+    // Let the zone's transition settle before measuring.
+    await page.waitForTimeout(700);
+    const zoneBox = (await zone.boundingBox())!;
+    const footerBox = (await page.getByTestId("footer").boundingBox())!;
+    const transcriptBox = (await page.getByRole("list", { name: "Transcript" }).boundingBox())!;
+    expect(zoneBox.y + zoneBox.height).toBeLessThanOrEqual(footerBox.y + 1);
+    expect(zoneBox.y + zoneBox.height).toBeLessThanOrEqual(transcriptBox.y + 1);
+    // The zone still has room for the visual.
+    expect(zoneBox.height).toBeGreaterThan(viewport.height * 0.45);
+    expect(errors).toEqual([]);
+  });
+}

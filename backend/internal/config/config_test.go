@@ -10,7 +10,7 @@ func TestLoadDefaults(t *testing.T) {
 		t.Setenv(k, "")
 	}
 	// t.Setenv to "" still counts as set for caarlos0/env; unset explicitly.
-	for _, k := range []string{"PORT", "CORELLIA_DEVICE_TOKEN", "CORELLIA_CLIENT_DIR", "CORELLIA_DATA_DIR", "CORELLIA_AGENT_NAME", "CORELLIA_DEV_ORIGINS", "CORELLIA_RUNTIME", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL", "CORELLIA_MODEL", "CORELLIA_EFFORT", "CORELLIA_HERMES_URL", "CORELLIA_HERMES_TOKEN", "CORELLIA_STT", "CORELLIA_TTS", "CORELLIA_TTS_VOICE", "CORELLIA_VOICE_MODE"} {
+	for _, k := range []string{"PORT", "CORELLIA_DEVICE_TOKEN", "CORELLIA_CLIENT_DIR", "CORELLIA_DATA_DIR", "CORELLIA_AGENT_NAME", "CORELLIA_DEV_ORIGINS", "CORELLIA_RUNTIME", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL", "CORELLIA_MODEL", "CORELLIA_EFFORT", "CORELLIA_MAX_TOKENS", "CORELLIA_HERMES_URL", "CORELLIA_HERMES_TOKEN", "CORELLIA_STT", "CORELLIA_TTS", "CORELLIA_TTS_VOICE", "CORELLIA_VOICE_MODE"} {
 		unsetenv(t, k)
 	}
 	cfg, err := Load()
@@ -74,6 +74,7 @@ func TestValidate(t *testing.T) {
 		{"bad runtime", func(c *Config) { c.Runtime = "deepseek" }, "CORELLIA_RUNTIME"},
 		{"runtime local", func(c *Config) { c.Runtime = "local" }, ""},
 		{"bad effort", func(c *Config) { c.Effort = "turbo" }, "CORELLIA_EFFORT"},
+		{"negative max tokens", func(c *Config) { c.MaxTokens = -1 }, "CORELLIA_MAX_TOKENS"},
 		{"bad stt", func(c *Config) { c.STT = "whisper" }, "CORELLIA_STT"},
 		{"bad voice mode", func(c *Config) { c.VoiceMode = "wake" }, "CORELLIA_VOICE_MODE"},
 		{"bad barge-in", func(c *Config) { c.VoiceBargeIn = "sometimes" }, "CORELLIA_VOICE_BARGE_IN"},

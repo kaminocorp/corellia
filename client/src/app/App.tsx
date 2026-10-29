@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { CommandInput, type CommandInputHandle } from "./CommandInput";
 import { ConnectionIndicator } from "./ConnectionIndicator";
@@ -12,8 +12,8 @@ import { Transcript } from "./Transcript";
 import { Agent3D, AgentFallback, StatsOverlay } from "../agent3d/Agent3D";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Gallery } from "../gallery/Gallery";
-import { Stage } from "../renderer/Stage";
-import { assignHotkeys } from "../renderer/resolve";
+import { FOOTER_HEIGHT_VAR, Stage } from "../renderer/Stage";
+import { assignHotkeys, placement } from "../renderer/resolve";
 import { useDecay } from "../renderer/useDecay";
 import { useGlobalKeys, type GlobalKeyHandlers } from "../renderer/useGlobalKeys";
 import { cancelTurn, clearScreen, fireAction, removeNode, sendTurn } from "../session/api";
@@ -47,10 +47,36 @@ function scrollUIZone(dir: "up" | "down" | "page_up" | "page_down"): boolean {
   return true;
 }
 
+/**
+ * Publishes the footer's extent from the bottom edge of the display (its
+ * height plus its offset) as a CSS variable on the display root, so the
+ * Stage can end its panel and full zones above the transcript, however
+ * many lines it holds and whatever the viewport (review 2026-10-30 round
+ * 3, item 3). jsdom has no ResizeObserver; the Stage then uses its
+ * fallback.
+ */
+function useFooterHeight(root: React.RefObject<HTMLElement | null>, footer: React.RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = footer.current;
+    const target = root.current;
+    if (!el || !target) return;
+    const publish = () => target.style.setProperty(FOOTER_HEIGHT_VAR, `${Math.max(0, target.clientHeight - el.offsetTop)}px`);
+    publish();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    ro.observe(target);
+    return () => ro.disconnect();
+  }, [root, footer]);
+}
+
 function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boolean; soak: boolean; particles?: number }) {
   const [devMode, setDevMode] = useState(false);
   const inputValue = useRef("");
   const inputRef = useRef<CommandInputHandle>(null);
+  const rootRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
+  useFooterHeight(rootRef, footerRef);
   const streamRef = useRef<SessionStream | null>(null);
   // Selectors may return fresh objects: useSessionState caches by state
   // version and shallow-compares, so the snapshot stays stable.
@@ -139,9 +165,14 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
   // The server goes idle at turn_done while speech still plays; the scene
   // keeps speaking (and reacting to the audio level) until playback ends.
   const sceneState = voice.status.mic === "capturing" ? "listening" : voice.status.speaking && agentState === "idle" ? "speaking" : agentState;
+  // While a panel or full visual is up, the transcript keeps only the
+  // latest exchange: the visual is the answer, and a tall transcript would
+  // push the zone above it into a strip.
+  const mode = placement(spec);
+  const transcriptLimit = mode === "panel" || mode === "full" ? 2 : 6;
 
   return (
-    <main className="relative h-full w-full overflow-hidden">
+    <main ref={rootRef} className="relative h-full w-full overflow-hidden">
       <Stage
         spec={spec}
         fire={fire}
@@ -169,10 +200,10 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
       <OfflineBanner status={connection} />
       {connection === "unauthorized" && <TokenPrompt onSubmit={onToken} />}
 
-      <footer className="absolute bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 px-6">
-        <ErrorLine />
+      <footer ref={footerRef} className="absolute bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 px-6" data-testid="footer">
+        <ErrorLine debug={debug} />
         <div className="mb-4">
-          <Transcript />
+          <Transcript limit={transcriptLimit} />
         </div>
         <CommandInput
           ref={inputRef}

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { audioLevel } from "../agent3d/audio";
-import { SpeechPlayer, type PlayBackend } from "./playback";
+import { SpeechBlockedError, SpeechPlayer, type PlayBackend } from "./playback";
 
 function fakeBackend() {
   const spoken: string[] = [];
@@ -124,4 +124,65 @@ describe("SpeechPlayer under barge-in and always-on use (review 2026-10-30, item
       vi.useRealTimers();
     }
   });
+
+  it("holds speech the browser refuses before a gesture and plays it on prime()", async () => {
+    // A reminder after a reload, before any key press: Chrome refuses
+    // speechSynthesis and the AudioContext (review 2026-10-30 round 3).
+    let blocked = true;
+    const spoken: string[] = [];
+    const backend: PlayBackend = {
+      speak: async (t) => {
+        if (blocked) throw new SpeechBlockedError();
+        spoken.push(t);
+      },
+      stop: vi.fn(),
+      prime: vi.fn(() => {
+        blocked = false;
+      }),
+    };
+    const onBlocked = vi.fn();
+    const onError = vi.fn();
+    const p = new SpeechPlayer(backend, { onBlocked, onError });
+    p.enqueue("Reminder: stretch.");
+    p.enqueue("Now.");
+    await flushAll();
+    expect(spoken).toEqual([]);
+    expect(p.isBlocked).toBe(true);
+    expect(p.isSpeaking).toBe(false);
+    expect(onBlocked).toHaveBeenCalledTimes(1);
+    expect(onBlocked).toHaveBeenLastCalledWith(true);
+    expect(onError).not.toHaveBeenCalled();
+    // More speech while blocked joins the held list without a second notice.
+    p.enqueue("Later.");
+    await flushAll();
+    expect(onBlocked).toHaveBeenCalledTimes(1);
+    // The first key press primes the backend and releases everything, in order.
+    p.prime();
+    await flushAll();
+    expect(backend.prime).toHaveBeenCalled();
+    expect(onBlocked).toHaveBeenLastCalledWith(false);
+    expect(spoken).toEqual(["Reminder: stretch.", "Now.", "Later."]);
+    expect(p.isBlocked).toBe(false);
+  });
+
+  it("stop() forgets held speech (Escape means silence, not later)", async () => {
+    const backend: PlayBackend = {
+      speak: async () => {
+        throw new SpeechBlockedError();
+      },
+      stop: vi.fn(),
+    };
+    const onBlocked = vi.fn();
+    const p = new SpeechPlayer(backend, { onBlocked });
+    p.enqueue("One.");
+    await flushAll();
+    expect(p.isBlocked).toBe(true);
+    p.stop();
+    expect(p.isBlocked).toBe(false);
+    expect(onBlocked).toHaveBeenLastCalledWith(false);
+  });
 });
+
+async function flushAll() {
+  for (let i = 0; i < 6; i++) await Promise.resolve();
+}
