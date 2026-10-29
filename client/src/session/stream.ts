@@ -24,7 +24,7 @@ export const EVENT_TYPES = [
   "tool_call",
   "tool_result",
   "turn_done",
-  "error",
+  "session_error",
   "proactive",
   "heartbeat",
 ] as const;
@@ -84,8 +84,13 @@ export class SessionStream {
       this.attempts = 0;
       this.store.setConnection("online");
     };
-    es.onerror = () => {
+    es.onerror = (e?: Event) => {
       if (this.es !== es) return;
+      // A server event whose name is `error` would land here too, as a
+      // MessageEvent, and used to flip the header to "reconnecting" while
+      // the stream was fine (review 2026-10-30, item 1). The wire no longer
+      // uses that name; this guard keeps any future one from doing the same.
+      if (isMessage(e)) return;
       if (es.readyState === CLOSED) {
         void this.recover();
         return;
@@ -93,7 +98,10 @@ export class SessionStream {
       // The browser is retrying by itself (server sent `retry: 2000`).
       this.store.setConnection(this.everOpened ? "reconnecting" : "offline");
     };
-    const handler = (e: MessageEvent<string>) => {
+    const handler = (e?: Event) => {
+      // Only MessageEvents carry data; a connection error delivered to a
+      // named listener is a plain Event (`e.data.slice` used to throw).
+      if (!isMessage(e)) return;
       const ev = parseEvent(e.data);
       if (!ev) {
         this.store.addError("off_contract_event", `dropped an event that failed validation: ${e.data.slice(0, 120)}`);
@@ -117,8 +125,14 @@ export class SessionStream {
       status = 0;
     }
     if (this.stopped) return;
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       this.store.setConnection("unauthorized");
+      return;
+    }
+    if (status === 403) {
+      // The Origin or Host guard, not the token: no token fixes it, so no
+      // token prompt. The banner says what to check.
+      this.store.setConnection("forbidden");
       return;
     }
     this.store.setConnection(this.everOpened ? "reconnecting" : "offline");
@@ -140,6 +154,11 @@ export class SessionStream {
       this.es = null;
     }
   }
+}
+
+/** True for an event that carries a string payload (a server-sent event, not a connection error). */
+function isMessage(e: Event | undefined): e is MessageEvent<string> {
+  return typeof (e as MessageEvent | undefined)?.data === "string";
 }
 
 async function defaultProbe(): Promise<number> {

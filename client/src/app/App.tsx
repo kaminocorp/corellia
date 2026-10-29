@@ -9,7 +9,8 @@ import { OfflineBanner } from "./OfflineBanner";
 import { runtimeLabel } from "./runtimeLabel";
 import { TokenPrompt } from "./TokenPrompt";
 import { Transcript } from "./Transcript";
-import { Agent3D, StatsOverlay } from "../agent3d/Agent3D";
+import { Agent3D, AgentFallback, StatsOverlay } from "../agent3d/Agent3D";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Gallery } from "../gallery/Gallery";
 import { Stage } from "../renderer/Stage";
 import { assignHotkeys } from "../renderer/resolve";
@@ -66,6 +67,13 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
   const voice = useVoice(activeTurnId);
   const controller = voice.controller;
 
+  // Voice capabilities are fetched at init; a page that loaded before the
+  // backend was up (or before a token was entered) learns about the server's
+  // STT/TTS and barge-in setting when the stream comes online.
+  useEffect(() => {
+    if (connection === "online") void controller.refreshCapabilities();
+  }, [controller, connection]);
+
   useEffect(() => {
     const stream = new SessionStream(sessionStore, { onEvent: (ev) => controller.onStreamEvent(ev) });
     streamRef.current = stream;
@@ -99,16 +107,24 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
       hotkeys,
       fire,
       scroll: (dir) => scrollUIZone(dir),
+      // Escape: silence first, then cancel the running turn, else (in
+      // useGlobalKeys) the escape-bound action or a clear. Most speech plays
+      // after turn_done, when nothing else would have stopped it (review
+      // 2026-10-30, item 4).
       cancel: () => {
-        if (!activeTurnId) return false;
-        cancelTurn().catch(() => {});
-        return true;
+        const wasSpeaking = controller.player.isSpeaking;
+        controller.stopSpeaking();
+        if (activeTurnId) {
+          cancelTurn().catch(() => {});
+          return true;
+        }
+        return wasSpeaking;
       },
       clear: () => {
         if (spec.root) clearScreen().catch(report("clear_failed"));
       },
     }),
-    [hotkeys, fire, activeTurnId, spec.root],
+    [hotkeys, fire, activeTurnId, spec.root, controller],
   );
   useGlobalKeys(keyHandlers);
 
@@ -126,7 +142,18 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
 
   return (
     <main className="relative h-full w-full overflow-hidden">
-      <Stage spec={spec} fire={fire} onInvalid={(id, msg) => sessionStore.addError("render_invalid", `${id}: ${msg}`)} agent={<Agent3D state={sceneState} particles={particles} />} />
+      <Stage
+        spec={spec}
+        fire={fire}
+        onInvalid={(id, msg) => sessionStore.addError("render_invalid", `${id}: ${msg}`)}
+        agent={
+          // A lost WebGL context (GPU process crash, sleep/wake) or a failed
+          // scene chunk must not blank the page: fall back to the static agent.
+          <ErrorBoundary label="3D agent" resetKey={sceneState} fallback={<AgentFallback state={sceneState} />} onError={(e) => sessionStore.addError("agent3d", e.message)}>
+            <Agent3D state={sceneState} particles={particles} />
+          </ErrorBoundary>
+        }
+      />
 
       <header className="absolute top-4 left-5 flex items-center gap-4 font-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
         <span>{agentName}</span>
@@ -143,6 +170,7 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
       {connection === "unauthorized" && <TokenPrompt onSubmit={onToken} />}
 
       <footer className="absolute bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 px-6">
+        <ErrorLine />
         <div className="mb-4">
           <Transcript />
         </div>
@@ -155,7 +183,6 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
           }}
         />
       </footer>
-      <ErrorLine />
 
       {debug && <DebugPane />}
       {stats && <StatsOverlay />}

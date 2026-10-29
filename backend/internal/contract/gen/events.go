@@ -46,6 +46,9 @@ type Capabilities struct {
 	UiOps bool `json:"ui_ops"`
 }
 
+// A failure or a rejected op. Named `session_error` on the wire because an SSE
+// event named `error` is delivered to EventSource.onerror as a connection error
+// (review 2026-10-30, item 1).
 type ErrorEvent struct {
 	// Code corresponds to the JSON schema field "code".
 	Code string `json:"code"`
@@ -358,6 +361,10 @@ type ToolResultEvent struct {
 }
 
 type TranscriptEntry struct {
+	// True for the apology of a failed turn: shown and spoken, but left out of the
+	// history the model sees.
+	Failed *bool `json:"failed,omitempty,omitzero"`
+
 	// Role corresponds to the JSON schema field "role".
 	Role TranscriptEntryRole `json:"role"`
 

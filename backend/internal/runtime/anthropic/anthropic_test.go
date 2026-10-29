@@ -178,6 +178,60 @@ func TestRefusalAndHTTPError(t *testing.T) {
 	}
 }
 
+// A stream that closes without message_delta/message_stop (the connection
+// dropped) is a failure, not a short answer (review 2026-10-30, item 5).
+func TestTruncatedStreamIsAnError(t *testing.T) {
+	srv, _ := server(t, func(n int, w http.ResponseWriter) {
+		sse(w, "message_start", `{"type":"message_start","message":{"id":"m","type":"message","role":"assistant","model":"x","content":[],"stop_reason":null,"usage":{"input_tokens":1,"output_tokens":1}}}`)
+		sse(w, "content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`)
+		sse(w, "content_block_delta", `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Half a sent"}}`)
+		if n == 2 {
+			// A tool call cut mid-input must not be silently skipped either.
+			sse(w, "content_block_stop", `{"type":"content_block_stop","index":0}`)
+			sse(w, "content_block_start", `{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tu_1","name":"get_time","input":{}}}`)
+			sse(w, "content_block_delta", `{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"zo"}}`)
+		}
+	})
+	rt := New(Options{APIKey: "k", BaseURL: srv.URL})
+	for round := 1; round <= 2; round++ {
+		evs := rttest.Collect(mustStart(t, rt, turn(nil)))
+		kinds := rttest.Kinds(evs)
+		var fatal *runtime.Event
+		for i := range evs {
+			if evs[i].Kind == runtime.EventError && evs[i].Fatal {
+				fatal = &evs[i]
+			}
+		}
+		if fatal == nil {
+			t.Fatalf("round %d: truncated stream ended %v without a fatal error", round, kinds)
+		}
+		if !strings.Contains(fatal.Err.Error(), "without a stop reason") {
+			t.Fatalf("round %d: error = %v", round, fatal.Err)
+		}
+		if got := rttest.Text(evs); got != "Half a sent" {
+			t.Fatalf("round %d: partial text = %q", round, got)
+		}
+	}
+}
+
+// The runtime follows only what config hands it: an ANTHROPIC_BASE_URL in
+// the process environment (exported for other tools) is ignored (rule 4).
+func TestEnvironmentIsNotRead(t *testing.T) {
+	t.Setenv("ANTHROPIC_BASE_URL", "http://127.0.0.1:1/never")
+	t.Setenv("ANTHROPIC_AUTH_TOKEN", "from-env")
+	srv, cap := server(t, func(_ int, w http.ResponseWriter) { textStream(w, "ready", "end_turn") })
+	rt := New(Options{APIKey: "k", BaseURL: srv.URL})
+	evs := rttest.Collect(mustStart(t, rt, turn(nil)))
+	if got := rttest.Text(evs); got != "ready" {
+		t.Fatalf("text = %q (events %v)", got, rttest.Kinds(evs))
+	}
+	cap.mu.Lock()
+	defer cap.mu.Unlock()
+	if len(cap.bodies) != 1 {
+		t.Fatalf("requests = %d", len(cap.bodies))
+	}
+}
+
 func TestCancelMidStream(t *testing.T) {
 	srv, _ := server(t, func(_ int, w http.ResponseWriter) {
 		f := w.(http.Flusher)

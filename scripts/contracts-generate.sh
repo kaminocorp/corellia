@@ -14,18 +14,19 @@ GO_GEN="$ROOT/backend/internal/contract/gen"
 GO_EMBED="$ROOT/backend/internal/contract/embed"
 TS_GEN="$ROOT/client/src/contract/gen"
 
-GOJS="${GO_JSONSCHEMA:-$(go env GOPATH)/bin/go-jsonschema}"
-if [ ! -x "$GOJS" ]; then
-  echo "installing go-jsonschema" >&2
-  go install github.com/atombender/go-jsonschema@v0.20.0
-fi
+# The Go generator runs at a pinned version through `go run` so every
+# machine (and CI) produces the same code; a locally installed binary of
+# another version used to make the committed types drift (review
+# 2026-10-30, item 7). GO_JSONSCHEMA overrides the command for experiments.
+GO_JSONSCHEMA_VERSION="v0.24.1"
+GOJS="${GO_JSONSCHEMA:-go run github.com/atombender/go-jsonschema@$GO_JSONSCHEMA_VERSION}"
 
 mkdir -p "$GO_GEN" "$GO_EMBED" "$TS_GEN"
 
 # --- Go types ---------------------------------------------------------------
 (
   cd "$SCHEMA"
-  "$GOJS" -p gen --only-models --tags json --capitalization ID --capitalization URL \
+  $GOJS -p gen --only-models --tags json --capitalization ID --capitalization URL \
     --schema-root-type https://corellia.dev/schema/ui-spec.schema.json=UISpec \
     --schema-root-type https://corellia.dev/schema/ops.schema.json=SpecOp \
     --schema-root-type https://corellia.dev/schema/events.schema.json=SessionEvent \

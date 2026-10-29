@@ -27,6 +27,27 @@ describe("useDecay", () => {
   });
 });
 
+describe("useGlobalKeys", () => {
+  it("ignores auto-repeat so a held Enter cannot confirm a proposal", () => {
+    const fire = vi.fn();
+    const ok: ResolvedAction = { id: "ok", label: "Do it", hotkey: "enter", slot: "confirm", nodeId: "card" };
+    const h: GlobalKeyHandlers = {
+      inputValue: () => "",
+      clearInput: () => {},
+      hotkeys: new Map([["ok", ok]]),
+      fire,
+      cancel: () => false,
+      clear: () => {},
+      scroll: () => false,
+    };
+    renderHook(() => useGlobalKeys(h));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", repeat: true }));
+    expect(fire).not.toHaveBeenCalled();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    expect(fire).toHaveBeenCalledWith("ok", "card");
+  });
+});
+
 describe("resolveKey", () => {
   const action = (id: string, hotkey: string): ResolvedAction => ({ id, label: id, hotkey, slot: "primary", nodeId: "n" });
   const handlers = (over: Partial<GlobalKeyHandlers> = {}): GlobalKeyHandlers => ({

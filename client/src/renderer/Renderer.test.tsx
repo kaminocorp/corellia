@@ -46,6 +46,40 @@ describe("Renderer", () => {
     expect(screen.getByText("x")).toBeInTheDocument();
   });
 
+  it("stacks floating overlays that share an anchor instead of piling them up", () => {
+    const spec = build([
+      { op: "add_node", id: "reply_text", node: { type: "Markdown", props: { text: "Reply" } } },
+      { op: "add_node", id: "reply_card", node: { type: "Overlay", props: { position: "top_right" }, slots: { content: ["reply_text"] } } },
+      { op: "add_node", id: "status_text", node: { type: "Status", props: { text: "That didn't work", level: "error" } } },
+      { op: "add_node", id: "status_card", node: { type: "Overlay", props: { position: "top_right" }, slots: { content: ["status_text"] } } },
+      { op: "add_node", id: "clock_text", node: { type: "Status", props: { text: "14:05" } } },
+      { op: "add_node", id: "ambient_clock", node: { type: "Overlay", props: { position: "top_left" }, slots: { content: ["clock_text"] } } },
+    ]);
+    const { container } = render(<Renderer spec={spec} fire={() => {}} />);
+    const right = container.querySelector('[data-overlay-group="top_right"]')!;
+    expect(right).not.toBeNull();
+    expect(right.className).toContain("flex-col");
+    expect(right.querySelectorAll("[data-floating]")).toHaveLength(2);
+    expect(container.querySelector('[data-overlay-group="top_left"]')!.querySelectorAll("[data-floating]")).toHaveLength(1);
+    // Inside a group each overlay lays out in flow, not absolutely over its neighbours.
+    for (const el of right.querySelectorAll("[data-floating] > [data-node] > div")) expect(el.className).not.toContain("absolute");
+    expect(screen.getByText("Reply")).toBeInTheDocument();
+    expect(screen.getByText("That didn't work")).toBeInTheDocument();
+  });
+
+  it("reports an invalid node once, after render, not on every re-render", () => {
+    const onInvalid = vi.fn();
+    const spec = build([
+      { op: "add_node", id: "stat", node: { type: "Stat", props: { label: "L", value: 1, trend: "sideways" } } },
+      { op: "set_root", id: "stat" },
+    ]);
+    const { rerender } = render(<Renderer spec={spec} fire={() => {}} onInvalid={onInvalid} />);
+    rerender(<Renderer spec={spec} fire={() => {}} onInvalid={onInvalid} />);
+    rerender(<Renderer spec={spec} fire={() => {}} onInvalid={onInvalid} />);
+    expect(onInvalid).toHaveBeenCalledTimes(1);
+    expect(onInvalid).toHaveBeenCalledWith("stat", expect.stringContaining("trend"));
+  });
+
   it("renders every non-layout component from its catalog example except Map", async () => {
     const { catalog } = await import("../contract");
     for (const [name, def] of Object.entries(catalog.components)) {

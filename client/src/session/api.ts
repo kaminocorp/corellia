@@ -63,8 +63,8 @@ export async function transcribe(audio: Blob, mime: string, fetchImpl: typeof fe
 }
 
 /** POST /api/voice/tts; resolves to encoded audio bytes. */
-export async function synthesize(text: string, fetchImpl: typeof fetch = fetch): Promise<ArrayBuffer> {
-  const res = await fetchImpl("/api/voice/tts", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ text }) });
+export async function synthesize(text: string, signal?: AbortSignal, fetchImpl: typeof fetch = fetch): Promise<ArrayBuffer> {
+  const res = await fetchImpl("/api/voice/tts", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ text }), signal });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
     throw new ApiError(res.status, body.code ?? "http_error", body.error ?? `HTTP ${res.status}`);

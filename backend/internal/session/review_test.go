@@ -40,19 +40,76 @@ func TestFailedTurnIsNotSilent(t *testing.T) {
 		t.Fatalf("status = %v", done["status"])
 	}
 	text, _ := done["text"].(string)
-	if !strings.Contains(text, "Let me") || !strings.Contains(text, "Sorry") || !strings.Contains(text, "boom") {
+	// The apology names the reason in plain words; the raw error ("boom:
+	// upstream HTTP 500") goes to the session_error event and the log only
+	// (review 2026-10-30, item 5).
+	if !strings.Contains(text, "Let me") || !strings.Contains(text, "Sorry") || !strings.Contains(text, "internal error") || strings.Contains(text, "boom") {
 		t.Fatalf("turn_done text = %q", text)
 	}
-	if len(speech) == 0 || !strings.Contains(strings.Join(speech, " "), "Sorry") {
-		t.Fatalf("no apology spoken: %v", speech)
+	if len(speech) == 0 || !strings.Contains(strings.Join(speech, " "), "Sorry") || strings.Contains(strings.Join(speech, " "), "boom") {
+		t.Fatalf("apology not spoken in plain words: %v", speech)
 	}
 	if !statusCard {
 		t.Fatal("no status card shown")
 	}
+	rawSeen := false
+	for _, e := range evs {
+		if e["type"] == "session_error" && strings.Contains(e["message"].(string), "boom") {
+			rawSeen = true
+		}
+	}
+	if !rawSeen {
+		t.Fatal("raw error missing from the session_error event")
+	}
 	s.WaitTurn(id)
 	tr := s.Snapshot()["transcript"].([]gen.TranscriptEntry)
-	if last := tr[len(tr)-1]; last.Role != gen.TranscriptEntryRoleAgent || !strings.Contains(last.Text, "Sorry") {
+	last := tr[len(tr)-1]
+	if last.Role != gen.TranscriptEntryRoleAgent || !strings.Contains(last.Text, "Sorry") || last.Failed == nil || !*last.Failed {
 		t.Fatalf("transcript tail = %+v", last)
+	}
+	// The next turn's history holds the question but not the apology.
+	s.mu.Lock()
+	hist := s.historyLocked()
+	s.mu.Unlock()
+	for _, m := range hist {
+		if strings.Contains(m.Text, "Sorry") {
+			t.Fatalf("failed reply leaked into model history: %+v", hist)
+		}
+	}
+	if len(hist) == 0 || hist[len(hist)-1].Role != "user" {
+		t.Fatalf("history = %+v", hist)
+	}
+}
+
+func TestDescribeFailure(t *testing.T) {
+	cases := map[string]string{
+		`anthropic: POST "http://127.0.0.1:1/v1/messages": 404 Not Found {"type":"error","error":{"type":"not_found_error"}}`: "isn't available",
+		"anthropic: 529 overloaded_error":                        "overloaded",
+		"anthropic: 401 authentication_error":                    "credentials",
+		"anthropic: 429 rate_limit_error":                        "rate-limiting",
+		"anthropic: stream ended without a stop reason":          "dropped",
+		"context deadline exceeded":                              "too long",
+		"dial tcp: lookup api.anthropic.com: no such host":       "can't reach",
+		"simulated failure (local demo): the user asked for one": "simulated",
+		"something nobody anticipated":                           "couldn't tell why",
+	}
+	for in, want := range cases {
+		if got := describeFailure(in); !strings.Contains(got, want) {
+			t.Errorf("describeFailure(%q) = %q, want it to contain %q", in, got, want)
+		}
+		if got := describeFailure(in); strings.Contains(got, "http") || strings.Contains(got, "{") {
+			t.Errorf("describeFailure(%q) = %q leaks detail", in, got)
+		}
+	}
+}
+
+func TestSnapshotCarriesSeqUnderLock(t *testing.T) {
+	s := New(Options{Registry: reg(t), Runtime: &scripted{}})
+	defer s.Close()
+	before := s.Seq()
+	snap := s.Snapshot()
+	if seq, ok := snap["seq"].(int); !ok || seq != before {
+		t.Fatalf("snapshot seq = %v, bus seq = %d", snap["seq"], before)
 	}
 }
 
@@ -78,7 +135,7 @@ func TestImageHostAllowlist(t *testing.T) {
 	evs := drainUntil(t, ch, "turn_done", id)
 	var codes []string
 	for _, e := range evs {
-		if e["type"] == "error" {
+		if e["type"] == "session_error" {
 			codes = append(codes, e["code"].(string))
 		}
 	}

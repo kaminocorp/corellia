@@ -139,8 +139,11 @@ export type TurnDoneEvent = Base & {
   modality?: Modality;
   [k: string]: unknown;
 };
+/**
+ * A failure or a rejected op. Named `session_error` on the wire because an SSE event named `error` is delivered to EventSource.onerror as a connection error (review 2026-10-30, item 1).
+ */
 export type ErrorEvent = Base & {
-  type: "error";
+  type: "session_error";
   code: string;
   message: string;
   fatal?: boolean;
@@ -265,6 +268,10 @@ export interface TranscriptEntry {
   ts: string;
   turn_id?: TurnId;
   source?: "keyboard" | "voice" | "proactive" | "action";
+  /**
+   * True for the apology of a failed turn: shown and spoken, but left out of the history the model sees.
+   */
+  failed?: boolean;
   [k: string]: unknown;
 }
 /**

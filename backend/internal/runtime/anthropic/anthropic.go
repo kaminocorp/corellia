@@ -20,7 +20,7 @@ import (
 // Options configures the runtime.
 type Options struct {
 	APIKey string
-	// BaseURL overrides the API endpoint (tests).
+	// BaseURL overrides the API endpoint (ANTHROPIC_BASE_URL via config; tests).
 	BaseURL string
 	// Model id; default claude-opus-5-5.
 	Model string
@@ -58,7 +58,11 @@ func New(o Options) *Runtime {
 		t := true
 		o.Fallbacks = &t
 	}
-	opts := []option.RequestOption{option.WithMaxRetries(1)}
+	// The SDK would otherwise read ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN,
+	// ANTHROPIC_BASE_URL, ANTHROPIC_PROFILE and ANTHROPIC_CUSTOM_HEADERS on
+	// its own; internal/config is the only environment reader (rule 4), so
+	// everything the client needs arrives through Options.
+	opts := []option.RequestOption{option.WithoutEnvironmentDefaults(), option.WithMaxRetries(1)}
 	if o.APIKey != "" {
 		opts = append(opts, option.WithAPIKey(o.APIKey))
 	}
@@ -193,6 +197,13 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 		}
 		if err := stream.Err(); err != nil {
 			return fmt.Errorf("anthropic: %w", err)
+		}
+		if message.StopReason == "" {
+			// The connection closed before message_delta carried a stop
+			// reason: a half reply, or a tool call cut mid-input. Reporting it
+			// as complete would pass the fragment off as the answer (review
+			// 2026-10-30, item 5).
+			return fmt.Errorf("anthropic: stream ended without a stop reason (connection dropped after %d content blocks)", len(message.Content))
 		}
 		if message.StopReason == anthropic.BetaStopReasonRefusal {
 			emit(runtime.Event{Kind: runtime.EventTextDelta, Text: "I can't help with that one."})

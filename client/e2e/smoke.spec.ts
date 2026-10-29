@@ -90,3 +90,40 @@ test("debug pane shows the stream and no error is logged", async ({ page }) => {
   await expect(page.getByLabel("Message")).toBeFocused();
   expect(errors).toEqual([]);
 });
+
+test("a failed turn is visible and spoken in plain words, and the connection stays online (review 2026-10-30, item 1)", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/");
+  const input = page.getByLabel("Message");
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+
+  await input.fill("what time is it");
+  await input.press("Enter");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+
+  await input.fill("please simulate a failure");
+  await input.press("Enter");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+  const transcript = page.getByRole("list", { name: "Transcript" });
+  await expect(transcript).toContainText("Sorry, that didn't work on my side. A simulated failure");
+  await expect(transcript).not.toContainText("local demo): the user asked"); // the raw error is not shown or spoken
+  await expect(page.getByTestId("error-line")).toContainText("runtime: simulated failure");
+  await expect(page.locator('[data-node="status_card_text"]')).toBeVisible();
+  // The server's `session_error` event must not read as a connection error.
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+  await expect(page.getByRole("status").filter({ hasText: /connection lost|unreachable/ })).toHaveCount(0);
+  // The glance root and the status card share top_right: stacked, both visible, not overlapping.
+  const group = page.locator('[data-overlay-group="top_right"]');
+  await expect(group.locator("[data-floating]")).toHaveCount(2);
+  const boxes = await group.locator("[data-floating] > [data-node]").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
+  expect(boxes).toHaveLength(2);
+  expect(boxes[1].top).toBeGreaterThanOrEqual(boxes[0].bottom);
+
+  // Every reload replays the buffered events: the banner must not come back.
+  await page.reload();
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+  await expect(page.getByRole("status").filter({ hasText: /connection lost|unreachable/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

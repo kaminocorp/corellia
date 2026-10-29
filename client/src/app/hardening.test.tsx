@@ -60,6 +60,8 @@ describe("hardening", () => {
     expect(screen.getByRole("status")).toHaveTextContent("unreachable");
     rerender(<OfflineBanner status="unauthorized" />);
     expect(screen.getByRole("status")).toHaveTextContent("token rejected");
+    rerender(<OfflineBanner status="forbidden" />);
+    expect(screen.getByRole("status")).toHaveTextContent("request refused");
   });
 
   it("heartbeat posts immediately and on the interval until stopped", () => {

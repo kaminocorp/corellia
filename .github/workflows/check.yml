@@ -7,7 +7,7 @@ on:
 
 jobs:
   client:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,7 +24,7 @@ jobs:
       - run: pnpm -C client build
 
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -36,7 +36,7 @@ jobs:
       - run: cd backend && gofmt -l . && test -z "$(gofmt -l .)"
 
   contract:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -54,7 +54,7 @@ jobs:
       - run: git diff --exit-code -- backend/internal/contract client/src/contract shared
 
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

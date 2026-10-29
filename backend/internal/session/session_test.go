@@ -112,7 +112,7 @@ func TestTurnLifecycleWithLocalRuntime(t *testing.T) {
 	if seen["turn_started"] != 1 || seen["text_delta"] == 0 || seen["spec_op"] < 5 || seen["speech"] == 0 {
 		t.Fatalf("event mix = %v", seen)
 	}
-	if seen["error"] != 0 {
+	if seen["session_error"] != 0 {
 		t.Fatalf("unexpected error events: %v", evs)
 	}
 	last := evs[len(evs)-1]
@@ -151,7 +151,7 @@ func TestInvalidOpsBecomeErrorEventsAndAreDropped(t *testing.T) {
 	evs := drainUntil(t, ch, "turn_done", id)
 	var codes []string
 	for _, e := range evs {
-		if e["type"] == "error" {
+		if e["type"] == "session_error" {
 			codes = append(codes, e["code"].(string))
 		}
 	}

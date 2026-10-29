@@ -48,13 +48,19 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	snap := h.s.Snapshot()
 	snap["type"] = "session"
-	snap["seq"] = h.s.Seq()
+	seq, ok := snap["seq"].(int)
+	if !ok {
+		// A session that does not report its own seq: read it afterwards
+		// (an op in between is replayed and re-applied, never lost).
+		seq = h.s.Seq()
+		snap["seq"] = seq
+	}
 	snap["ts"] = h.Now().UTC().Format(time.RFC3339Nano)
 	snapJSON, err := json.Marshal(snap)
 	if err != nil {
 		return
 	}
-	writeSSE(w, snap["seq"].(int), "session", snapJSON)
+	writeSSE(w, seq, "session", snapJSON)
 	flusher.Flush()
 
 	hb := time.NewTicker(h.Heartbeat)

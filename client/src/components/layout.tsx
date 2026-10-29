@@ -1,3 +1,6 @@
+import { useContext } from "react";
+
+import { OVERLAY_ANCHOR, OverlayStack } from "./overlayStack";
 import { GAP } from "./styles";
 import type { ComponentImpl } from "./types";
 
@@ -31,17 +34,13 @@ export const Split: ComponentImpl = ({ props, slot }) => {
   );
 };
 
-const POSITION: Record<string, string> = {
-  top_left: "top-6 left-6",
-  top_right: "top-6 right-6",
-  bottom_left: "bottom-28 left-6",
-  bottom_right: "bottom-28 right-6",
-  center: "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+export const Overlay: ComponentImpl = ({ props, slot }) => {
+  const stacked = useContext(OverlayStack);
+  const anchor = stacked ? "relative" : `absolute ${OVERLAY_ANCHOR[String(props.position)] ?? OVERLAY_ANCHOR.top_right}`;
+  return (
+    <>
+      {props.dim ? <div className="pointer-events-none fixed inset-0 bg-black/50" aria-hidden /> : null}
+      <div className={`${anchor} max-w-[28rem] min-w-[16rem]`}>{slot("content")}</div>
+    </>
+  );
 };
-
-export const Overlay: ComponentImpl = ({ props, slot }) => (
-  <>
-    {props.dim ? <div className="pointer-events-none absolute inset-0 bg-black/50" aria-hidden /> : null}
-    <div className={`absolute max-w-[28rem] min-w-[16rem] ${POSITION[String(props.position)] ?? POSITION.top_right}`}>{slot("content")}</div>
-  </>
-);

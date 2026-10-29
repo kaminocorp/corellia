@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -58,6 +59,11 @@ type Config struct {
 
 	// AnthropicAPIKey enables the anthropic runtime.
 	AnthropicAPIKey string `env:"ANTHROPIC_API_KEY"`
+	// AnthropicBaseURL points the anthropic runtime at another endpoint (a
+	// gateway, a fake for tests). Read here, not by the SDK, so a URL
+	// exported for other tools is only followed when it is set for this
+	// process too (rule 4).
+	AnthropicBaseURL string `env:"ANTHROPIC_BASE_URL"`
 	// OpenAIAPIKey / OpenAIBaseURL enable the openai-compatible runtime
 	// (DeepSeek: OPENAI_BASE_URL=https://api.deepseek.com/v1).
 	OpenAIAPIKey  string `env:"OPENAI_API_KEY"`
@@ -95,11 +101,19 @@ type Config struct {
 	DevOrigins []string `env:"CORELLIA_DEV_ORIGINS" envDefault:"http://localhost:5173" envSeparator:","`
 }
 
+// devOriginsSet reports whether CORELLIA_DEV_ORIGINS was given explicitly.
+func devOriginsSet() bool { _, ok := os.LookupEnv("CORELLIA_DEV_ORIGINS"); return ok }
+
 // Load parses the environment into a Config and validates it.
 func Load() (Config, error) {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {
 		return Config{}, fmt.Errorf("config: %w", err)
+	}
+	if cfg.DeviceToken != "" && !devOriginsSet() {
+		// The Vite default is a development convenience; in token mode any
+		// local dev server on :5173 could otherwise drive the agent.
+		cfg.DevOrigins = nil
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err

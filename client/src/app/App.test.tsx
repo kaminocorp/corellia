@@ -137,7 +137,7 @@ describe("App", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(calls).toContain("POST /api/turn");
     act(() => {
-      es.emit("error", { type: "error", seq: 4, ts: "2026-10-29T10:00:01Z", turn_id: "t1", code: "runtime", message: "upstream HTTP 500", fatal: true });
+      es.emit("session_error", { type: "session_error", seq: 4, ts: "2026-10-29T10:00:01Z", turn_id: "t1", code: "runtime", message: "upstream HTTP 500", fatal: true });
     });
     expect(screen.getByTestId("error-line")).toHaveTextContent("runtime: upstream HTTP 500");
   });

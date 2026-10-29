@@ -85,7 +85,7 @@ func (s *Store) AppendJSONL(name string, v any) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(s.path(name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(s.path(name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}

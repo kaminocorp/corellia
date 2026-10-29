@@ -25,7 +25,7 @@ export type Capture = { start(stream: MediaStream): void; stop(flush?: boolean):
 export type VoiceDeps = {
   getMicStream: () => Promise<MediaStream>;
   transcribe: (audio: Blob, mime: string) => Promise<{ text: string }>;
-  synthesize: (text: string) => Promise<ArrayBuffer>;
+  synthesize: (text: string, signal?: AbortSignal) => Promise<ArrayBuffer>;
   sendTurn: (text: string) => Promise<unknown>;
   cancelTurn: () => Promise<unknown>;
   fetchCapabilities: () => Promise<VoiceCapabilities>;
@@ -33,7 +33,7 @@ export type VoiceDeps = {
   browserRecognition: () => boolean;
   createBrowserStt: (cb: ConstructorParameters<typeof BrowserStt>[0]) => { start(): void; stop(): void };
   browserSynth: () => PlayBackend | null;
-  serverSynth: (fetchAudio: (text: string) => Promise<ArrayBuffer>) => PlayBackend;
+  serverSynth: (fetchAudio: (text: string, signal?: AbortSignal) => Promise<ArrayBuffer>) => PlayBackend;
 };
 
 const silent: PlayBackend = { speak: async () => {}, stop: () => {} };
@@ -50,6 +50,13 @@ export class VoiceController {
   private disposed = false;
   /** Speech that began while the agent was talking with barge-in off: its text is dropped. */
   private ignoreUtterance = false;
+  /**
+   * Bumped on every open and close. openMic awaits getUserMedia; a close
+   * in the meantime (a short push-to-talk tap, a second Ctrl+Space while
+   * the permission prompt is open) must win, or the mic would record while
+   * the indicator says off (review 2026-10-30, item 3).
+   */
+  private micGen = 0;
 
   constructor(private readonly deps: VoiceDeps) {
     this.player = new SpeechPlayer(silent, {
@@ -74,13 +81,45 @@ export class VoiceController {
     // React StrictMode (Vite dev) runs the effect twice: dispose, then init
     // again on the same instance. A disposed controller comes back to life.
     this.disposed = false;
-    const c = await this.deps.fetchCapabilities();
+    let c: VoiceCapabilities;
+    try {
+      c = await this.deps.fetchCapabilities();
+    } catch (e) {
+      // The backend is not up yet: the browser fallbacks apply until
+      // refreshCapabilities runs when the stream comes online.
+      this.patch({ error: e instanceof Error ? e.message : String(e) });
+      this.player.setBackend(this.deps.browserSynth() ?? silent);
+      return;
+    }
     if (this.disposed) return;
+    this.applyCapabilities(c, true);
+  }
+
+  /**
+   * Re-reads the server's voice capabilities (on reconnect). Only a change
+   * is applied, and the playback backend is swapped only when the TTS
+   * provider changed, so a routine reconnect does not cut speech.
+   */
+  async refreshCapabilities(): Promise<void> {
+    let c: VoiceCapabilities;
+    try {
+      c = await this.deps.fetchCapabilities();
+    } catch {
+      return;
+    }
+    if (this.disposed) return;
+    if (JSON.stringify(c) === JSON.stringify(this.caps)) return;
+    this.applyCapabilities(c, c.tts !== this.caps.tts);
+  }
+
+  private applyCapabilities(c: VoiceCapabilities, swapBackend: boolean) {
     this.caps = c;
     this.activation.mode = c.mode;
-    if (c.tts !== "none") this.player.setBackend(this.deps.serverSynth(this.deps.synthesize));
-    else this.player.setBackend(this.deps.browserSynth() ?? silent);
-    this.patch({ mode: c.mode, stt: c.stt, tts: c.tts });
+    if (swapBackend) {
+      if (c.tts !== "none") this.player.setBackend(this.deps.serverSynth(this.deps.synthesize));
+      else this.player.setBackend(this.deps.browserSynth() ?? silent);
+    }
+    this.patch({ mode: c.mode, stt: c.stt, tts: c.tts, error: null });
   }
 
   setActiveTurn(id: string | null): void {
@@ -138,15 +177,23 @@ export class VoiceController {
     void this.apply(this.activation.keyup(e));
   }
 
-  /** Attaches key listeners; returns the detach function. */
+  /** Push-to-talk and the window loses focus (Cmd+Tab while holding the key): the key-up never arrives, so release here. */
+  handleBlur(): void {
+    if (this.caps.mode === "ptt") void this.apply(this.activation.keyup({ code: "Space" }));
+  }
+
+  /** Attaches key and blur listeners; returns the detach function. */
   attach(target: Window): () => void {
     const down = (e: KeyboardEvent) => this.handleKeyDown(e);
     const up = (e: KeyboardEvent) => this.handleKeyUp(e);
+    const blur = () => this.handleBlur();
     target.addEventListener("keydown", down);
     target.addEventListener("keyup", up);
+    target.addEventListener("blur", blur);
     return () => {
       target.removeEventListener("keydown", down);
       target.removeEventListener("keyup", up);
+      target.removeEventListener("blur", blur);
     };
   }
 
@@ -170,6 +217,7 @@ export class VoiceController {
   }
 
   private async openMic(): Promise<void> {
+    const gen = ++this.micGen;
     try {
       if (this.caps.stt === "none" && this.deps.browserRecognition()) {
         const stt = this.deps.createBrowserStt({
@@ -178,12 +226,22 @@ export class VoiceController {
           },
           onSpeechStart: () => this.onSpeechStart(),
           onSpeechEnd: () => void this.apply(this.activation.setCapturing(false)),
-          onError: (e) => this.patch({ error: e }),
+          onError: (e, fatal) => {
+            this.patch({ error: e });
+            // Recognition is gone for good: the indicator must not keep
+            // saying "listening".
+            if (fatal) this.forceOff();
+          },
         });
         this.stt = stt;
         stt.start();
       } else {
         const stream = await this.deps.getMicStream();
+        if (gen !== this.micGen || !this.activation.open) {
+          // Closed while the permission prompt was open: release the device.
+          stream.getTracks?.().forEach((t) => t.stop());
+          return;
+        }
         const cap = this.deps.createCapture({
           onSpeechStart: () => this.onSpeechStart(),
           onUtterance: async (blob, mime) => {
@@ -207,13 +265,21 @@ export class VoiceController {
       }
       this.patch({ error: null });
     } catch (e) {
-      this.closeMic();
-      this.activation.state = "off";
-      this.patch({ mic: "off", error: e instanceof Error ? e.message : String(e) });
+      if (gen !== this.micGen) return; // already closed meanwhile
+      this.forceOff();
+      this.patch({ error: e instanceof Error ? e.message : String(e) });
     }
   }
 
+  /** Closes the mic and resets activation to off (a failure, not a key). */
+  private forceOff(): void {
+    this.closeMic();
+    this.activation.state = "off";
+    this.patch({ mic: "off" });
+  }
+
   private closeMic(flush = false): void {
+    this.micGen++;
     this.capture?.stop(flush);
     this.capture = null;
     this.stt?.stop();

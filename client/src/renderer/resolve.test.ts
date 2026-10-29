@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applyOps, emptySpec, type SpecOp } from "../contract";
-import { assignHotkeys, floatingOverlays, placement, resolveNode, withDefaults } from "./resolve";
+import { assignHotkeys, floatingOverlays, overlayGroups, placement, resolveNode, withDefaults } from "./resolve";
 
 const build = (ops: SpecOp[]) => applyOps(emptySpec(), ops);
 
@@ -32,6 +32,41 @@ describe("assignHotkeys", () => {
     expect(keys.get("ok")?.hotkey).toBe("enter");
     expect(keys.has("no")).toBe(false); // dangling action record is skipped
     expect(keys.get("x")?.nodeId).toBe("a");
+  });
+});
+
+describe("assignHotkeys and proposals", () => {
+  it("gives no digit to a confirm_proposal action below the top card; cancel actions still get one", () => {
+    const spec = build([
+      { op: "set_action", id: "p1_yes", action: { kind: "tool", tool: "confirm_proposal", args: { proposal_id: "p1" } } },
+      { op: "set_action", id: "p1_no", action: { kind: "tool", tool: "reject_proposal", args: { proposal_id: "p1" } } },
+      { op: "set_action", id: "p2_yes", action: { kind: "tool", tool: "confirm_proposal", args: { proposal_id: "p2" } } },
+      { op: "set_action", id: "p2_no", action: { kind: "tool", tool: "reject_proposal", args: { proposal_id: "p2" } } },
+      { op: "add_node", id: "c1", node: { type: "Confirm", props: { proposal_id: "p1", title: "A" }, actions: { confirm: { id: "p1_yes", label: "Do it", hotkey: "enter" }, reject: { id: "p1_no", label: "Cancel", hotkey: "escape" } } } },
+      { op: "add_node", id: "c2", node: { type: "Confirm", props: { proposal_id: "p2", title: "B" }, actions: { confirm: { id: "p2_yes", label: "Do it" }, reject: { id: "p2_no", label: "Cancel" } } } },
+      { op: "add_node", id: "stack", node: { type: "Stack", slots: { children: ["c1", "c2"] } } },
+      { op: "add_node", id: "proposals", node: { type: "Overlay", props: { position: "bottom_right" }, slots: { content: ["stack"] } } },
+    ]);
+    const keys = assignHotkeys(spec);
+    expect(keys.get("p1_yes")?.hotkey).toBe("enter");
+    expect(keys.get("p2_yes")?.hotkey).toBe(""); // voice or Enter once it is on top
+    expect(keys.get("p2_no")?.hotkey).toBe("1");
+  });
+});
+
+describe("overlayGroups", () => {
+  it("groups floating overlays by anchor, in id order", () => {
+    const spec = build([
+      { op: "add_node", id: "status_card", node: { type: "Overlay", props: { position: "top_right" } } },
+      { op: "add_node", id: "reply_card", node: { type: "Overlay", props: { position: "top_right" } } },
+      { op: "add_node", id: "ambient_clock", node: { type: "Overlay", props: { position: "top_left" } } },
+      { op: "add_node", id: "root", node: { type: "Overlay", props: {} } },
+      { op: "set_root", id: "root" },
+    ]);
+    expect(overlayGroups(spec)).toEqual([
+      { position: "top_right", ids: ["root", "reply_card", "status_card"] },
+      { position: "top_left", ids: ["ambient_clock"] },
+    ]);
   });
 });
 

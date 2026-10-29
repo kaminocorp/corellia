@@ -8,7 +8,7 @@ import { useRef, useSyncExternalStore } from "react";
 import { applyOp, emptySpec, ReducerError } from "../contract";
 import type { AgentState, Capabilities, Proposal, SessionEvent, SpecOp, TranscriptEntry, UISpec } from "../contract";
 
-export type ConnectionStatus = "connecting" | "online" | "reconnecting" | "offline" | "unauthorized";
+export type ConnectionStatus = "connecting" | "online" | "reconnecting" | "offline" | "unauthorized" | "forbidden";
 
 export type ClientError = { code: string; message: string; ts: string; turnId?: string };
 
@@ -109,6 +109,8 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
       touched: Object.fromEntries(Object.keys(ev.spec.nodes).map((id) => [id, state.touched[id] ?? (Date.parse(ev.ts) || Date.now())])),
       activeTurnId: ev.agent_state === "idle" ? null : state.activeTurnId,
       streamingText: ev.agent_state === "idle" ? "" : state.streamingText,
+      // Speech heard before the reconnect cannot be completed by what follows.
+      pendingSpeech: [],
       recentEvents: tail([...state.recentEvents, ev], MAX_RECENT),
     };
   }
@@ -122,6 +124,7 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
       );
       next.activeTurnId = ev.turn_id ?? null;
       next.streamingText = "";
+      next.pendingSpeech = [];
       return next;
     case "state":
       next.agentState = ev.state;
@@ -141,14 +144,18 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
       return next;
     case "turn_done": {
       const text = ev.text ?? state.streamingText;
-      if (text) {
+      // A snapshot taken between the server's transcript append and its
+      // turn_done already holds this reply; do not add it twice.
+      const last = state.transcript[state.transcript.length - 1];
+      const dup = !!last && last.role === "agent" && !!ev.turn_id && last.turn_id === ev.turn_id;
+      if (text && !dup) {
         next.transcript = tail([...state.transcript, { role: "agent", text, ts: ev.ts, turn_id: ev.turn_id }], MAX_TRANSCRIPT);
       }
       next.activeTurnId = null;
       next.streamingText = "";
       return next;
     }
-    case "error":
+    case "session_error":
       next.errors = tail([...state.errors, { code: ev.code, message: ev.message, ts: ev.ts, turnId: ev.turn_id }], MAX_ERRORS);
       return next;
     case "proposal": {

@@ -238,7 +238,7 @@ func (s *Session) Confirm(id string, source runtime.Source) error {
 			return err
 		}
 		s.bus.Publish("proposal", withTurn(map[string]any{"proposal": gp, "status": "failed"}, pd.TurnID))
-		s.bus.Publish("error", withTurn(map[string]any{"code": "action_failed", "message": err.Error()}, pd.TurnID))
+		s.bus.Publish("session_error", withTurn(map[string]any{"code": "action_failed", "message": err.Error()}, pd.TurnID))
 		s.sayAndRecord(pd.TurnID, fmt.Sprintf("That didn't work: %s", err.Error()))
 		if quiet {
 			s.setState(gen.AgentStateIdle, "")
@@ -374,7 +374,7 @@ func (s *Session) runTool(tool string, args map[string]any) error {
 		return nil
 	}
 	if err != nil {
-		s.bus.Publish("error", map[string]any{"code": "tool_failed", "message": err.Error()})
+		s.bus.Publish("session_error", map[string]any{"code": "tool_failed", "message": err.Error()})
 		return nil
 	}
 	s.applyResultOps("", res)

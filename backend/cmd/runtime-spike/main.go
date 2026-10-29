@@ -113,7 +113,7 @@ func main() {
 				if st.FirstOp == 0 {
 					st.FirstOp = time.Since(start)
 				}
-			case "error":
+			case "session_error":
 				code, _ := m["code"].(string)
 				if code != "runtime" && code != "runtime_start" && code != "tool_failed" {
 					st.SpecErrors++

@@ -53,6 +53,13 @@ export function assignHotkeys(spec: UISpec): Map<string, ResolvedAction> {
   for (const id of floatingOverlays(spec)) visit(id, seen);
   let digit = 1;
   for (const { ref } of pending) {
+    // Confirming a side effect takes Enter on the top card (the server binds
+    // it) or a spoken confirmation: a digit typed as the start of a message
+    // must not run one on a card further down the stack (review 2026-10-30).
+    if (!ref.hotkey && spec.actions[ref.id]?.tool === "confirm_proposal") {
+      out.set(ref.id, ref);
+      continue;
+    }
     if (!ref.hotkey) {
       while (digit <= 9 && used.has(String(digit))) digit++;
       if (digit <= 9) {
@@ -80,6 +87,23 @@ export function floatingOverlays(spec: UISpec): string[] {
     .filter(([id, n]) => n.type === "Overlay" && id !== spec.root && !referenced.has(id))
     .map(([id]) => id)
     .sort();
+}
+
+/**
+ * Overlays grouped by their anchor: a root Overlay (a glance) first, then
+ * the floating ones in id order. Overlays at the same position are stacked
+ * by the renderer instead of being drawn on top of each other (review
+ * 2026-10-30, item 8).
+ */
+export function overlayGroups(spec: UISpec): Array<{ position: string; ids: string[] }> {
+  const groups = new Map<string, string[]>();
+  const ids = floatingOverlays(spec);
+  if (spec.root && spec.nodes[spec.root]?.type === "Overlay") ids.unshift(spec.root);
+  for (const id of ids) {
+    const pos = String(spec.nodes[id]?.props?.position ?? "top_right");
+    groups.set(pos, [...(groups.get(pos) ?? []), id]);
+  }
+  return [...groups.entries()].map(([position, ids]) => ({ position, ids }));
 }
 
 export type Placement = "none" | "glance" | "panel" | "full";

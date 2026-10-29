@@ -111,6 +111,19 @@ func TestReminderEmitsProposal(t *testing.T) {
 	}
 }
 
+func TestSimulatedFailure(t *testing.T) {
+	evs := collect(t, &Runtime{}, "please simulate a failure")
+	var fatal bool
+	for _, ev := range evs {
+		if ev.Kind == runtime.EventError && ev.Fatal && ev.Err != nil && strings.Contains(ev.Err.Error(), "simulated failure") {
+			fatal = true
+		}
+	}
+	if !fatal {
+		t.Fatalf("no fatal error event: %+v", evs)
+	}
+}
+
 func TestCancelStopsStream(t *testing.T) {
 	r := &Runtime{Delay: 50 * time.Millisecond}
 	ctx, cancel := context.WithCancel(context.Background())

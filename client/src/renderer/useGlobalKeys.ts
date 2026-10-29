@@ -60,6 +60,10 @@ export function useGlobalKeys(h: GlobalKeyHandlers) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       // The command input marks the Enter that sent a message as handled.
       if (e.defaultPrevented) return;
+      // A held key must not confirm or fire anything: the auto-repeat of the
+      // Enter that just sent a message used to confirm the pending proposal
+      // (review 2026-10-30).
+      if (e.repeat) return;
       const what = resolveKey(e.key, h);
       if (!what) return;
       if (what === "digit") {

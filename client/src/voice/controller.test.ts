@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { SessionEvent } from "../contract";
 import type { CaptureCallbacks } from "./capture";
+import type { VoiceCapabilities } from "./capabilities";
 import { VoiceController, type VoiceDeps } from "./controller";
 import type { PlayBackend } from "./playback";
 
@@ -145,5 +146,80 @@ describe("VoiceController review items (Phase 12)", () => {
     await flush();
     expect(capture.stop).toHaveBeenCalledWith(true);
     expect(c.getStatus().mic).toBe("off");
+  });
+});
+
+describe("VoiceController review items (2026-10-30)", () => {
+  it("a close while getUserMedia is pending wins: the stream is released and nothing captures", async () => {
+    let resolveStream: (s: MediaStream) => void = () => {};
+    const tracks = [{ stop: vi.fn() }];
+    const { d, capture } = deps({ getMicStream: () => new Promise<MediaStream>((r) => (resolveStream = r)) });
+    const c = new VoiceController(d);
+    await c.init();
+    c.handleKeyDown(ctrlSpace()); // open: awaits the permission prompt
+    await flush();
+    expect(c.getStatus().mic).toBe("listening");
+    c.handleKeyDown(ctrlSpace()); // close before the prompt resolves
+    await flush();
+    expect(c.getStatus().mic).toBe("off");
+    resolveStream({ getTracks: () => tracks } as unknown as MediaStream);
+    await flush();
+    expect(capture.start).not.toHaveBeenCalled();
+    expect(tracks[0].stop).toHaveBeenCalled();
+    expect(c.getStatus().mic).toBe("off");
+    // A later open still works and uses exactly one capture.
+    c.handleKeyDown(ctrlSpace());
+    await flush();
+    resolveStream({ getTracks: () => tracks } as unknown as MediaStream);
+    await flush();
+    expect(capture.start).toHaveBeenCalledTimes(1);
+    expect(c.getStatus().mic).toBe("listening");
+  });
+
+  it("push-to-talk releases the mic when the window loses focus", async () => {
+    const { d, capture } = deps({ fetchCapabilities: async () => ({ stt: "openai", tts: "openai", mode: "ptt" as const }) });
+    const c = new VoiceController(d);
+    await c.init();
+    const detach = c.attach(window);
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", ctrlKey: true }));
+    await flush();
+    expect(c.getStatus().mic).toBe("listening");
+    window.dispatchEvent(new Event("blur"));
+    await flush();
+    expect(capture.stop).toHaveBeenCalled();
+    expect(c.getStatus().mic).toBe("off");
+    detach();
+  });
+
+  it("a fatal recognition error turns the indicator off", async () => {
+    let sttCb: ConstructorParameters<typeof import("./browserStt").BrowserStt>[0] | null = null;
+    const { d } = deps({
+      fetchCapabilities: async () => ({ stt: "none", tts: "none", mode: "toggle" as const }),
+      browserRecognition: () => true,
+      createBrowserStt: (cb) => {
+        sttCb = cb;
+        return { start: vi.fn(), stop: vi.fn() };
+      },
+    });
+    const c = new VoiceController(d);
+    await c.init();
+    await c.toggle();
+    expect(c.getStatus().mic).toBe("listening");
+    sttCb!.onError?.("speech recognition: network error, retrying in 1 s");
+    expect(c.getStatus().mic).toBe("listening");
+    sttCb!.onError?.("speech recognition stopped: not-allowed", true);
+    expect(c.getStatus()).toMatchObject({ mic: "off", error: "speech recognition stopped: not-allowed" });
+  });
+
+  it("refreshCapabilities applies a change without cutting speech when TTS is unchanged", async () => {
+    let caps: VoiceCapabilities = { stt: "none", tts: "openai", mode: "toggle", barge_in: "auto" };
+    const { d, backend } = deps({ fetchCapabilities: async () => caps });
+    const c = new VoiceController(d);
+    await c.init();
+    expect(c.getStatus().stt).toBe("none");
+    caps = { ...caps, stt: "openai", barge_in: "off" };
+    await c.refreshCapabilities();
+    expect(c.getStatus().stt).toBe("openai");
+    expect(backend.stop).not.toHaveBeenCalled();
   });
 });

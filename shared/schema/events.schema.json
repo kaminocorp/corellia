@@ -211,6 +211,10 @@
             "proactive",
             "action"
           ]
+        },
+        "failed": {
+          "description": "True for the apology of a failed turn: shown and spoken, but left out of the history the model sees.",
+          "type": "boolean"
         }
       }
     },
@@ -522,6 +526,7 @@
       }
     },
     "ErrorEvent": {
+      "description": "A failure or a rejected op. Named `session_error` on the wire because an SSE event named `error` is delivered to EventSource.onerror as a connection error (review 2026-10-30, item 1).",
       "allOf": [
         {
           "$ref": "#/$defs/Base"
@@ -535,7 +540,7 @@
       ],
       "properties": {
         "type": {
-          "const": "error",
+          "const": "session_error",
           "type": "string"
         },
         "code": {

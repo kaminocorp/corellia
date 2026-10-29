@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)](#01513---phase-13-beta-readiness-session_error-event-no-false-offline-banner--mic-open-race--speech-abortdeadline--failures-in-plain-words--truncated-stream--error--ci-pinned-go-jsonschema-ubuntu-2404--overlay-stacking--owner-checklist-2026-10-29)
 - [0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)](#01512---phase-12-anthropic-contract-goldens--live-check-runtime-check--streamed-speech-per-sentence--precompiled-validators-no-unsafe-eval--proposal-stack-digit-grace-period-keyboard-scroll-barge-in-setting-ptt-flush-2026-10-29)
 - [0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)](#01511---phase-11-review-fixes-stable-store-selectors--browser-smoke-test-playwright--enterproposal-fix--dev-mode-request-guards-and-csp--visible-failures--reconnecttoken-prompt--ci-2026-10-29)
 - [0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)](#01510---phase-10-display-box-provisioning-kiosk-watchdog-systemd--heartbeat-request-logging-dockerfile--client-error-boundary-offline-banner-soak--docs-rewrite-2026-10-29)
@@ -94,6 +95,34 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)
+
+Roadmap Phase 13: the blocking gaps of the second independent review ([`executing/review-2026-10-30.md`](executing/review-2026-10-30.md), verdict alpha) that need no API key or microphone, plus its cheap non-blocking items. Full notes: [`completions/phase-13-beta-readiness.md`](completions/phase-13-beta-readiness.md). The two owner-only items are one checklist: [`executing/owner-checklist.md`](executing/owner-checklist.md).
+
+### Added
+
+- **`session_error` event** (contract): the failure/rejected-op event, renamed from `error` because an SSE event of that name reaches `EventSource.onerror` and read as a lost connection, on the failed turn and on every reload after it. `TranscriptEntry.failed` marks the apology of a failed turn.
+- **Local runtime failure intent** ("simulate a failure", "fail on purpose") and a fifth smoke-test step that drives it: apology in plain words, error line, status card, header still online before and after a reload.
+- **`session.describeFailure`**: the short spoken reason for a failed turn (credentials, model, rate limit, overloaded, internal error, dropped connection, timeout, unreachable); the raw error stays in the event and the log.
+- **`docs/executing/owner-checklist.md`**: the live model run and the Mac microphone run, with pass criteria and what to record.
+- `ANTHROPIC_BASE_URL` as a config field; `forbidden` connection status; `ErrorBoundary.fallback`; `VoiceController.refreshCapabilities`; `overlayGroups`/`OverlayStack`; `PlayBackend.speak(text, signal)` with a per-piece deadline.
+
+### Fixed
+
+- **False "connection lost" banner** after any failed turn (and the `e.data.slice` page error on a real network error).
+- **Mic-open race**: a close while `getUserMedia` is pending wins and releases the stream; push-to-talk releases on blur; a fatal recognition error turns the indicator off.
+- **Speech queue**: a piece stopped during its TTS fetch no longer plays late over the next one (and no longer leaks its level meter); a piece whose end never comes is skipped at its deadline; Escape silences playback before anything else; the browser backend holds its utterance.
+- **Raw provider errors** were spoken and shown with URL and JSON body, and fed back to the model as its own words; **a stream dropped mid-reply** counted as a completed turn (Anthropic runtime: no stop reason is now an error).
+- **CI**: the contract job ran a different go-jsonschema than the committed types (now `go run ...@v0.24.1`); the smoke job ran on an image without a Playwright Chromium (now `ubuntu-24.04`).
+- **Overlay collisions**: overlays sharing an anchor stack in one column; the top anchors clear the top bar; the offline banner sits in the top bar; the error line is its own footer row.
+- Enter auto-repeat confirmed a proposal; digits reached "Do it" on lower proposals; voice capabilities were fetched once; no error boundary around the 3D agent; a `network` recognition error was fatal and barge-in worked only for the first utterance; the renderer updated the store during render; `pendingSpeech` not reset; the token prompt on a 403; snapshot and seq read in two calls; the Anthropic SDK read `ANTHROPIC_*` from the environment; `open_directions` asked for confirmation; the Vite dev origin allowed in token mode; `transcript.jsonl` 0644.
+
+### Edited
+
+- `README.md`, `.env.example`, roadmap (status, Phase 13, progress), the review file committed.
+
+---
 
 ## 0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)
 

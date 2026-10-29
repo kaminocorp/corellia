@@ -206,7 +206,7 @@ func collect(ch <-chan session.Item, turnID string, start time.Time, timeout tim
 				if r.firstOp == 0 {
 					r.firstOp = time.Since(start)
 				}
-			case "error":
+			case "session_error":
 				code, _ := m["code"].(string)
 				msg, _ := m["message"].(string)
 				if code == "runtime" || code == "runtime_start" || code == "tool_failed" {
@@ -239,7 +239,7 @@ func diagnose(detail string) string {
 	case strings.Contains(l, "429") || strings.Contains(l, "rate"):
 		return "diagnosis: rate limited. Wait a minute and run again."
 	case strings.Contains(l, "tools=[]") || strings.Contains(l, "ops=0"):
-		return "diagnosis: the model answered without calling get_time or show_ui. The prompt asks for both; check the server log for rejected ops (`error` events) and try CORELLIA_EFFORT=medium."
+		return "diagnosis: the model answered without calling get_time or show_ui. The prompt asks for both; check the server log for rejected ops (`session_error` events) and try CORELLIA_EFFORT=medium."
 	case strings.Contains(l, "timeout"):
 		return "diagnosis: no answer within the timeout. Check connectivity to api.anthropic.com or raise -timeout."
 	}

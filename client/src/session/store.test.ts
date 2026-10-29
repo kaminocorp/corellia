@@ -76,6 +76,33 @@ describe("session reducer", () => {
   });
 });
 
+describe("session reducer (review 2026-10-30 items)", () => {
+  it("drops pending out-of-turn speech on a new turn and on a snapshot", () => {
+    seq = 0;
+    let s = reduce(initialState(), snapshot());
+    s = reduce(s, ev("speech", { text: "Reminder:", final: false }));
+    expect(s.pendingSpeech).toEqual(["Reminder:"]);
+    s = reduce(s, ev("turn_started", { turn_id: "t1", text: "hi", source: "keyboard" }));
+    expect(s.pendingSpeech).toEqual([]);
+    s = reduce(s, ev("turn_done", { turn_id: "t1", status: "completed", text: "Hello.", modality: "voice" }));
+    s = reduce(s, ev("speech", { text: "Later:", final: false }));
+    s = reduce(s, snapshot());
+    expect(s.pendingSpeech).toEqual([]);
+  });
+
+  it("does not add the reply twice when the snapshot already holds it", () => {
+    seq = 0;
+    let s = reduce(initialState(), snapshot({ agent_state: "speaking", transcript: [{ role: "user", text: "hi", ts, turn_id: "t1" }] }));
+    s = reduce(s, ev("turn_started", { turn_id: "t1", text: "hi", source: "keyboard" }));
+    s = reduce(s, ev("turn_done", { turn_id: "t1", status: "completed", text: "Hello.", modality: "voice" }));
+    const n = s.transcript.length;
+    // The same turn_done again (replayed after a snapshot that had the entry) adds nothing.
+    s = reduce(s, ev("turn_done", { turn_id: "t1", status: "completed", text: "Hello.", modality: "voice" }));
+    expect(s.transcript.length).toBe(n);
+    expect(s.transcript.filter((e) => e.role === "agent" && e.turn_id === "t1")).toHaveLength(1);
+  });
+});
+
 describe("SessionStore", () => {
   it("notifies listeners only on change", () => {
     const store = new SessionStore();

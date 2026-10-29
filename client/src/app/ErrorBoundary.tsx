@@ -6,6 +6,8 @@ type Props = {
   label?: string;
   /** The boundary recovers when this value changes identity (the spec, for generated UI). */
   resetKey?: unknown;
+  /** Rendered instead of the default alert (the static agent when the 3D scene fails). */
+  fallback?: ReactNode;
 };
 type State = { error: Error | null };
 
@@ -32,6 +34,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render(): ReactNode {
     if (this.state.error) {
+      if (this.props.fallback !== undefined) return this.props.fallback;
       return (
         <div className="m-4 border border-destructive/60 bg-card/80 p-3 font-mono text-xs text-destructive" role="alert">
           {this.props.label ?? "render failure"}: {this.state.error.message}

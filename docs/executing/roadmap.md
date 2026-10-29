@@ -1,6 +1,6 @@
 # Corellia vision implementation roadmap
 
-**Status:** Phase 12 (verifiable cloud runtime, streamed speech, strict CSP, remaining review items) done on 2026-10-29; the build is a usable alpha. Phase 11 (review fixes) was done the same day. Phases 0-10 were completed the same day and found not ready by the independent review ([`review-2026-10-29.md`](review-2026-10-29.md)). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
+**Status:** Phase 13 (beta readiness: the round-2 review's blocking gaps that need no key or microphone) done on 2026-10-29. Phases 11 and 12 (review fixes; verifiable cloud runtime, streamed speech, strict CSP) were done the same day, as were Phases 0-10. The second independent review ([`review-2026-10-30.md`](review-2026-10-30.md)) rated `0c40505` an alpha; after Phase 13 what stands between the build and a beta is the owner's two runs in [`owner-checklist.md`](owner-checklist.md) (live model, Mac microphone). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
 **Scope:** implement [`../VISION.md`](../VISION.md) end to end: an always-on personal agent workspace (3D agent, keyboard + voice, generated UI from a closed catalog, propose/confirm actions, decision layer, swappable agent runtime, display-box deployment).
 **Branch:** all work on `feat/vision-implementation`, pushed only to that branch. No merges, no PRs, no deploys.
 **Companion records:** one `docs/completions/phase-NN-<name>.md` per completed phase, one `docs/changelog.md` entry per phase.
@@ -239,9 +239,24 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 - **Dependencies:** Phase 11.
 - **Acceptance:** `pnpm check` green (contract goldens, sentence-stream tests, drift test for the precompiled validators, hotkey and proposal-stack tests, smoke test under the strict CSP); with no key, `cmd/runtime-check -runtime anthropic` fails fast with a clear message; with a key, it prints the table and the spike report lands in `docs/executing/spikes/` (not runnable here; documented as the owner's first step on a Mac).
 
+### Phase 13: Beta readiness (round-2 review)
+
+- **Scope:** the blocking gaps of the second independent review ([`review-2026-10-30.md`](review-2026-10-30.md), against `0c40505`) that can be fixed and verified without an API key or a microphone, plus its cheap non-blocking items. The two owner-only items (live model, Mac microphone run) become one checklist. Added after Phase 12; the review is committed with this phase.
+- **Deliverables:**
+  - **Item 1, the false offline banner.** The error event is renamed on the wire and in the contract (`session_error`): an SSE event named `error` is delivered to `EventSource.onerror` and read as a connection failure, on the turn that failed and again on every reload while the bus replays it. The client additionally ignores `MessageEvent`s in `onerror` and plain `Event`s in the named listeners (the `e.data.slice` crash). The local runtime gains an on-demand failure ("simulate a failure" / "fail on purpose"); a smoke-test step drives it and asserts the header stays online, before and after a reload.
+  - **Item 3, the mic-open race.** A generation counter in `VoiceController`: a close while `getUserMedia` is pending wins and releases the stream; a second open cannot create a second capture. Push-to-talk also releases on window blur. A fatal recognition error returns the indicator to off.
+  - **Item 4, the speech queue.** Every piece gets an `AbortSignal` the player fires on stop (a piece still being fetched is dropped, its meter never started) and a deadline (a piece whose end never comes is skipped and the queue moves on); the browser backend holds its utterance. Escape silences playback first, then cancels the turn, then falls through to the escape-bound action or a clear.
+  - **Item 5, raw failures and dropped streams.** The apology and the status card carry a short reason in plain words (`describeFailure`, mirroring `cmd/runtime-check`'s diagnoses); the raw error stays in the `session_error` event (debug pane) and the log. The failed reply is marked `failed` in the transcript and left out of model history. An Anthropic stream that ends without a stop reason (connection dropped, tool call cut mid-input) is a fatal error, not a short answer.
+  - **Item 7, CI.** `scripts/contracts-generate.sh` runs go-jsonschema at a pinned version through `go run` on every machine; the workflow runs on `ubuntu-24.04` (Playwright's Chromium is not published for the 26.04 image `ubuntu-latest` moved to).
+  - **Item 8, overlay collisions.** The renderer groups overlays by anchor (a glance root and the floating cards) into one column per corner; the top anchors sit below the top bar; the offline banner lives in the top bar; the error line is its own footer row above the transcript.
+  - **Non-blocking:** Enter/Escape/digit auto-repeat ignored; no digit on `confirm_proposal` actions below the top card; voice capabilities re-read when the stream comes online; the 3D agent inside an error boundary with the static fallback; browser recognition restarts with backoff after a `network` error and marks speech start per utterance (interim results) so barge-in works past the first sentence; invalid nodes reported after render, once; `pendingSpeech` reset on snapshot and `turn_started`; a 403 from the Origin or Host guard shows "request refused", not the token prompt; the snapshot's seq is read under the session lock and spec/turn-start publishes happen under it; the Anthropic SDK no longer reads its own environment (`ANTHROPIC_BASE_URL` is a config field); `open_directions` runs without confirmation (it only draws a map); `CORELLIA_DEV_ORIGINS`' Vite default is dropped in token mode; `transcript.jsonl` is 0600.
+  - **Owner checklist:** [`owner-checklist.md`](owner-checklist.md) for the live model run (item 2) and the Mac microphone run (item 6), with pass criteria and what to record.
+- **Dependencies:** Phase 12.
+- **Acceptance:** `pnpm check` green here and in CI (all four jobs); the five smoke tests pass in real Chromium, including the failing-turn step; the review's items 1, 3, 4, 5, 7 and 8 have a test each.
+
 ## 4. Versioning and records
 
-- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11) and 0.15.12 (Phase 12).
+- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11), 0.15.12 (Phase 12) and 0.15.13 (Phase 13).
 - Completion notes: `docs/completions/phase-NN-<name>.md` with sections: Summary, What was built, Design decisions, Files changed, How to run, How to test, Known gaps, Follow-ups.
 - Commits: one per phase at minimum, conventional subject `phase N: <name>`; pushed to `origin/feat/vision-implementation` only.
 
@@ -252,7 +267,7 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | No credentials here, so cloud runtimes, STT and TTS cannot be exercised live. | Fixture-driven tests against recorded wire formats; keyless local paths for every feature; completion notes state exactly what is unverified. |
 | No display box or Linux GPU here. | Kiosk scripts are written from documentation and marked untested; adaptive resolution and the stats overlay make the first box test cheap. |
 | Catalog scope creep. | v1 catalog is fixed in Phase 2; additions after that are their own changelog entries. |
-| Model emits invalid specs. | Server validates each op, repairs trivial cases (unknown optional prop dropped, missing `spec_version` filled), drops the rest with an `error` event the client shows in debug mode; first-try validity is a spike metric. |
+| Model emits invalid specs. | Server validates each op, repairs trivial cases (unknown optional prop dropped, missing `spec_version` filled), drops the rest with a `session_error` event the client shows in debug mode; first-try validity is a spike metric. |
 | Two reducers drift. | Shared fixtures and golden outputs tested in both languages. |
 
 ## 6. Progress
@@ -272,3 +287,4 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 10 Display box, hardening, docs | done 2026-10-29 | [`../completions/phase-10-display-box-hardening-docs.md`](../completions/phase-10-display-box-hardening-docs.md) | 0.15.10 |
 | 11 Review fixes | done 2026-10-29 | [`../completions/phase-11-review-fixes.md`](../completions/phase-11-review-fixes.md) | 0.15.11 |
 | 12 Verifiable cloud runtime, streamed speech, strict CSP, review items | done 2026-10-29 | [`../completions/phase-12-cloud-runtime-speech-csp.md`](../completions/phase-12-cloud-runtime-speech-csp.md) | 0.15.12 |
+| 13 Beta readiness (round-2 review) | done 2026-10-29 | [`../completions/phase-13-beta-readiness.md`](../completions/phase-13-beta-readiness.md) | 0.15.13 |

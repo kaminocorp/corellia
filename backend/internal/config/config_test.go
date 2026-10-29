@@ -34,6 +34,30 @@ func TestLoadDefaults(t *testing.T) {
 	}
 }
 
+func TestTokenModeDropsDefaultDevOrigins(t *testing.T) {
+	unsetenv(t, "CORELLIA_DEV_ORIGINS")
+	t.Setenv("CORELLIA_DEVICE_TOKEN", "0123456789abcdef0123456789abcdef")
+	t.Setenv("ANTHROPIC_BASE_URL", "http://gateway.internal:8000")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.DevOrigins) != 0 {
+		t.Errorf("DevOrigins = %v, want none in token mode without CORELLIA_DEV_ORIGINS", cfg.DevOrigins)
+	}
+	if cfg.AnthropicBaseURL != "http://gateway.internal:8000" {
+		t.Errorf("AnthropicBaseURL = %q", cfg.AnthropicBaseURL)
+	}
+	t.Setenv("CORELLIA_DEV_ORIGINS", "http://box.local:5173")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.DevOrigins) != 1 || cfg.DevOrigins[0] != "http://box.local:5173" {
+		t.Errorf("explicit DevOrigins = %v", cfg.DevOrigins)
+	}
+}
+
 func TestValidate(t *testing.T) {
 	base := Config{Port: 8080, AgentName: "Corellia", Runtime: "auto", Effort: "low", STT: "auto", TTS: "auto", VoiceMode: "toggle", VoiceBargeIn: "auto"}
 	cases := []struct {

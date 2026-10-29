@@ -221,7 +221,11 @@ func (s *Session) Capabilities() gen.Capabilities {
 	return c
 }
 
-// Snapshot returns the `session` event payload (without seq/ts/type).
+// Snapshot returns the `session` event payload (without ts/type). It
+// carries the bus seq read under the session lock, so a spec op or turn
+// start published between the two cannot be missing from both the snapshot
+// and the replay the client accepts (review 2026-10-30): state-changing
+// publishes happen under the same lock.
 func (s *Session) Snapshot() map[string]any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -239,6 +243,7 @@ func (s *Session) Snapshot() map[string]any {
 	}
 	transcript := s.todaysTranscriptLocked(50)
 	return map[string]any{
+		"seq":               s.bus.Seq(),
 		"session_id":        s.o.ID,
 		"agent_name":        s.o.AgentName,
 		"agent_state":       s.state,
@@ -301,10 +306,11 @@ func (s *Session) StartTurn(text string, source runtime.Source) (turnID string, 
 	at := &activeTurn{id: turnID, cancel: cancel, done: make(chan struct{})}
 	s.active = at
 	s.state = gen.AgentStateThinking
-	s.mu.Unlock()
-
+	// Published under the lock so a snapshot sees the entry and the event
+	// on the same side of its seq (the bus never blocks).
 	s.bus.Publish("turn_started", map[string]any{"turn_id": turnID, "text": text, "source": string(source)})
 	s.bus.Publish("state", map[string]any{"state": gen.AgentStateThinking, "turn_id": turnID})
+	s.mu.Unlock()
 
 	turn := runtime.Turn{
 		ID:      turnID,
@@ -368,7 +374,13 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 			text = failureReply(text, failure)
 		}
 		if text != "" {
-			s.appendTranscriptLocked(gen.TranscriptEntry{Role: gen.TranscriptEntryRoleAgent, Text: text, Ts: s.o.Now(), TurnID: ptr(gen.TurnID(turn.ID))})
+			entry := gen.TranscriptEntry{Role: gen.TranscriptEntryRoleAgent, Text: text, Ts: s.o.Now(), TurnID: ptr(gen.TurnID(turn.ID))}
+			if status == gen.TurnDoneEventStatusFailed {
+				// Shown and spoken, but never fed back to the model as its
+				// own words (historyLocked skips it).
+				entry.Failed = ptr(true)
+			}
+			s.appendTranscriptLocked(entry)
 		}
 		rootFit := s.rootFitLocked()
 		busy := s.spec.Root != nil
@@ -380,7 +392,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 		})
 		switch {
 		case status == gen.TurnDoneEventStatusFailed:
-			s.showStatusCard("That didn't work: "+truncate(failure, 160), "error", 20*time.Second)
+			s.showStatusCard("That didn't work: "+describeFailure(failure), "error", 20*time.Second)
 			if stream != nil {
 				// Whatever was already said stays said; the apology follows
 				// the unspoken rest of the partial reply.
@@ -415,7 +427,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 	if err != nil {
 		status = gen.TurnDoneEventStatusFailed
 		failure = err.Error()
-		s.bus.Publish("error", map[string]any{"turn_id": turn.ID, "code": "runtime_start", "message": err.Error(), "fatal": true})
+		s.bus.Publish("session_error", map[string]any{"turn_id": turn.ID, "code": "runtime_start", "message": err.Error(), "fatal": true})
 		finish()
 		return
 	}
@@ -468,7 +480,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 			if ev.Err != nil {
 				msg = ev.Err.Error()
 			}
-			s.bus.Publish("error", map[string]any{"turn_id": turn.ID, "code": "runtime", "message": msg, "fatal": ev.Fatal})
+			s.bus.Publish("session_error", map[string]any{"turn_id": turn.ID, "code": "runtime", "message": msg, "fatal": ev.Fatal})
 			if ev.Fatal {
 				status = gen.TurnDoneEventStatusFailed
 				failure = msg
@@ -498,23 +510,23 @@ func (s *Session) setState(st gen.AgentState, turnID string) {
 // error events and are dropped. Returns true if the spec changed.
 func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 	if s.o.Registry == nil {
-		s.bus.Publish("error", withTurn(map[string]any{"code": "no_registry", "message": "spec ops need a contract registry"}, turnID))
+		s.bus.Publish("session_error", withTurn(map[string]any{"code": "no_registry", "message": "spec ops need a contract registry"}, turnID))
 		return false
 	}
 	op, err := s.o.Registry.DecodeOp(raw)
 	if err != nil {
-		s.bus.Publish("error", withTurn(map[string]any{"code": "invalid_op", "message": err.Error()}, turnID))
+		s.bus.Publish("session_error", withTurn(map[string]any{"code": "invalid_op", "message": err.Error()}, turnID))
 		return false
 	}
 	s.mu.Lock()
 	if e := s.checkImageHostLocked(op); e != nil {
 		s.mu.Unlock()
-		s.bus.Publish("error", withTurn(map[string]any{"code": e.Code, "message": e.Error()}, turnID))
+		s.bus.Publish("session_error", withTurn(map[string]any{"code": e.Code, "message": e.Error()}, turnID))
 		return false
 	}
 	if e := s.v.CheckOp(&s.spec, op); e != nil {
 		s.mu.Unlock()
-		s.bus.Publish("error", withTurn(map[string]any{"code": e.Code, "message": e.Error()}, turnID))
+		s.bus.Publish("session_error", withTurn(map[string]any{"code": e.Code, "message": e.Error()}, turnID))
 		return false
 	}
 	if err := uispec.Apply(&s.spec, op); err != nil {
@@ -524,19 +536,19 @@ func (s *Session) applyOp(turnID string, raw json.RawMessage) bool {
 		if errors.As(err, &re) {
 			code = re.Code
 		}
-		s.bus.Publish("error", withTurn(map[string]any{"code": code, "message": err.Error()}, turnID))
+		s.bus.Publish("session_error", withTurn(map[string]any{"code": code, "message": err.Error()}, turnID))
 		return false
 	}
 	var issues []uispec.Error
 	if _, isDone := op.(gen.DoneOp); isDone {
 		issues = s.v.CheckSpec(&s.spec)
 	}
-	s.mu.Unlock()
 	var opMap map[string]any
 	_ = json.Unmarshal(raw, &opMap)
 	s.bus.Publish("spec_op", withTurn(map[string]any{"op": opMap}, turnID))
+	s.mu.Unlock()
 	for _, is := range issues {
-		s.bus.Publish("error", withTurn(map[string]any{"code": is.Code, "message": is.Error()}, turnID))
+		s.bus.Publish("session_error", withTurn(map[string]any{"code": is.Code, "message": is.Error()}, turnID))
 	}
 	if _, isClear := op.(gen.ClearOp); isClear {
 		s.restoreConfirmCards()
@@ -635,6 +647,9 @@ func (s *Session) historyLocked() []runtime.Message {
 	}
 	var out []runtime.Message
 	for _, e := range s.transcript[start:] {
+		if e.Failed != nil && *e.Failed {
+			continue // an apology for a failed turn is not the model's reply
+		}
 		out = append(out, runtime.Message{Role: string(e.Role), Text: e.Text})
 	}
 	return out
@@ -667,11 +682,13 @@ func truncate(s string, n int) string {
 }
 
 // failureReply is what the user sees and hears when a turn fails: the
-// partial reply, if any, followed by a short apology with the reason.
+// partial reply, if any, followed by a short apology with the reason in
+// plain words (describeFailure); the raw error goes to the event stream
+// and the log, not to the speaker.
 func failureReply(partial, reason string) string {
 	apology := "Sorry, that didn't work on my side."
 	if reason != "" {
-		apology += " " + truncate(reason, 200)
+		apology += " " + describeFailure(reason)
 	}
 	if strings.TrimSpace(partial) == "" {
 		return apology

@@ -414,10 +414,12 @@ func reminderTool(o Options) *tools.Tool {
 
 func directionsTool(o Options) *tools.Tool {
 	return &tools.Tool{
-		Name:            "open_directions",
-		Description:     "Show a route on the map. `to` is a place name or [lat, lng]; `from` likewise (default: the office).",
-		InputSchema:     schema(`{"type":"object","additionalProperties":false,"required":["to"],"properties":{"to":{"anyOf":[{"type":"string","maxLength":120},{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2}]},"from":{"anyOf":[{"type":"string","maxLength":120},{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2}]}}}`),
-		RequiresConfirm: true,
+		Name:        "open_directions",
+		Description: "Show a route on the map. `to` is a place name or [lat, lng]; `from` likewise (default: the office).",
+		InputSchema: schema(`{"type":"object","additionalProperties":false,"required":["to"],"properties":{"to":{"anyOf":[{"type":"string","maxLength":120},{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2}]},"from":{"anyOf":[{"type":"string","maxLength":120},{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2}]}}}`),
+		// Draws on Corellia's own screen and changes nothing outside it, so
+		// it runs without confirmation (rule 5; review 2026-10-30).
+		RequiresConfirm: false,
 		Risk:            "low",
 		Label: func(a map[string]any) string {
 			if s, ok := a["to"].(string); ok {

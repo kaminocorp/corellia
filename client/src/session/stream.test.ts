@@ -54,6 +54,63 @@ describe("SessionStream", () => {
   });
 });
 
+describe("SessionStream and the EventSource error channel (review 2026-10-30, item 1)", () => {
+  const base = { seq: 2, ts: "2026-10-29T10:00:00Z" };
+  it("a server session_error event reaches the store and leaves the connection online", () => {
+    const store = new SessionStore();
+    const stream = new SessionStream(store, { factory: (url) => new FakeEventSource(url) as unknown as EventSource });
+    stream.connect();
+    const es = FakeEventSource.instances.at(-1)!;
+    es.onopen?.();
+    es.emit("session_error", JSON.stringify({ type: "session_error", ...base, code: "runtime", message: "upstream 404", fatal: true }));
+    expect(store.getState().errors.at(-1)?.message).toBe("upstream 404");
+    expect(store.getState().connection).toBe("online");
+    stream.disconnect();
+  });
+
+  it("a MessageEvent delivered to onerror is not a connection error", () => {
+    const store = new SessionStore();
+    const stream = new SessionStream(store, { factory: (url) => new FakeEventSource(url) as unknown as EventSource });
+    stream.connect();
+    const es = FakeEventSource.instances.at(-1)!;
+    es.onopen?.();
+    // What browsers do with a server event named `error`: dispatch it to onerror too.
+    (es.onerror as unknown as (e: unknown) => void)?.({ data: JSON.stringify({ type: "heartbeat", ...base }) });
+    expect(store.getState().connection).toBe("online");
+    stream.disconnect();
+  });
+
+  it("a plain Event on a named listener neither throws nor records an error", () => {
+    const store = new SessionStore();
+    const stream = new SessionStream(store, { factory: (url) => new FakeEventSource(url) as unknown as EventSource });
+    stream.connect();
+    const es = FakeEventSource.instances.at(-1)!;
+    es.onopen?.();
+    for (const l of es.listeners.get("session_error") ?? []) l({ type: "error" } as unknown as Event);
+    expect(store.getState().errors).toEqual([]);
+    expect(store.getState().connection).toBe("online");
+    stream.disconnect();
+  });
+
+  it("a 403 from the probe is a refused request, not a token problem", async () => {
+    const { vi } = await import("vitest");
+    vi.useFakeTimers();
+    try {
+      const store = new SessionStore();
+      const stream = new SessionStream(store, { factory: (url) => new FakeEventSource(url) as unknown as EventSource, probe: async () => 403 });
+      stream.connect();
+      const es = FakeEventSource.instances.at(-1)!;
+      (es as unknown as { readyState: number }).readyState = 2;
+      es.onerror?.();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(store.getState().connection).toBe("forbidden");
+      stream.disconnect();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("SessionStream recovery", () => {
   const snapshot = (seq: number) =>
     JSON.stringify({

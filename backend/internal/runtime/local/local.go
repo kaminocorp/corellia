@@ -156,10 +156,20 @@ func (r *Runtime) answer(ctx context.Context, e *emitter, turn runtime.Turn) {
 		r.reminderScenario(e, turn)
 	case hasAny(text, "weather"):
 		r.weatherScenario(e, turn)
+	case hasAny(text, "simulate a failure", "fail on purpose"):
+		// What a broken turn looks like, without a cloud runtime: a partial
+		// reply, then a fatal error. The session turns it into a spoken
+		// apology, a status card and a `session_error` event; the browser
+		// smoke test drives this to prove the header stays online.
+		e.text("Let me try that. ")
+		e.send(runtime.Event{Kind: runtime.EventError, Err: errSimulated, Fatal: true})
 	default:
 		e.text(fmt.Sprintf("I heard: \"%s\". The local runtime only knows a few scripted replies; connect a cloud runtime for real answers.", strings.TrimSpace(turn.Text)))
 	}
 }
+
+// errSimulated is the local runtime's on-demand failure.
+var errSimulated = errors.New("simulated failure (local demo): the user asked for one")
 
 func name(t runtime.Turn) string {
 	if t.Context.AgentName != "" {
