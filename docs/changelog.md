@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)](#0150---vision-roadmap-ten-phase-implementation-plan--section-11-defaults-2026-10-29)
 - [0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)](#0141---vision-default-client-approach-web-client-browser-on-macos-kiosk-or-shell-on-the-box-2026-10-29)
 - [0.14.0 — Direction Reset: Personal Agent Workspace Vision + Docs Archive Cleanup (2026-10-28)](#0140--direction-reset-personal-agent-workspace-vision--docs-archive-cleanup-2026-10-28)
 - [0.13.12 — Presentation Deck Restructure (4 Problem Slides + Tangle/Thesis Redesign) + Tools Inventory Grid + Carousel Icon Buttons + Layout Overflow Fixes](#01312--presentation-deck-restructure-4-problem-slides--tanglethesis-redesign--tools-inventory-grid--carousel-icon-buttons--layout-overflow-fixes-2026-04-27)
@@ -81,6 +82,21 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)
+
+**Docs-only.** First commit on `feat/vision-implementation`, the branch that carries the end-to-end implementation of [`VISION.md`](VISION.md). No code change.
+
+### Added
+
+- **`docs/executing/roadmap.md`**: the implementation plan. Ground truth about the repo and the dev environment (no credentials, no Postgres, no `buf`), a stated default for each of the eleven open questions in VISION.md section 11, the target repo layout, architecture rules for the new direction, and ten phases (restructure, shared contract, session + local runtime, component renderer, 3D agent, decision layer + actions + tools, cloud runtimes + spike, voice, memory + proactivity, display box + hardening + docs) each with scope, deliverables, dependencies and acceptance criteria.
+- **`docs/completions/phase-00-roadmap.md`**: completion note for the roadmap step.
+
+### Decisions recorded (defaults, each behind a seam)
+
+JSON Schema + SSE/JSON HTTP replace protobuf/Connect; Vite static client replaces Next.js; device token + local file state replace Supabase + Postgres; `AgentRuntime` with `local`, `anthropic`, `openai-compatible` and `hermes` implementations and a `NotImplemented` DeepSeek-harness stub; decision layer in the backend with a rules default; own voice pipeline with a keyless browser path; VAD-gated mic toggled by key, off at boot; particle-nebula 3D agent with adaptive resolution; Chromium kiosk on the box.
+
+---
 
 ## 0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)
 
