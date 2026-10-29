@@ -1,0 +1,17 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Card",
+      "props": {
+        "title": "x"
+      },
+      "slots": {
+        "footer": []
+      }
+    }
+  },
+  "code": "unknown_slot"
+}

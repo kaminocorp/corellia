@@ -1,0 +1,27 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Stat",
+        "props": {
+          "label": "Outside",
+          "value": 21
+        }
+      }
+    },
+    {
+      "op": "set_props",
+      "id": "n1",
+      "props": {
+        "value": 22.5,
+        "trend": "up"
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    }
+  ]
+}

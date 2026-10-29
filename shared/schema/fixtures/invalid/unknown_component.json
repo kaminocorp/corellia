@@ -1,0 +1,12 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Hologram",
+      "props": {}
+    }
+  },
+  "code": "unknown_component"
+}

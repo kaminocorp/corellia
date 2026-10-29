@@ -1,0 +1,31 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Stat",
+        "props": {
+          "label": "A",
+          "value": 1
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Status",
+        "props": {
+          "text": "replaced"
+        },
+        "pinned": true,
+        "ttl_ms": 5000
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    }
+  ]
+}

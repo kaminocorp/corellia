@@ -1,0 +1,23 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "n2"
+          ]
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    }
+  ],
+  "codes": [
+    "dangling_ref"
+  ]
+}

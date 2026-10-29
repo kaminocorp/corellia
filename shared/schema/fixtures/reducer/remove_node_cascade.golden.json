@@ -1,0 +1,1 @@
+{"actions":{},"data":{},"nodes":{"n1":{"slots":{"children":["n3"]},"type":"Stack"},"n3":{"props":{"label":"L","value":"V"},"type":"Stat"}},"root":"n1","spec_version":1}

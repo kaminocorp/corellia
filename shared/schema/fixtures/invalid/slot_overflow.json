@@ -1,0 +1,17 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Split",
+      "slots": {
+        "left": [
+          "a",
+          "b"
+        ]
+      }
+    }
+  },
+  "code": "slot_overflow"
+}

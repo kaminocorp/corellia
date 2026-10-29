@@ -1,0 +1,10 @@
+{
+  "before": [],
+  "op": {
+    "op": "set_slot",
+    "id": "n1",
+    "slot": "body",
+    "children": []
+  },
+  "code": "node_not_found"
+}

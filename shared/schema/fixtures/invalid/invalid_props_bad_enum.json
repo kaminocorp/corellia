@@ -1,0 +1,15 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Chart",
+      "props": {
+        "kind": "pie",
+        "series": []
+      }
+    }
+  },
+  "code": "invalid_props"
+}

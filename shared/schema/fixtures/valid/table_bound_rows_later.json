@@ -1,0 +1,49 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Table",
+        "props": {
+          "columns": [
+            {
+              "key": "name",
+              "label": "Name"
+            },
+            {
+              "key": "qty",
+              "label": "Qty",
+              "align": "right"
+            }
+          ],
+          "rows": {
+            "bind": "$.rows"
+          }
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    },
+    {
+      "op": "set_data",
+      "value": {
+        "rows": [
+          {
+            "name": "Bolts",
+            "qty": 12
+          },
+          {
+            "name": "Nuts",
+            "qty": 40
+          }
+        ]
+      }
+    },
+    {
+      "op": "done"
+    }
+  ]
+}

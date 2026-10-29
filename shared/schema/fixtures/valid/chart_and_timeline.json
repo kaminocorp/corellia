@@ -1,0 +1,73 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "g",
+      "node": {
+        "type": "Grid",
+        "props": {
+          "columns": 2
+        },
+        "slots": {
+          "children": [
+            "c",
+            "t"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "c",
+      "node": {
+        "type": "Chart",
+        "props": {
+          "kind": "line",
+          "series": [
+            {
+              "name": "Temp",
+              "points": [
+                {
+                  "x": "Mon",
+                  "y": 18
+                },
+                {
+                  "x": "Tue",
+                  "y": 21
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "t",
+      "node": {
+        "type": "Timeline",
+        "props": {
+          "items": [
+            {
+              "time": "09:00",
+              "title": "Standup",
+              "state": "past"
+            },
+            {
+              "time": "11:00",
+              "title": "Review",
+              "state": "current"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "g"
+    },
+    {
+      "op": "done"
+    }
+  ]
+}

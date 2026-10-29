@@ -1,0 +1,14 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Stat",
+      "props": {
+        "label": "Outside"
+      }
+    }
+  },
+  "code": "invalid_props"
+}

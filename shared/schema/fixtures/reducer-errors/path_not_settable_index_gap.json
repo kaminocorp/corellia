@@ -1,0 +1,18 @@
+{
+  "before": [
+    {
+      "op": "set_data",
+      "value": {
+        "list": [
+          1
+        ]
+      }
+    }
+  ],
+  "op": {
+    "op": "set_data",
+    "path": "$.list[3]",
+    "value": 1
+  },
+  "code": "path_not_settable"
+}

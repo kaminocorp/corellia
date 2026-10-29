@@ -1,0 +1,129 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "d0",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d1"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d1",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d2"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d2",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d3"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d3",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d4"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d4",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d5"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d5",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d6"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d6",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d7"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d7",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d8"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d8",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "d9"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "d9",
+      "node": {
+        "type": "Markdown",
+        "props": {
+          "text": "leaf"
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "d0"
+    }
+  ],
+  "codes": [
+    "budget_exceeded"
+  ]
+}

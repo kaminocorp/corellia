@@ -1,0 +1,942 @@
+{
+  "catalog_version": 1,
+  "components": {
+    "Stack": {
+      "description": "Vertical or horizontal stack of children with a gap. The default container.",
+      "category": "layout",
+      "fit": [
+        "glance",
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "column",
+              "row"
+            ],
+            "default": "column"
+          },
+          "gap": {
+            "type": "string",
+            "enum": [
+              "none",
+              "sm",
+              "md",
+              "lg"
+            ],
+            "default": "md"
+          },
+          "align": {
+            "type": "string",
+            "enum": [
+              "start",
+              "center",
+              "end",
+              "stretch"
+            ],
+            "default": "stretch"
+          }
+        }
+      },
+      "slots": {
+        "children": {
+          "accepts": [
+            "*"
+          ],
+          "max": 16
+        }
+      },
+      "tags": [
+        "layout"
+      ],
+      "example": {
+        "direction": "column",
+        "gap": "md"
+      }
+    },
+    "Grid": {
+      "description": "Equal-width columns. Children flow row by row.",
+      "category": "layout",
+      "fit": [
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "default": 2
+          },
+          "gap": {
+            "type": "string",
+            "enum": [
+              "none",
+              "sm",
+              "md",
+              "lg"
+            ],
+            "default": "md"
+          }
+        }
+      },
+      "slots": {
+        "children": {
+          "accepts": [
+            "*"
+          ],
+          "max": 24
+        }
+      },
+      "tags": [
+        "layout"
+      ],
+      "example": {
+        "columns": 3
+      }
+    },
+    "Split": {
+      "description": "Two panes side by side (or stacked) with a ratio. Use for a visual plus a detail card.",
+      "category": "layout",
+      "fit": [
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ratio": {
+            "type": "number",
+            "minimum": 0.2,
+            "maximum": 0.8,
+            "default": 0.6
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "row",
+              "column"
+            ],
+            "default": "row"
+          }
+        }
+      },
+      "slots": {
+        "left": {
+          "accepts": [
+            "*"
+          ],
+          "max": 1
+        },
+        "right": {
+          "accepts": [
+            "*"
+          ],
+          "max": 1
+        }
+      },
+      "tags": [
+        "layout"
+      ],
+      "example": {
+        "ratio": 0.6
+      }
+    },
+    "Overlay": {
+      "description": "A floating layer over the scene, anchored to a screen position. For glance cards and confirmations.",
+      "category": "layout",
+      "fit": [
+        "glance"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "type": "string",
+            "enum": [
+              "top_left",
+              "top_right",
+              "bottom_left",
+              "bottom_right",
+              "center"
+            ],
+            "default": "top_right"
+          },
+          "dim": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "slots": {
+        "content": {
+          "accepts": [
+            "*"
+          ],
+          "max": 1
+        }
+      },
+      "tags": [
+        "layout",
+        "overlay"
+      ],
+      "example": {
+        "position": "top_right"
+      }
+    },
+    "Card": {
+      "description": "A titled panel with a body slot. The workhorse container for a reply.",
+      "category": "content",
+      "fit": [
+        "glance",
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "accent": {
+            "type": "string",
+            "enum": [
+              "none",
+              "primary",
+              "cyan",
+              "violet",
+              "blue",
+              "rose",
+              "amber"
+            ],
+            "default": "none"
+          }
+        }
+      },
+      "bindable": [
+        "title",
+        "subtitle"
+      ],
+      "slots": {
+        "body": {
+          "accepts": [
+            "*"
+          ],
+          "max": 8
+        }
+      },
+      "actions": [
+        "primary",
+        "secondary"
+      ],
+      "tags": [
+        "container",
+        "text"
+      ],
+      "example": {
+        "title": "Next meeting",
+        "accent": "primary"
+      }
+    },
+    "Markdown": {
+      "description": "Prose. A safe subset of Markdown: paragraphs, emphasis, lists, headings, inline code. No raw HTML, no images.",
+      "category": "content",
+      "fit": [
+        "glance",
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "sm",
+              "md",
+              "lg"
+            ],
+            "default": "md"
+          }
+        }
+      },
+      "bindable": [
+        "text"
+      ],
+      "tags": [
+        "text",
+        "prose"
+      ],
+      "example": {
+        "text": "The flight lands at **14:20**."
+      }
+    },
+    "Stat": {
+      "description": "One big number with a label, optional unit, delta and trend. For a single fact readable across the room.",
+      "category": "content",
+      "fit": [
+        "glance",
+        "panel"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "value"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "value": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "delta": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "flat"
+            ]
+          }
+        }
+      },
+      "bindable": [
+        "value",
+        "delta",
+        "trend",
+        "label"
+      ],
+      "tags": [
+        "numeric",
+        "fact"
+      ],
+      "example": {
+        "label": "Outside",
+        "value": 21,
+        "unit": "°C",
+        "trend": "up"
+      }
+    },
+    "List": {
+      "description": "A list of items, each with a title and optional subtitle and leading icon name.",
+      "category": "content",
+      "fit": [
+        "glance",
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "title"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "subtitle": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "icon": {
+                  "type": "string",
+                  "enum": [
+                    "dot",
+                    "check",
+                    "clock",
+                    "pin",
+                    "alert",
+                    "star"
+                  ]
+                },
+                "done": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "ordered": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "bindable": [
+        "items"
+      ],
+      "tags": [
+        "list",
+        "text"
+      ],
+      "example": {
+        "items": [
+          {
+            "title": "Buy milk",
+            "icon": "dot"
+          }
+        ]
+      }
+    },
+    "Table": {
+      "description": "Rows and columns. Columns declare a key, label and alignment; rows are objects keyed by column key.",
+      "category": "content",
+      "fit": [
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "properties": {
+          "columns": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "label"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,31}$"
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "align": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "right",
+                    "center"
+                  ],
+                  "default": "left"
+                }
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "bindable": [
+        "rows",
+        "columns"
+      ],
+      "tags": [
+        "tabular",
+        "list",
+        "numeric"
+      ],
+      "example": {
+        "columns": [
+          {
+            "key": "name",
+            "label": "Name"
+          },
+          {
+            "key": "qty",
+            "label": "Qty",
+            "align": "right"
+          }
+        ],
+        "rows": [
+          {
+            "name": "Bolts",
+            "qty": 12
+          }
+        ]
+      }
+    },
+    "Chart": {
+      "description": "Bar, line or area chart of one or more series of x/y points. x may be a label or a number.",
+      "category": "content",
+      "fit": [
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "series"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bar",
+              "line",
+              "area"
+            ]
+          },
+          "series": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "points"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "points": {
+                  "type": "array",
+                  "maxItems": 500,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": [
+                          "string",
+                          "number"
+                        ]
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x_label": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "y_label": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "y_min": {
+            "type": "number"
+          },
+          "y_max": {
+            "type": "number"
+          }
+        }
+      },
+      "bindable": [
+        "series"
+      ],
+      "tags": [
+        "numeric",
+        "series",
+        "trend"
+      ],
+      "example": {
+        "kind": "line",
+        "series": [
+          {
+            "name": "Temp",
+            "points": [
+              {
+                "x": "Mon",
+                "y": 18
+              },
+              {
+                "x": "Tue",
+                "y": 21
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "Timeline": {
+      "description": "Ordered events with a time, title, detail and state. For schedules and progress.",
+      "category": "content",
+      "fit": [
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "time",
+                "title"
+              ],
+              "properties": {
+                "time": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "detail": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "past",
+                    "current",
+                    "upcoming"
+                  ],
+                  "default": "upcoming"
+                }
+              }
+            }
+          }
+        }
+      },
+      "bindable": [
+        "items"
+      ],
+      "tags": [
+        "time",
+        "schedule",
+        "list"
+      ],
+      "example": {
+        "items": [
+          {
+            "time": "09:00",
+            "title": "Standup",
+            "state": "past"
+          },
+          {
+            "time": "11:00",
+            "title": "Design review",
+            "state": "current"
+          }
+        ]
+      }
+    },
+    "Image": {
+      "description": "A remote image (https only) with alt text. Fit controls scaling.",
+      "category": "content",
+      "fit": [
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "src",
+          "alt"
+        ],
+        "properties": {
+          "src": {
+            "type": "string",
+            "pattern": "^https://\\S+$",
+            "maxLength": 2000
+          },
+          "alt": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "fit": {
+            "type": "string",
+            "enum": [
+              "contain",
+              "cover"
+            ],
+            "default": "contain"
+          }
+        }
+      },
+      "bindable": [
+        "src",
+        "alt"
+      ],
+      "tags": [
+        "image",
+        "visual"
+      ],
+      "example": {
+        "src": "https://example.com/photo.jpg",
+        "alt": "Harbour at dusk"
+      }
+    },
+    "Map": {
+      "description": "A map centred on a coordinate with optional markers and a route polyline. Coordinates are [latitude, longitude].",
+      "category": "content",
+      "fit": [
+        "panel",
+        "full"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "center"
+        ],
+        "properties": {
+          "center": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "zoom": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 19,
+            "default": 12
+          },
+          "markers": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "position"
+              ],
+              "properties": {
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 60
+                }
+              }
+            }
+          },
+          "route": {
+            "type": "array",
+            "maxItems": 2000,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        }
+      },
+      "bindable": [
+        "center",
+        "markers",
+        "route",
+        "zoom"
+      ],
+      "tags": [
+        "place",
+        "geo",
+        "visual"
+      ],
+      "example": {
+        "center": [
+          38.72,
+          -9.14
+        ],
+        "zoom": 12,
+        "markers": [
+          {
+            "position": [
+              38.72,
+              -9.14
+            ],
+            "label": "Lisbon"
+          }
+        ]
+      }
+    },
+    "Confirm": {
+      "description": "A proposed action awaiting confirmation. Enter confirms, Escape rejects. Rendered by the backend for every proposal; the model does not need to emit it.",
+      "category": "action",
+      "fit": [
+        "glance"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposal_id",
+          "title"
+        ],
+        "properties": {
+          "proposal_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "low"
+          }
+        }
+      },
+      "actions": [
+        "confirm",
+        "reject"
+      ],
+      "tags": [
+        "action"
+      ],
+      "example": {
+        "proposal_id": "p1",
+        "title": "Set a reminder for 17:00",
+        "risk": "low"
+      }
+    },
+    "Status": {
+      "description": "A one-line status with a level (info, ok, warn, error). For short acknowledgements and errors.",
+      "category": "status",
+      "fit": [
+        "glance"
+      ],
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "ok",
+              "warn",
+              "error"
+            ],
+            "default": "info"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "bindable": [
+        "text",
+        "level"
+      ],
+      "tags": [
+        "status",
+        "text"
+      ],
+      "example": {
+        "level": "ok",
+        "text": "Reminder set for 17:00."
+      }
+    }
+  }
+}

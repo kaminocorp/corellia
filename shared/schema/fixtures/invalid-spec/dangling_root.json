@@ -1,0 +1,11 @@
+{
+  "ops": [
+    {
+      "op": "set_root",
+      "id": "n9"
+    }
+  ],
+  "codes": [
+    "dangling_ref"
+  ]
+}

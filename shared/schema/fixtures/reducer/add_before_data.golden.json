@@ -1,0 +1,1 @@
+{"actions":{},"data":{"rows":[{"name":"Bolts"}]},"nodes":{"n1":{"props":{"columns":[{"key":"name","label":"Name"}],"rows":{"bind":"$.rows"}},"type":"Table"}},"root":"n1","spec_version":1}

@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corellia.dev/schema/api.schema.json",
+  "title": "API",
+  "description": "Request and response bodies of the JSON HTTP API. The root object only indexes the definitions (so generators emit every one); handlers reference the $defs by name.",
+  "$defs": {
+    "TurnRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "keyboard",
+            "voice"
+          ],
+          "default": "keyboard"
+        },
+        "client_turn_id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Optional idempotency key chosen by the client."
+        }
+      }
+    },
+    "TurnResponse": {
+      "type": "object",
+      "required": [
+        "turn_id"
+      ],
+      "properties": {
+        "turn_id": {
+          "type": "string"
+        },
+        "cancelled_turn_id": {
+          "type": "string",
+          "description": "Set when starting this turn cancelled a running one."
+        }
+      }
+    },
+    "CancelRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "turn_id": {
+          "type": "string",
+          "description": "Omit to cancel whatever is running."
+        }
+      }
+    },
+    "ConfirmRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_id"
+      ],
+      "properties": {
+        "proposal_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "keyboard",
+            "voice"
+          ],
+          "default": "keyboard"
+        }
+      }
+    },
+    "ActionRequest": {
+      "description": "The client fired a node action.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "turn_request": {
+      "$ref": "#/$defs/TurnRequest"
+    },
+    "turn_response": {
+      "$ref": "#/$defs/TurnResponse"
+    },
+    "cancel_request": {
+      "$ref": "#/$defs/CancelRequest"
+    },
+    "confirm_request": {
+      "$ref": "#/$defs/ConfirmRequest"
+    },
+    "action_request": {
+      "$ref": "#/$defs/ActionRequest"
+    },
+    "error_response": {
+      "$ref": "#/$defs/ErrorResponse"
+    }
+  }
+}

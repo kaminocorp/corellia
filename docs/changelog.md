@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)](#0152---phase-2-shared-contract-json-schemas--v1-catalog--gots-codegen--validators--reducers-with-shared-fixtures-2026-10-29)
 - [0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)](#0151---phase-1-legacy-control-plane-removed--go-backend-skeleton-device-token-static-client--vite-client-skeleton-2026-10-29)
 - [0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)](#0150---vision-roadmap-ten-phase-implementation-plan--section-11-defaults-2026-10-29)
 - [0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)](#0141---vision-default-client-approach-web-client-browser-on-macos-kiosk-or-shell-on-the-box-2026-10-29)
@@ -83,6 +84,24 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)
+
+Roadmap Phase 2. Full notes: [`completions/phase-02-shared-contract.md`](completions/phase-02-shared-contract.md).
+
+### Added
+
+- **`shared/schema/`**: `ui-spec`, `ops`, `events`, `api`, `catalog` JSON Schemas (draft 2020-12); `REDUCER.md` (normative reducer and validation semantics, error codes); `fixtures/` (reducer goldens, valid, invalid, reducer-errors, invalid-spec; 41 cases).
+- **`shared/catalog/catalog.json`**: v1 catalog, 15 components (Stack, Grid, Split, Overlay, Card, Markdown, Stat, List, Table, Chart, Timeline, Image, Map, Confirm, Status) with props schemas, bindable props, slots, actions, fit hints, tags, examples.
+- **Codegen**: `scripts/contracts-generate.sh` + `scripts/gen-ts-types.mjs` (`pnpm contracts:generate`); generated `backend/internal/contract/gen/*.go`, embedded copies `backend/internal/contract/embed/*.json`, `client/src/contract/gen/*.ts`; drift tests in both languages.
+- **Backend** `internal/contract` (compiled validators, catalog, bound-prop rule, op decoding) and `internal/uispec` (binding paths, reducer, catalog-aware op and whole-spec validation).
+- **Client** `src/contract/` (Ajv validators, paths, pure reducer, op and whole-spec checks) with the shared-fixture test.
+
+### Edited
+
+- `backend/go.mod` (+ santhosh-tekuri/jsonschema v6), `client/package.json` (+ ajv, ajv-formats, json-schema-to-typescript), root `package.json` (`contracts:generate`).
+
+---
 
 ## 0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)
 

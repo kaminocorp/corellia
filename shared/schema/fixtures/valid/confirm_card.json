@@ -1,0 +1,54 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "c",
+      "node": {
+        "type": "Confirm",
+        "props": {
+          "proposal_id": "p1",
+          "title": "Set a reminder for 17:00",
+          "risk": "low"
+        },
+        "actions": {
+          "confirm": {
+            "id": "ok",
+            "label": "Do it",
+            "hotkey": "enter"
+          },
+          "reject": {
+            "id": "no",
+            "label": "Cancel",
+            "hotkey": "escape"
+          }
+        }
+      }
+    },
+    {
+      "op": "set_action",
+      "id": "ok",
+      "action": {
+        "kind": "tool",
+        "tool": "confirm_proposal",
+        "args": {
+          "proposal_id": "p1"
+        }
+      }
+    },
+    {
+      "op": "set_action",
+      "id": "no",
+      "action": {
+        "kind": "dismiss",
+        "target": "c"
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "c"
+    },
+    {
+      "op": "done"
+    }
+  ]
+}

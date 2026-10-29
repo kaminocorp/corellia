@@ -1,0 +1,11 @@
+{
+  "before": [],
+  "op": {
+    "op": "set_props",
+    "id": "n1",
+    "props": {
+      "title": "x"
+    }
+  },
+  "code": "node_not_found"
+}

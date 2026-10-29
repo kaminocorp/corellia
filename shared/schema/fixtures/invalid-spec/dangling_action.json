@@ -1,0 +1,27 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Card",
+        "props": {
+          "title": "t"
+        },
+        "actions": {
+          "primary": {
+            "id": "a9",
+            "label": "Go"
+          }
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    }
+  ],
+  "codes": [
+    "dangling_ref"
+  ]
+}
