@@ -239,7 +239,7 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | Phase | Status | Completion note | Changelog |
 |---|---|---|---|
 | 0 Roadmap | done 2026-10-29 | [`../completions/phase-00-roadmap.md`](../completions/phase-00-roadmap.md) | 0.15.0 |
-| 1 Restructure and skeletons | pending | | |
+| 1 Restructure and skeletons | done 2026-10-29 | [`../completions/phase-01-restructure-and-skeletons.md`](../completions/phase-01-restructure-and-skeletons.md) | 0.15.1 |
 | 2 Shared contract | pending | | |
 | 3 Session, events, local runtime | pending | | |
 | 4 Component library and renderer | pending | | |

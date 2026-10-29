@@ -1,69 +1,68 @@
+// Package config is the only place in the backend that reads environment
+// variables. It validates at startup and hands a typed Config to everything
+// else (roadmap rule 4).
 package config
 
 import (
-	"log/slog"
-	"os"
+	"fmt"
+	"strings"
 
 	"github.com/caarlos0/env/v11"
 )
 
+// Config is the typed view of the process environment.
 type Config struct {
+	// Port is the HTTP listen port for the API, the SSE stream and the
+	// static client.
 	Port int `env:"PORT" envDefault:"8080"`
 
-	// DatabaseURL is Supabase's Direct Connection URL
-	// (db.<ref>.supabase.co:5432). Consumed by pgxpool, which acts as
-	// an in-process transaction pooler — no external pooler on the wire.
-	// Non-superuser role once corellia_app is introduced.
-	//
-	// DATABASE_URL_DIRECT (same host, postgres superuser role) is
-	// deliberately NOT exposed here — it's a shell-only env var read
-	// by goose during migrations. Keeping it out of Config means the
-	// app binary never holds superuser credentials.
-	//
-	// If the local network lacks IPv6 reachability to the Direct host,
-	// swap DATABASE_URL for the Session Pooler form
-	// (*.pooler.supabase.com:5432) — drop-in compatible, no code
-	// change. Never use Transaction Pooler (:6543); it breaks pgx's
-	// prepared-statement cache, which sqlc relies on.
-	DatabaseURL string `env:"DATABASE_URL,required"`
+	// DeviceToken is the bearer token the display client presents. When
+	// empty the server runs in dev mode and accepts loopback clients only.
+	DeviceToken string `env:"CORELLIA_DEVICE_TOKEN"`
 
-	SupabaseURL string `env:"SUPABASE_URL,required"`
+	// ClientDir is the directory holding the built client (Vite output).
+	// Served with an SPA fallback. When the directory does not exist the
+	// server still runs and serves a plain "client not built" page.
+	ClientDir string `env:"CORELLIA_CLIENT_DIR" envDefault:"../client/dist"`
 
-	// FlyAPIToken / FlyOrgSlug are bootstrap credentials for the single
-	// process-wide DeployTarget consumed by deploy.StaticResolver. They
-	// are slated for retirement in v1.5, when DB-backed deploy_targets
-	// rows replace this env-var bootstrap with per-org user-configurable
-	// credentials. See docs/executing/deploy-target-resolver.md §1.
-	//
-	// Env var name is FLY_SPAWN_TOKEN (not FLY_API_TOKEN) because flyctl
-	// honors FLY_API_TOKEN ahead of `fly auth login` credentials — using
-	// that name in backend/.env caused direnv to silently shadow the
-	// operator's interactive identity on `fly deploy`. The runtime
-	// spawn credential and the operator's deploy identity are distinct
-	// roles; the rename keeps them in their own lanes. See changelog 0.7.6.
-	// TODO(v1.5): delete these two fields when DBResolver lands.
-	FlyAPIToken string `env:"FLY_SPAWN_TOKEN,required"`
-	FlyOrgSlug  string `env:"FLY_ORG_SLUG,required"`
+	// DataDir holds all local state (transcript, memory, reminders).
+	DataDir string `env:"CORELLIA_DATA_DIR" envDefault:"./data"`
 
-	FrontendOrigin string `env:"FRONTEND_ORIGIN,required"`
+	// AgentName is the product-facing name of the agent.
+	AgentName string `env:"CORELLIA_AGENT_NAME" envDefault:"Corellia"`
 
-	// CorelliaAPIURL is the externally-reachable base URL of this control-plane
-	// instance (e.g. "https://corellia-api.fly.dev"). The spawn flow appends
-	// the Connect-go path to construct CORELLIA_TOOL_MANIFEST_URL, which is
-	// injected into each agent's Fly app secrets so the adapter can fetch its
-	// tool manifest at boot.
-	//
-	// Optional (empty default). When unset, manifest-token generation is skipped
-	// and agents spawn without tools governance — safe for local dev and any
-	// deployment that hasn't enabled v1.5 Pillar B yet.
-	CorelliaAPIURL string `env:"CORELLIA_API_URL" envDefault:""`
+	// DevOrigins are extra origins allowed by CORS (the Vite dev server by
+	// default). Comma-separated. The Vite proxy makes this unnecessary in
+	// the default dev setup; it exists for running the client from another
+	// host while developing.
+	DevOrigins []string `env:"CORELLIA_DEV_ORIGINS" envDefault:"http://localhost:5173" envSeparator:","`
 }
 
-func Load() Config {
+// Load parses the environment into a Config and validates it.
+func Load() (Config, error) {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {
-		slog.Error("config load failed", "err", err)
-		os.Exit(1)
+		return Config{}, fmt.Errorf("config: %w", err)
 	}
-	return cfg
+	if err := cfg.Validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
 }
+
+// Validate applies rules that the struct tags cannot express.
+func (c Config) Validate() error {
+	if c.Port < 1 || c.Port > 65535 {
+		return fmt.Errorf("config: PORT %d out of range", c.Port)
+	}
+	if strings.TrimSpace(c.AgentName) == "" {
+		return fmt.Errorf("config: CORELLIA_AGENT_NAME must not be blank")
+	}
+	if t := c.DeviceToken; t != "" && len(t) < 16 {
+		return fmt.Errorf("config: CORELLIA_DEVICE_TOKEN must be at least 16 characters when set")
+	}
+	return nil
+}
+
+// DevMode reports whether the server runs without a device token.
+func (c Config) DevMode() bool { return c.DeviceToken == "" }

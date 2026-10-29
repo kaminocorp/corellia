@@ -5,16 +5,15 @@
 # Go
 backend/tmp/
 backend/bin/
+backend/data/
+data/
 
-# Node (will be used by frontend later)
+# Node
 node_modules/
-.next/
-.turbo/
+client/dist/
+.vite/
 
 # Editor
 .vscode/
 .idea/
 .DS_Store
-
-# Generated assets (upload to GitHub CDN, don't commit binaries)
-docs/assets/login-animation.mp4

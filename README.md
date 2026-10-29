@@ -188,6 +188,8 @@ corellia/
 
 ```bash
 # runtimes
+
+> **Direction change (2026-10-28) and implementation in progress.** Corellia is now a personal agent workspace: an always-on office screen with a 3D agent, keyboard and voice input, and UI the agent assembles from a closed component catalog. The plan is [`docs/executing/roadmap.md`](docs/executing/roadmap.md); progress is recorded in `docs/completions/` and `docs/changelog.md`. The control-plane code described below was removed in Phase 1 (git history keeps it; docs in [`docs/archive/`](docs/archive/README.md)). This README is rewritten in Phase 10.
 node 20+                                           # via volta or nvm
 pnpm 9+                                            # corepack enable
 go 1.22+

@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)](#0151---phase-1-legacy-control-plane-removed--go-backend-skeleton-device-token-static-client--vite-client-skeleton-2026-10-29)
 - [0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)](#0150---vision-roadmap-ten-phase-implementation-plan--section-11-defaults-2026-10-29)
 - [0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)](#0141---vision-default-client-approach-web-client-browser-on-macos-kiosk-or-shell-on-the-box-2026-10-29)
 - [0.14.0 — Direction Reset: Personal Agent Workspace Vision + Docs Archive Cleanup (2026-10-28)](#0140--direction-reset-personal-agent-workspace-vision--docs-archive-cleanup-2026-10-28)
@@ -82,6 +83,26 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)
+
+Roadmap Phase 1. Full notes: [`completions/phase-01-restructure-and-skeletons.md`](completions/phase-01-restructure-and-skeletons.md).
+
+### Removed
+
+- The v1 control plane: `frontend/` (Next.js), all of `backend/internal/` (agents, adapters, Supabase auth, sqlc db, Fly deploy, generated Connect code, tools governance, orgs, users), migrations, queries, `shared/proto/`, Fly config, Dockerfile, smoke-deploy command, video capture script. `adapters/hermes/` stays. Go dependencies pruned to env, chi and godotenv.
+
+### Added
+
+- **Backend**: `internal/config` (new var set: `PORT`, `CORELLIA_DEVICE_TOKEN`, `CORELLIA_CLIENT_DIR`, `CORELLIA_DATA_DIR`, `CORELLIA_AGENT_NAME`, `CORELLIA_DEV_ORIGINS`; `Load` returns errors, `Validate`, `DevMode`), `internal/auth` (device-token middleware; dev mode = loopback only), `internal/httpsrv` (`/healthz`, `/api/config`, CORS for dev origins, static client with SPA fallback and immutable asset caching, 503 hint when not built), `cmd/api` (graceful shutdown, build info ldflags). 10 tests.
+- **Client** (`client/`): Vite 7 + React 19 + TS 5.9 + Tailwind 4 + R3F/three (unused until Phase 5) + vitest/Testing Library + eslint flat config. Full-screen dark shell, always-focused `CommandInput` (Enter submits, Esc clears, refocus on blur and on any printable key), `/healthz` connection indicator, design tokens reduced from v1, salvaged shader sources under `src/agent3d/shaders/`. 8 tests.
+- Root workspace: `package.json` scripts (`dev`, `build`, `test`, `type-check`, `lint`, `check`), `pnpm-workspace.yaml` with `allowBuilds` for esbuild (pnpm 12), new `pnpm-lock.yaml`, `Procfile` (Vite + air), `.gitignore`, `.env.example` rewritten.
+
+### Edited
+
+- `CLAUDE.md` rewritten for the new layout, rules and commands (interim until Phase 10). `README.md` and `docs/stack.md` carry a note that the described v1 code is removed. Roadmap progress table updated.
+
+---
 
 ## 0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)
 

@@ -1,6 +1,6 @@
 # Corellia — Implementation Stack (v1)
 
-> **Status (2026-10-28):** describes the v1 control-plane implementation that is still in the tree.
+> **Status (2026-10-29):** describes the v1 control-plane implementation, which was removed from the tree in Phase 1 of the vision implementation (see `executing/roadmap.md`). Kept until the Phase 10 rewrite.
 > Under the new direction ([`VISION.md`](VISION.md)) these picks are **defaults, not decisions**:
 > Go backend, TypeScript frontend, Connect-go + protobuf contract, `go.work` monorepo.
 > Fly.io deploy, Supabase auth and the fleet/spawn domain are legacy and may be dropped.
