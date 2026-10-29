@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)](#0154---phase-4-component-library-15-components--renderer-bindings-hotkeys-decay-placement--catalog-describerank--action-and-screen-endpoints-2026-10-29)
 - [0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)](#0153---phase-3-agentruntime-seam--local-runtime--session-with-sse-event-stream--client-session-store-2026-10-29)
 - [0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)](#0152---phase-2-shared-contract-json-schemas--v1-catalog--gots-codegen--validators--reducers-with-shared-fixtures-2026-10-29)
 - [0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)](#0151---phase-1-legacy-control-plane-removed--go-backend-skeleton-device-token-static-client--vite-client-skeleton-2026-10-29)
@@ -85,6 +86,23 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)
+
+Roadmap Phase 4. Full notes: [`completions/phase-04-component-library-and-renderer.md`](completions/phase-04-component-library-and-renderer.md).
+
+### Added
+
+- **Client components** for every catalog entry (layout: Stack, Grid, Split, Overlay; content: Card, Markdown, Stat, List, Table, Chart, Timeline, Image, Map; Confirm; Status), a safe Markdown subset parser, SVG chart geometry, MapLibre GL map over OSM raster tiles (lazy chunk, static fallback), and a registry whose test asserts parity with the catalog.
+- **Renderer**: binding resolution with catalog defaults and per-node validation, slot mounting, depth cap, hotkey assignment (explicit keys kept, digits 1–9 assigned), `Stage` placement (glance / panel / full) around the agent, decay via `ttl_ms`, global keys (`Esc` cancel → escape action → clear; `Enter`; digits) that stay inert while typing.
+- **Backend** `internal/catalog` (`Describe`, `Rank`, `Classify`), session `FireAction`/`ClearScreen`/`RemoveNode`, endpoints `POST /api/action`, `POST /api/screen/clear`, `POST /api/screen/remove`.
+- `?gallery=1` component gallery. Store `touched` map and `applyLocal`.
+
+### Edited
+
+- `App.tsx` mounts the Stage; `CommandInput` reports its value; Vite chunk warning limit raised for the lazy MapLibre chunk.
+
+---
 
 ## 0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)
 

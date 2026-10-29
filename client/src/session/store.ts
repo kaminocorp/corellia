@@ -6,7 +6,7 @@
 import { useSyncExternalStore } from "react";
 
 import { applyOp, emptySpec, ReducerError } from "../contract";
-import type { AgentState, Capabilities, Proposal, SessionEvent, TranscriptEntry, UISpec } from "../contract";
+import type { AgentState, Capabilities, Proposal, SessionEvent, SpecOp, TranscriptEntry, UISpec } from "../contract";
 
 export type ConnectionStatus = "connecting" | "online" | "reconnecting" | "offline";
 
@@ -26,6 +26,8 @@ export type SessionState = {
   capabilities: Capabilities | null;
   errors: ClientError[];
   recentEvents: SessionEvent[];
+  /** Node id -> epoch ms of its last add/set, for decay. */
+  touched: Record<string, number>;
 };
 
 export const MAX_ERRORS = 20;
@@ -47,7 +49,28 @@ export function initialState(): SessionState {
     capabilities: null,
     errors: [],
     recentEvents: [],
+    touched: {},
   };
+}
+
+/** Updates the touched map for an op (pure). */
+export function touch(touched: Record<string, number>, op: SpecOp, at: number): Record<string, number> {
+  switch (op.op) {
+    case "add_node":
+    case "set_props":
+    case "set_slot":
+      return { ...touched, [op.id]: at };
+    case "remove_node": {
+      if (!(op.id in touched)) return touched;
+      const copy = { ...touched };
+      delete copy[op.id];
+      return copy;
+    }
+    case "clear":
+      return {};
+    default:
+      return touched;
+  }
 }
 
 const tail = <T>(arr: T[], max: number): T[] => (arr.length > max ? arr.slice(arr.length - max) : arr);
@@ -65,6 +88,7 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
       transcript: tail(ev.transcript ?? [], MAX_TRANSCRIPT),
       pendingProposals: ev.pending_proposals,
       capabilities: ev.capabilities,
+      touched: Object.fromEntries(Object.keys(ev.spec.nodes).map((id) => [id, Date.parse(ev.ts) || Date.now()])),
       activeTurnId: ev.agent_state === "idle" ? null : state.activeTurnId,
       streamingText: ev.agent_state === "idle" ? "" : state.streamingText,
       recentEvents: tail([...state.recentEvents, ev], MAX_RECENT),
@@ -91,6 +115,7 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
     case "spec_op":
       try {
         next.spec = applyOp(state.spec, ev.op);
+        next.touched = touch(state.touched, ev.op, Date.parse(ev.ts) || Date.now());
       } catch (e) {
         const code = e instanceof ReducerError ? e.code : "reducer";
         next.errors = tail([...state.errors, { code, message: String(e), ts: ev.ts, turnId: ev.turn_id }], MAX_ERRORS);
@@ -142,6 +167,16 @@ export class SessionStore {
 
   setConnection(connection: ConnectionStatus): void {
     if (connection !== this.state.connection) this.set({ ...this.state, connection });
+  }
+
+  /** Applies an op the client itself issues (decay, dismiss) ahead of the server's echo. */
+  applyLocal(op: SpecOp): void {
+    try {
+      const spec = applyOp(this.state.spec, op);
+      this.set({ ...this.state, spec, touched: touch(this.state.touched, op, Date.now()) });
+    } catch (e) {
+      this.addError("local_op", String(e));
+    }
   }
 
   addError(code: string, message: string): void {

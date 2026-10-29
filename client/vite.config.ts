@@ -21,6 +21,9 @@ export default defineConfig({
   build: {
     target: "es2020",
     sourcemap: false,
+    // maplibre-gl is loaded on demand by the Map component and is ~1 MB
+    // minified on its own; the main bundle stays well under the default.
+    chunkSizeWarningLimit: 1100,
   },
   test: {
     environment: "jsdom",

@@ -286,3 +286,66 @@ func TestNoRuntime(t *testing.T) {
 }
 
 func now() time.Time { return time.Now() }
+
+func TestLocalOpsAndActions(t *testing.T) {
+	s := New(Options{Registry: reg(t), Runtime: &local.Runtime{}})
+	defer s.Close()
+	id, _, _ := s.StartTurn("show me a map of Lisbon", runtime.SourceKeyboard)
+	s.WaitTurn(id)
+	ch, unsub := s.Subscribe(s.Seq())
+	defer unsub()
+
+	if err := s.FireAction("missing", ""); !errors.Is(err, ErrActionNotFound) {
+		t.Fatalf("missing action err = %v", err)
+	}
+	if err := s.FireAction("nav", ""); !errors.Is(err, ErrActionUnsupported) {
+		t.Fatalf("propose action err = %v", err)
+	}
+	if err := s.RemoveNode("text"); err != nil {
+		t.Fatal(err)
+	}
+	evs := drainUntil(t, ch, "spec_op", "")
+	if op := evs[len(evs)-1]["op"].(map[string]any); op["op"] != "remove_node" || op["id"] != "text" {
+		t.Fatalf("op = %v", op)
+	}
+	if _, ok := s.Spec().Nodes["text"]; ok {
+		t.Fatal("node not removed")
+	}
+	if err := s.RemoveNode("ghost"); err != nil {
+		t.Fatalf("removing an unknown node should be a no-op: %v", err)
+	}
+	if err := s.ClearScreen(); err != nil {
+		t.Fatal(err)
+	}
+	if spec := s.Spec(); spec.Root != nil || len(spec.Nodes) != 0 {
+		t.Fatal("screen not cleared")
+	}
+	// A dismiss action and a send_message action through the gate.
+	for _, op := range []map[string]any{
+		{"op": "add_node", "id": "n1", "node": map[string]any{"type": "Status", "props": map[string]any{"text": "x"}, "actions": map[string]any{}}},
+		{"op": "set_root", "id": "n1"},
+		{"op": "set_action", "id": "bye", "action": map[string]any{"kind": "dismiss", "target": "n1"}},
+		{"op": "set_action", "id": "ask", "action": map[string]any{"kind": "send_message", "message": "hello"}},
+	} {
+		if err := s.publishLocalOp(op); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.FireAction("bye", ""); err != nil {
+		t.Fatal(err)
+	}
+	if spec := s.Spec(); spec.Root != nil {
+		t.Fatal("dismiss did not remove the root")
+	}
+	if err := s.FireAction("ask", ""); err != nil {
+		t.Fatal(err)
+	}
+	active := s.ActiveTurn()
+	s.WaitTurn(active)
+	snap := s.Snapshot()
+	tr := snap["transcript"].([]gen.TranscriptEntry)
+	last := tr[len(tr)-2]
+	if last.Text != "hello" || *last.Source != "action" {
+		t.Fatalf("send_message turn = %+v", last)
+	}
+}

@@ -19,6 +19,9 @@ type sessionAPI interface {
 	Snapshot() map[string]any
 	Subscribe(lastSeq int) (<-chan session.Item, func())
 	Seq() int
+	FireAction(actionID string, nodeID string) error
+	ClearScreen() error
+	RemoveNode(id string) error
 }
 
 // SessionHandler serves /api/session, /api/turn, /api/turn/cancel and
@@ -106,6 +109,53 @@ func (h *SessionHandler) PostCancel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"cancelled": h.s.Cancel(req.TurnID)})
+}
+
+// PostAction fires a spec action chosen on the client (keyboard or voice).
+func (h *SessionHandler) PostAction(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ActionID string `json:"action_id"`
+		NodeID   string `json:"node_id"`
+	}
+	if !h.decodeBody(w, r, "ActionRequest", &req) {
+		return
+	}
+	switch err := h.s.FireAction(req.ActionID, req.NodeID); {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	case errors.Is(err, session.ErrActionNotFound):
+		writeError(w, http.StatusNotFound, "action_not_found", err.Error())
+	case errors.Is(err, session.ErrActionUnsupported):
+		writeError(w, http.StatusNotImplemented, "action_unsupported", err.Error())
+	default:
+		writeError(w, http.StatusBadRequest, "action_failed", err.Error())
+	}
+}
+
+// PostScreenClear clears the screen (Escape when idle).
+func (h *SessionHandler) PostScreenClear(w http.ResponseWriter, _ *http.Request) {
+	if err := h.s.ClearScreen(); err != nil {
+		writeError(w, http.StatusInternalServerError, "clear_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// PostScreenRemove reports a client-side decay so the server spec follows.
+func (h *SessionHandler) PostScreenRemove(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		NodeID string `json:"node_id"`
+	}
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
+	if err != nil || json.Unmarshal(raw, &req) != nil || req.NodeID == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "node_id required")
+		return
+	}
+	if err := h.s.RemoveNode(req.NodeID); err != nil {
+		writeError(w, http.StatusBadRequest, "remove_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // GetCatalog serves the raw catalog JSON.

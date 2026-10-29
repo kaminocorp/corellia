@@ -93,3 +93,12 @@
     animation: none;
   }
 }
+
+/* MapLibre marker (the Map component creates these elements). */
+.corellia-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px hsl(142 71% 45% / 0.3), 0 0 18px hsl(142 71% 45% / 0.6);
+}

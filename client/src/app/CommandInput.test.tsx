@@ -21,13 +21,16 @@ describe("CommandInput", () => {
 
   it("ignores empty submissions and clears on Escape", () => {
     const onSubmit = vi.fn();
-    render(<CommandInput onSubmit={onSubmit} />);
+    const onValueChange = vi.fn();
+    render(<CommandInput onSubmit={onSubmit} onValueChange={onValueChange} />);
     const input = screen.getByLabelText("Message") as HTMLInputElement;
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onSubmit).not.toHaveBeenCalled();
     fireEvent.change(input, { target: { value: "draft" } });
+    expect(onValueChange).toHaveBeenLastCalledWith("draft");
     fireEvent.keyDown(input, { key: "Escape" });
     expect(input.value).toBe("");
+    expect(onValueChange).toHaveBeenLastCalledWith("");
   });
 
   it("regains focus when a printable key is pressed elsewhere", () => {

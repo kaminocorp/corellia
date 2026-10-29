@@ -182,3 +182,30 @@ func TestEventsStreamReplaysAfterLastEventID(t *testing.T) {
 		t.Fatalf("first replayed seq = %v", evs[1]["seq"])
 	}
 }
+
+func TestActionAndScreenEndpoints(t *testing.T) {
+	h, sess := sessionServer(t)
+	id, _, _ := sess.StartTurn("show me a map of Lisbon", runtime.SourceKeyboard)
+	sess.WaitTurn(id)
+	if rec := post(h, "/api/action", `{"action_id":"nope"}`); rec.Code != 404 {
+		t.Fatalf("unknown action: %d", rec.Code)
+	}
+	if rec := post(h, "/api/action", `{"action_id":"nav"}`); rec.Code != 501 {
+		t.Fatalf("propose action: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := post(h, "/api/action", `{"bogus":1}`); rec.Code != 400 {
+		t.Fatalf("bad body: %d", rec.Code)
+	}
+	if rec := post(h, "/api/screen/remove", `{"node_id":"text"}`); rec.Code != 200 {
+		t.Fatalf("remove: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := post(h, "/api/screen/remove", `{}`); rec.Code != 400 {
+		t.Fatalf("remove without id: %d", rec.Code)
+	}
+	if rec := post(h, "/api/screen/clear", ""); rec.Code != 200 {
+		t.Fatalf("clear: %d", rec.Code)
+	}
+	if spec := sess.Spec(); spec.Root != nil {
+		t.Fatal("not cleared")
+	}
+}

@@ -1,4 +1,4 @@
-import type { CancelRequest, TurnRequest, TurnResponse } from "../contract";
+import type { ActionRequest, CancelRequest, TurnRequest, TurnResponse } from "../contract";
 import { authHeaders } from "./auth";
 
 export class ApiError extends Error {
@@ -39,4 +39,17 @@ export function sendTurn(text: string, source: "keyboard" | "voice" = "keyboard"
 export function cancelTurn(turnId?: string, fetchImpl?: typeof fetch) {
   const body: CancelRequest = turnId ? { turn_id: turnId } : {};
   return postJSON<{ cancelled: boolean }>("/api/turn/cancel", body, fetchImpl);
+}
+
+export function fireAction(actionId: string, nodeId?: string, fetchImpl?: typeof fetch) {
+  const body: ActionRequest = nodeId ? { action_id: actionId, node_id: nodeId } : { action_id: actionId };
+  return postJSON<{ ok: boolean }>("/api/action", body, fetchImpl);
+}
+
+export function clearScreen(fetchImpl?: typeof fetch) {
+  return postJSON<{ ok: boolean }>("/api/screen/clear", {}, fetchImpl);
+}
+
+export function removeNode(nodeId: string, fetchImpl?: typeof fetch) {
+  return postJSON<{ ok: boolean }>("/api/screen/remove", { node_id: nodeId }, fetchImpl);
 }

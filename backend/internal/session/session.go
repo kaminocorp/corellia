@@ -483,3 +483,76 @@ func truncate(s string, n int) string {
 	}
 	return fmt.Sprintf("%s…", s[:n])
 }
+
+// ErrActionNotFound is returned when an action id is unknown.
+var ErrActionNotFound = errors.New("session: action not found")
+
+// ErrActionUnsupported is returned for action kinds not yet executable.
+var ErrActionUnsupported = errors.New("session: action kind not supported yet")
+
+// publishLocalOp validates and applies an op the session itself issues
+// (dismiss, clear, decay) and publishes it without a turn id.
+func (s *Session) publishLocalOp(op map[string]any) error {
+	raw, err := json.Marshal(op)
+	if err != nil {
+		return err
+	}
+	decoded, err := s.o.Registry.DecodeOp(raw)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if e := s.v.CheckOp(&s.spec, decoded); e != nil {
+		s.mu.Unlock()
+		return e
+	}
+	if err := uispec.Apply(&s.spec, decoded); err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	s.mu.Unlock()
+	s.bus.Publish("spec_op", map[string]any{"op": op})
+	return nil
+}
+
+// ClearScreen removes everything from the screen.
+func (s *Session) ClearScreen() error {
+	return s.publishLocalOp(map[string]any{"op": "clear"})
+}
+
+// RemoveNode removes a node (client-side decay reports through here so
+// the server's spec stays authoritative). Unknown ids are a no-op.
+func (s *Session) RemoveNode(id string) error {
+	return s.publishLocalOp(map[string]any{"op": "remove_node", "id": id})
+}
+
+// FireAction executes a spec action by id. `dismiss` removes its target,
+// `send_message` starts a turn with the message; `tool` and `propose`
+// arrive with the Phase 6 gate and return ErrActionUnsupported until then.
+func (s *Session) FireAction(actionID string, nodeID string) error {
+	s.mu.Lock()
+	action, ok := s.spec.Actions[actionID]
+	s.mu.Unlock()
+	if !ok {
+		return ErrActionNotFound
+	}
+	switch action.Kind {
+	case gen.ActionKindDismiss:
+		target := nodeID
+		if action.Target != nil {
+			target = string(*action.Target)
+		}
+		if target == "" {
+			return ErrActionNotFound
+		}
+		return s.RemoveNode(target)
+	case gen.ActionKindSendMessage:
+		if action.Message == nil {
+			return ErrActionNotFound
+		}
+		_, _, err := s.StartTurn(*action.Message, runtime.SourceAction)
+		return err
+	default:
+		return ErrActionUnsupported
+	}
+}

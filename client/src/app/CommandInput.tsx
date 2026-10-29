@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 type Props = {
   onSubmit: (text: string) => void;
-  /** Escape with an empty input (used to cancel the running turn). */
-  onEscapeEmpty?: () => void;
+  /** Reports every value change so global hotkeys know when the input is empty. */
+  onValueChange?: (value: string) => void;
   placeholder?: string;
 };
 
@@ -12,9 +12,13 @@ type Props = {
  * whenever a printable key is pressed anywhere on the page (VISION 3,
  * "keyboard chat, always focused, no click needed").
  */
-export function CommandInput({ onSubmit, onEscapeEmpty, placeholder = "Say something…" }: Props) {
+export function CommandInput({ onSubmit, onValueChange, placeholder = "Say something…" }: Props) {
   const ref = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState("");
+  const [value, setValueState] = useState("");
+  const setValue = (v: string) => {
+    setValueState(v);
+    onValueChange?.(v);
+  };
 
   useEffect(() => {
     const el = ref.current;
@@ -47,9 +51,9 @@ export function CommandInput({ onSubmit, onEscapeEmpty, placeholder = "Say somet
       }
       e.preventDefault();
     }
-    if (e.key === "Escape") {
-      if (value === "") onEscapeEmpty?.();
+    if (e.key === "Escape" && value !== "") {
       setValue("");
+      e.stopPropagation();
     }
   };
 
