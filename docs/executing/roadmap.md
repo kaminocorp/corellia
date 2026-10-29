@@ -1,6 +1,6 @@
 # Corellia vision implementation roadmap
 
-**Status:** executing. Written 2026-10-29 before any code change. Updated at each phase boundary (the "Progress" table at the end).
+**Status:** complete (all ten phases done on 2026-10-29). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
 **Scope:** implement [`../VISION.md`](../VISION.md) end to end: an always-on personal agent workspace (3D agent, keyboard + voice, generated UI from a closed catalog, propose/confirm actions, decision layer, swappable agent runtime, display-box deployment).
 **Branch:** all work on `feat/vision-implementation`, pushed only to that branch. No merges, no PRs, no deploys.
 **Companion records:** one `docs/completions/phase-NN-<name>.md` per completed phase, one `docs/changelog.md` entry per phase.
@@ -248,4 +248,4 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 7 Cloud runtimes and spike | done 2026-10-29 | [`../completions/phase-07-cloud-runtimes-and-spike.md`](../completions/phase-07-cloud-runtimes-and-spike.md) | 0.15.7 |
 | 8 Voice | done 2026-10-29 | [`../completions/phase-08-voice.md`](../completions/phase-08-voice.md) | 0.15.8 |
 | 9 Memory, persistence, proactivity | done 2026-10-29 | [`../completions/phase-09-memory-persistence-proactivity.md`](../completions/phase-09-memory-persistence-proactivity.md) | 0.15.9 |
-| 10 Display box, hardening, docs | pending | | |
+| 10 Display box, hardening, docs | done 2026-10-29 | [`../completions/phase-10-display-box-hardening-docs.md`](../completions/phase-10-display-box-hardening-docs.md) | 0.15.10 |

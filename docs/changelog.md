@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)](#01510---phase-10-display-box-provisioning-kiosk-watchdog-systemd--heartbeat-request-logging-dockerfile--client-error-boundary-offline-banner-soak--docs-rewrite-2026-10-29)
 - [0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)](#0159---phase-9-file-store--memoryremindertranscript-persistence--memory-summary-in-prompts--proactive-scheduler-reminders-ambient-clock-with-hold-policy-2026-10-29)
 - [0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)](#0158---phase-8-voice-stttts-seams--openai-audio-provider--endpoints-client-vad-capture-browser-recognition-fallback-speech-playback-with-audio-level-activation-keys-barge-in-mic-indicator-2026-10-29)
 - [0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)](#0157---phase-7-cloud-runtimes-anthropic-streaming--tool-use-openai-compatibledeepseek-hermes-sidecar-deepseek-harness-stub--runtime-selector--runtime-spike-2026-10-29)
@@ -91,6 +92,22 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)
+
+Roadmap Phase 10, the last phase of the vision implementation. Full notes: [`completions/phase-10-display-box-hardening-docs.md`](completions/phase-10-display-box-hardening-docs.md).
+
+### Added
+
+- **`box/`**: `provision.sh`, Chromium kiosk script and X session, `corellia-kiosk.service`, heartbeat watchdog script/service/timer, `corellia-api.service`, README with the 30 fps and audio test procedures (untested on hardware).
+- **Backend**: `POST /api/heartbeat` and `client_heartbeat_age_s` on `/healthz`; structured request logging; `backend/Dockerfile` (client + backend in one image).
+- **Client**: heartbeat every 30 s, offline banner, error boundary around the generated UI, `?soak=1` scripted-turn driver. 4 tests.
+
+### Edited
+
+- `README.md`, `CLAUDE.md`, `docs/stack.md`, `docs/README.md`, `docs/blueprints/toolchain-overview.md`, `docs/blueprints/codegen-cheatsheet.md` rewritten for the new system. Roadmap progress table complete.
+
+---
 
 ## 0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)
 

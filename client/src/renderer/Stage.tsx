@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { UISpec } from "../contract";
 import { placement } from "./resolve";
 import { Renderer } from "./Renderer";
@@ -37,7 +38,9 @@ export function Stage({ spec, agent, fire, onInvalid }: Props) {
         {agent}
       </div>
       <div className={`absolute overflow-hidden transition-all duration-500 ${uiClass}`} data-testid="ui-zone">
-        <Renderer spec={spec} fire={fire} onInvalid={onInvalid} />
+        <ErrorBoundary label="generated UI failed to render" onError={(e) => onInvalid?.("render", e.message)}>
+          <Renderer spec={spec} fire={fire} onInvalid={onInvalid} />
+        </ErrorBoundary>
       </div>
     </div>
   );

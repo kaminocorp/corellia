@@ -103,3 +103,24 @@ func TestCORSPreflight(t *testing.T) {
 		t.Fatalf("unknown origin must not be allowed")
 	}
 }
+
+func TestHeartbeat(t *testing.T) {
+	now := time.Unix(1000, 0)
+	hb := NewHeartbeat(func() time.Time { return now })
+	cfg := config.Config{Port: 8080, AgentName: "Corellia", ClientDir: t.TempDir()}
+	h := New(Deps{Config: cfg, Heartbeat: hb, Now: func() time.Time { return now }})
+	if rec := get(h, "/healthz", "1.1.1.1:1"); !strings.Contains(rec.Body.String(), `"client_heartbeat_age_s":-1`) {
+		t.Fatalf("no heartbeat yet: %s", rec.Body.String())
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/heartbeat", nil)
+	req.RemoteAddr = "127.0.0.1:1"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("heartbeat: %d", rec.Code)
+	}
+	now = now.Add(42 * time.Second)
+	if rec := get(h, "/healthz", "1.1.1.1:1"); !strings.Contains(rec.Body.String(), `"client_heartbeat_age_s":42`) {
+		t.Fatalf("age: %s", rec.Body.String())
+	}
+}

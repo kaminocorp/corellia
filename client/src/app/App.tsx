@@ -4,6 +4,7 @@ import { CommandInput } from "./CommandInput";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { DebugPane } from "./DebugPane";
 import { MicIndicator } from "./MicIndicator";
+import { OfflineBanner } from "./OfflineBanner";
 import { Transcript } from "./Transcript";
 import { Agent3D, StatsOverlay } from "../agent3d/Agent3D";
 import { Gallery } from "../gallery/Gallery";
@@ -13,6 +14,8 @@ import { useDecay } from "../renderer/useDecay";
 import { useGlobalKeys, type GlobalKeyHandlers } from "../renderer/useGlobalKeys";
 import { cancelTurn, clearScreen, fireAction, removeNode, sendTurn } from "../session/api";
 import { fetchHealth } from "../session/health";
+import { startHeartbeat } from "../session/heartbeat";
+import { startSoak } from "../session/soak";
 import { sessionStore, useSessionState } from "../session/store";
 import { SessionStream } from "../session/stream";
 import { useVoice } from "../voice/useVoice";
@@ -26,10 +29,10 @@ export function App() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   if (params.get("gallery") === "1") return <Gallery />;
   const particles = Number(params.get("particles")) || undefined;
-  return <Display debug={params.get("debug") === "1"} stats={params.get("stats") === "1"} particles={particles} />;
+  return <Display debug={params.get("debug") === "1"} stats={params.get("stats") === "1"} soak={params.get("soak") === "1"} particles={particles} />;
 }
 
-function Display({ debug, stats, particles }: { debug: boolean; stats: boolean; particles?: number }) {
+function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boolean; soak: boolean; particles?: number }) {
   const [devMode, setDevMode] = useState(false);
   const inputValue = useRef("");
   const { connection, agentName, agentState, activeTurnId, spec, touched } = useSessionState((s) => ({
@@ -48,8 +51,14 @@ function Display({ debug, stats, particles }: { debug: boolean; stats: boolean; 
     const stream = new SessionStream(sessionStore, { onEvent: (ev) => controller.onStreamEvent(ev) });
     stream.connect();
     void fetchHealth().then((h) => setDevMode(h?.dev_mode ?? false));
-    return () => stream.disconnect();
-  }, [controller]);
+    const stopHeartbeat = startHeartbeat();
+    const stopSoak = soak ? startSoak() : () => {};
+    return () => {
+      stream.disconnect();
+      stopHeartbeat();
+      stopSoak();
+    };
+  }, [controller, soak]);
 
   const report = (code: string) => (e: Error) => sessionStore.addError(code, e.message);
   const fire = useCallback((actionId: string, nodeId: string) => {
@@ -103,6 +112,7 @@ function Display({ debug, stats, particles }: { debug: boolean; stats: boolean; 
       <div className="absolute top-4 right-5">
         <MicIndicator status={voice.status} />
       </div>
+      <OfflineBanner status={connection} />
 
       <footer className="absolute bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 px-6">
         <div className="mb-4">

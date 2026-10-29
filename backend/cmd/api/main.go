@@ -105,12 +105,13 @@ func main() {
 	go proactive.New(mem, sess, time.Now, time.Local).Run(schedCtx, time.Second)
 
 	handler := httpsrv.New(httpsrv.Deps{
-		Config:  cfg,
-		Build:   httpsrv.BuildInfo{Version: version, Commit: commit},
-		Session: httpsrv.NewSessionHandler(sess, reg),
-		Events:  httpsrv.NewEventsHandler(sess),
-		Voice:   httpsrv.NewVoiceHandler(voiceProviders),
-		Memory:  httpsrv.NewMemoryHandler(mem),
+		Config:    cfg,
+		Build:     httpsrv.BuildInfo{Version: version, Commit: commit},
+		Session:   httpsrv.NewSessionHandler(sess, reg),
+		Events:    httpsrv.NewEventsHandler(sess),
+		Voice:     httpsrv.NewVoiceHandler(voiceProviders),
+		Memory:    httpsrv.NewMemoryHandler(mem),
+		Heartbeat: httpsrv.NewHeartbeat(time.Now),
 	})
 
 	srv := &http.Server{

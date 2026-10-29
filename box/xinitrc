@@ -1,0 +1,8 @@
+#!/bin/sh
+# Minimal X session for the display box: no blanking, no cursor, kiosk.
+xset s off
+xset s noblank
+xset -dpms
+unclutter -idle 0.5 -root &
+openbox &
+exec /opt/corellia/corellia-kiosk.sh

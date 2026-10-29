@@ -5,6 +5,7 @@ package httpsrv
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -34,6 +35,9 @@ type Deps struct {
 	Events  http.Handler
 	Voice   *VoiceHandler
 	Memory  *MemoryHandler
+	// Heartbeat tracks the client's check-ins; nil disables the endpoint.
+	Heartbeat *Heartbeat
+	Logger    *slog.Logger
 }
 
 // New builds the root http.Handler.
@@ -41,20 +45,28 @@ func New(d Deps) http.Handler {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
+	if d.Logger == nil {
+		d.Logger = slog.Default()
+	}
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
+	r.Use(requestLogger(d.Logger))
 	r.Use(corsMiddleware(d.Config.DevOrigins))
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{
+		body := map[string]any{
 			"ok":       true,
 			"version":  d.Build.Version,
 			"commit":   d.Build.Commit,
 			"dev_mode": d.Config.DevMode(),
 			"time":     d.Now().UTC().Format(time.RFC3339),
-		})
+		}
+		if d.Heartbeat != nil {
+			body["client_heartbeat_age_s"] = d.Heartbeat.Age()
+		}
+		writeJSON(w, http.StatusOK, body)
 	})
 
 	r.Route("/api", func(r chi.Router) {
@@ -83,6 +95,9 @@ func New(d Deps) http.Handler {
 		}
 		if d.Memory != nil {
 			r.Get("/memory", d.Memory.Get)
+		}
+		if d.Heartbeat != nil {
+			r.Post("/heartbeat", d.Heartbeat.Post)
 		}
 		if d.Voice != nil {
 			r.Get("/voice/capabilities", d.Voice.GetCapabilities)
