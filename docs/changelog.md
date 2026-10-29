@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.15 - Phase 15: Round-3 Review, Remaining Items: Reminder Lead-In + Minute Wording + No Empty Key Cap + SSE Replay from the Snapshot + Cancelled Replies out of History + finish_reason length = Cut Off + Local Demo Intents and Times + packageManager Pin (2026-10-29)](#01515---phase-15-round-3-review-remaining-items-reminder-lead-in--minute-wording--no-empty-key-cap--sse-replay-from-the-snapshot--cancelled-replies-out-of-history--finishreason-length--cut-off--local-demo-intents-and-times--packagemanager-pin-2026-10-29)
 - [0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)](#01514---phase-14-round-3-review-fixes-footer-aware-layout-no-transcript-over-visuals--plain-words-error-line--max_tokens--cut-off-cap-64000-corellia_max_tokens--failures-classified-by-http-status--osm-attribution-referer-and-block-detection--held-speech-until-a-gesture--owner-checklist-corrections-2026-10-29)
 - [0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)](#01513---phase-13-beta-readiness-session_error-event-no-false-offline-banner--mic-open-race--speech-abortdeadline--failures-in-plain-words--truncated-stream--error--ci-pinned-go-jsonschema-ubuntu-2404--overlay-stacking--owner-checklist-2026-10-29)
 - [0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)](#01512---phase-12-anthropic-contract-goldens--live-check-runtime-check--streamed-speech-per-sentence--precompiled-validators-no-unsafe-eval--proposal-stack-digit-grace-period-keyboard-scroll-barge-in-setting-ptt-flush-2026-10-29)
@@ -96,6 +97,34 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.15 - Phase 15: Round-3 Review, Remaining Items: Reminder Lead-In + Minute Wording + No Empty Key Cap + SSE Replay from the Snapshot + Cancelled Replies out of History + finish_reason length = Cut Off + Local Demo Intents and Times + packageManager Pin (2026-10-29)
+
+Roadmap Phase 15: the small non-blocking items of the third independent review ([`executing/review-2026-10-30-round3.md`](executing/review-2026-10-30-round3.md)) that Phase 14 left, the Phase 13 follow-up on cancelled replies, and two cheap Phase 14 gaps. Full notes: [`completions/phase-15-round-3-remaining-items.md`](completions/phase-15-round-3-remaining-items.md). With this phase every roadmap phase and every review item that needs no key or microphone is done; the owner's two runs in [`executing/owner-checklist.md`](executing/owner-checklist.md) remain.
+
+### Added
+
+- **`TranscriptEntry.cancelled`** (contract, `events.schema.json`; Go and TS regenerated): the partial reply of a cancelled turn, kept on screen ending in "…" and left out of the history the model sees.
+- **`decision.ReminderLeadIn`** ("Reminder: "): what a fired reminder's speech starts with.
+- **`builtin.Duration`**: minutes in words ("1 minute", "1 hour 30 minutes", "2 hours") for the reminder proposal label.
+- **`packageManager: pnpm@12.16.1`** in `package.json`, for corepack and pnpm's own version management (pnpm records it in `pnpm-lock.yaml`; CI's `pnpm/action-setup` steps now take the version from the field instead of a `version: 12` input).
+- The smoke test's overlap measurement runs at 3840×2160 as well (eight smoke tests).
+
+### Fixed
+
+- **A reminder spoke its bare text** ("stretch"): it says "Reminder: stretch", the same words as its transcript entry.
+- **"Set a reminder in 1 minutes."**
+- **Lower proposals drew an empty key cap** next to "Do it" (confirm actions below the top card get no digit by design): the label stands alone.
+- **Every SSE connection replayed the whole bus buffer** (up to 1000 events) on a reload, which the client then dropped by seq: the handler takes the snapshot first and subscribes from its seq.
+- **A cancelled turn's partial reply went into the model's history** (Phase 13 follow-up): marked and skipped, like the apology of a failed turn.
+- **`finish_reason: length` on the OpenAI-compatible runtime passed as a completed turn**: it is `runtime.ErrTruncated` (a Phase 14 known gap); a tool call cut with it never runs.
+- **Local demo:** "show me a table" and "show me a chart" showed Lisbon on the map; "remind me in 5 minutes" and "remind me at 9" both proposed 17:00; the reminder's text was the whole phrase. Specific intents come before the map; "in N minutes/hours", "in an hour and 15 minutes", "at 9", "at 9:30pm" are parsed; the text is the subject after "to", minus the time.
+
+### Edited
+
+- `docs/stack.md` (SSE row), `README.md` (pnpm pin), the owner checklist (step A3: how to read first-speech numbers on tool turns, since Opus 5.5 returns text between tool calls as thinking blocks), the roadmap (status, Phase 15, progress), the Phase 14 note (follow-ups).
+
+---
 
 ## 0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)
 

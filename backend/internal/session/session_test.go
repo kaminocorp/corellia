@@ -32,6 +32,7 @@ func reg(t *testing.T) *contract.Registry {
 type scripted struct {
 	events []runtime.Event
 	block  chan struct{} // when non-nil, blocks before emitting
+	after  int           // ... after this many events (0: before the first)
 }
 
 func (s *scripted) Name() string { return "scripted" }
@@ -42,14 +43,14 @@ func (s *scripted) Start(ctx context.Context, _ runtime.Turn) (<-chan runtime.Ev
 	out := make(chan runtime.Event)
 	go func() {
 		defer close(out)
-		if s.block != nil {
-			select {
-			case <-s.block:
-			case <-ctx.Done():
-				return
+		for i, ev := range s.events {
+			if s.block != nil && i == s.after {
+				select {
+				case <-s.block:
+				case <-ctx.Done():
+					return
+				}
 			}
-		}
-		for _, ev := range s.events {
 			select {
 			case out <- ev:
 			case <-ctx.Done():
@@ -170,12 +171,14 @@ func TestInvalidOpsBecomeErrorEventsAndAreDropped(t *testing.T) {
 
 func TestNewTurnCancelsRunningOne(t *testing.T) {
 	block := make(chan struct{})
-	rt := &scripted{block: block, events: []runtime.Event{{Kind: runtime.EventTextDelta, Text: "late"}, {Kind: runtime.EventDone}}}
+	// Each turn says "late" and then blocks until released.
+	rt := &scripted{block: block, after: 1, events: []runtime.Event{{Kind: runtime.EventTextDelta, Text: "late"}, {Kind: runtime.EventDone}}}
 	s := New(Options{Registry: reg(t), Runtime: rt})
 	defer s.Close()
 	ch, unsub := s.Subscribe(0)
 	defer unsub()
 	first, _, _ := s.StartTurn("one", runtime.SourceKeyboard)
+	drainUntil(t, ch, "text_delta", first)
 	second, cancelled, _ := s.StartTurn("two", runtime.SourceVoice)
 	if cancelled != first {
 		t.Fatalf("cancelled = %q, want %q", cancelled, first)
@@ -191,6 +194,29 @@ func TestNewTurnCancelsRunningOne(t *testing.T) {
 	}
 	if s.ActiveTurn() != "" {
 		t.Fatal("turn still active")
+	}
+	// The cancelled turn's partial reply stays on screen, marked, and the
+	// model never sees it as its own words.
+	s.mu.Lock()
+	tr := s.transcript
+	hist := s.historyLocked()
+	s.mu.Unlock()
+	var cut *gen.TranscriptEntry
+	for i := range tr {
+		if tr[i].TurnID != nil && string(*tr[i].TurnID) == first && tr[i].Role == gen.TranscriptEntryRoleAgent {
+			cut = &tr[i]
+		}
+	}
+	if cut == nil || cut.Cancelled == nil || !*cut.Cancelled || cut.Text != "late…" {
+		t.Fatalf("cancelled entry = %+v", cut)
+	}
+	// Both turns streamed "late"; only the second, completed one is history.
+	var roles []string
+	for _, m := range hist {
+		roles = append(roles, m.Role+":"+m.Text)
+	}
+	if got := strings.Join(roles, ","); got != "user:one,user:two,agent:late" {
+		t.Fatalf("history = %s", got)
 	}
 }
 
@@ -415,7 +441,7 @@ func TestProposeConfirmFlow(t *testing.T) {
 	if !statuses["pending"] || !statuses["confirmed"] || !statuses["executed"] {
 		t.Fatalf("statuses = %v", statuses)
 	}
-	if rs := store.Reminders(); len(rs) != 1 || rs[0].Text != "remind me to call Ana at 17:00" {
+	if rs := store.Reminders(); len(rs) != 1 || rs[0].Text != "call Ana" {
 		t.Fatalf("reminders = %+v", rs)
 	}
 	spec = s.Spec()

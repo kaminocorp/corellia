@@ -361,6 +361,10 @@ type ToolResultEvent struct {
 }
 
 type TranscriptEntry struct {
+	// True for the partial reply of a cancelled turn: kept on screen as what was
+	// said, but left out of the history the model sees.
+	Cancelled *bool `json:"cancelled,omitempty,omitzero"`
+
 	// True for the apology of a failed turn: shown and spoken, but left out of the
 	// history the model sees.
 	Failed *bool `json:"failed,omitempty,omitzero"`

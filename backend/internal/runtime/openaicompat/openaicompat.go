@@ -208,6 +208,11 @@ func (r *Runtime) stream(ctx context.Context, msgs []message, tools []map[string
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil || len(chunk.Choices) == 0 {
 			continue
 		}
+		if chunk.Choices[0].FinishReason == "length" {
+			// Cut by max_tokens: a fragment is not an answer, and a tool
+			// call cut with it never ran (same rule as the Anthropic runtime).
+			return assistant, fmt.Errorf("openai: %w at max_tokens %d", runtime.ErrTruncated, r.o.MaxTokens)
+		}
 		d := chunk.Choices[0].Delta
 		if d.Content != "" {
 			assistant.Content += d.Content

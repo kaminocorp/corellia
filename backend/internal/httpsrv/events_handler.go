@@ -9,8 +9,13 @@ import (
 )
 
 // EventsHandler streams session events over SSE. It sends a `session`
-// snapshot first, then replays events after Last-Event-ID (header or
-// `last_event_id` query parameter), then live events, with heartbeats.
+// snapshot first, then the events after the snapshot's seq, then live
+// events, with heartbeats. The snapshot already holds everything earlier
+// (spec, transcript, proposals, state) and the client resets to it, so a
+// client's Last-Event-ID (header or `last_event_id` query parameter) only
+// matters when it is ahead of the snapshot, which cannot happen on one
+// server; replaying the whole buffer on every reload was waste (review
+// 2026-10-30 round 3).
 type EventsHandler struct {
 	s sessionAPI
 	// Heartbeat interval; defaults to 15s.
@@ -36,16 +41,6 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		lastSeq, _ = strconv.Atoi(v)
 	}
 
-	// Subscribe before snapshotting so nothing published in between is lost
-	// (the snapshot already reflects it, and the replay re-sends it; the
-	// client reducer tolerates that because ops are applied to the
-	// snapshot's spec only when seq > snapshot seq).
-	ch, unsub := h.s.Subscribe(lastSeq)
-	defer unsub()
-
-	h.writeHeaders(w)
-	_, _ = fmt.Fprint(w, "retry: 2000\n\n")
-
 	snap := h.s.Snapshot()
 	snap["type"] = "session"
 	seq, ok := snap["seq"].(int)
@@ -56,6 +51,17 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		snap["seq"] = seq
 	}
 	snap["ts"] = h.Now().UTC().Format(time.RFC3339Nano)
+	// Subscribe after the snapshot, from its seq: anything published in
+	// between is in the bus buffer and comes out of the replay (an op the
+	// snapshot already shows is re-applied by the client's reducer, never
+	// lost). A snapshot cannot be older than the client's last id, so the
+	// larger of the two wins.
+	ch, unsub := h.s.Subscribe(max(lastSeq, seq))
+	defer unsub()
+
+	h.writeHeaders(w)
+	_, _ = fmt.Fprint(w, "retry: 2000\n\n")
+
 	snapJSON, err := json.Marshal(snap)
 	if err != nil {
 		return

@@ -1,6 +1,7 @@
 {
   "name": "corellia",
   "private": true,
+  "packageManager": "pnpm@12.16.1",
   "scripts": {
     "dev": "pnpm -C client dev",
     "build": "pnpm -C client build",

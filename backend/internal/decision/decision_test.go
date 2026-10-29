@@ -34,6 +34,9 @@ func TestRules(t *testing.T) {
 			if d.Respond != tc.respond || d.Modality != tc.modality || d.Timing != tc.timing || d.AutoCard != tc.card || (len(d.Speech) > 0) != tc.speaks {
 				t.Fatalf("decision = %+v", d)
 			}
+			if tc.in.Proactive == "reminder" && d.Speech[0] != "Reminder: Call Ana." {
+				t.Fatalf("reminder speech = %q, want a lead-in", d.Speech)
+			}
 		})
 	}
 }

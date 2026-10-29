@@ -175,6 +175,20 @@ func checkOps(t *testing.T, reg *contract.Registry, v *uispec.Validator, ops []j
 	}
 }
 
+func TestDurationWords(t *testing.T) {
+	cases := map[float64]string{0.4: "under a minute", 1: "1 minute", 2: "2 minutes", 59.6: "1 hour", 60: "1 hour", 90: "1 hour 30 minutes", 120: "2 hours", 1441: "24 hours 1 minute"}
+	for mins, want := range cases {
+		if got := Duration(mins); got != want {
+			t.Errorf("Duration(%v) = %q, want %q", mins, got, want)
+		}
+	}
+	r, _ := registry(t)
+	res, err := r.Call(context.Background(), "set_reminder", map[string]any{"text": "stretch", "in_minutes": float64(1)})
+	if !errors.Is(err, runtime.ErrRequiresConfirm) || res.Proposal.Label != "Set a reminder in 1 minute" {
+		t.Fatalf("proposal: %+v %v", res.Proposal, err)
+	}
+}
+
 func TestParseWhen(t *testing.T) {
 	now := time.Date(2026, 10, 29, 14, 0, 0, 0, time.UTC)
 	cases := []struct {

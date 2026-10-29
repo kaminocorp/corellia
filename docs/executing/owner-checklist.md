@@ -24,7 +24,7 @@ pnpm check                    # must be green locally before you trust anything 
    ```bash
    scripts/anthropic-live-check.sh
    ```
-   Writes `docs/executing/spikes/anthropic-<date>.md`. Read the table: first token, first speech, first op, first-try spec validity.
+   Writes `docs/executing/spikes/anthropic-<date>.md`. Read the table: first token, first speech, first op, first-try spec validity. On tool turns, read first speech with care: Opus 5.5 returns text written between tool calls as thinking blocks, which the runtime does not speak, so the first spoken word of a tool turn can come after the last tool round; a plain turn's number is the one to compare with the 2 s criterion.
 4. **Use it.**
    ```bash
    pnpm -C client build && cd backend && go run ./cmd/api

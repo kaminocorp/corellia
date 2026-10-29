@@ -42,6 +42,8 @@ func TestScenariosProduceValidSpecs(t *testing.T) {
 		{"what time is it", "14:05", true, true},
 		{"show me a map of Berlin", "Berlin", true, false},
 		{"give me the stock table", "stock", true, false},
+		{"show me a table", "stock", true, false},
+		{"show me a chart", "midweek", true, false},
 		{"temperature trend", "midweek", true, false},
 		{"what's on my schedule today", "standup", true, false},
 		{"weather", "degrees", true, false},
@@ -99,15 +101,35 @@ func TestScenariosProduceValidSpecs(t *testing.T) {
 }
 
 func TestReminderEmitsProposal(t *testing.T) {
-	evs := collect(t, &Runtime{}, "remind me to call Ana")
-	found := false
-	for _, ev := range evs {
-		if ev.Kind == runtime.EventProposal && ev.Proposal != nil && ev.Proposal.Tool == "set_reminder" {
-			found = true
-		}
+	cases := []struct {
+		text  string
+		label string
+		args  string
+	}{
+		{"remind me to call Ana", "Set a reminder for 17:00", `{"at":"17:00","text":"call Ana"}`},
+		{"remind me in 5 minutes to stretch", "Set a reminder in 5 minutes", `{"in_minutes":5,"text":"stretch"}`},
+		{"remind me at 9 to water the plants", "Set a reminder for 09:00", `{"at":"09:00","text":"water the plants"}`},
+		{"set a reminder at 9:30pm", "Set a reminder for 21:30", `{"at":"21:30","text":"set a reminder"}`},
+		{"remind me to call Ana at 17:00", "Set a reminder for 17:00", `{"at":"17:00","text":"call Ana"}`},
+		{"remind me in an hour and 15 minutes to leave", "Set a reminder in 1 hour 15 minutes", `{"in_minutes":75,"text":"leave"}`},
 	}
-	if !found {
-		t.Fatal("no proposal event")
+	for _, tc := range cases {
+		t.Run(tc.text, func(t *testing.T) {
+			evs := collect(t, &Runtime{}, tc.text)
+			var p *runtime.Proposal
+			for _, ev := range evs {
+				if ev.Kind == runtime.EventProposal && ev.Proposal != nil && ev.Proposal.Tool == "set_reminder" {
+					p = ev.Proposal
+				}
+			}
+			if p == nil {
+				t.Fatal("no proposal event")
+			}
+			args, _ := json.Marshal(p.Args)
+			if p.Label != tc.label || string(args) != tc.args {
+				t.Fatalf("proposal %q %s, want %q %s", p.Label, args, tc.label, tc.args)
+			}
+		})
 	}
 }
 

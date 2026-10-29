@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hejijunhao/corellia/backend/internal/runtime"
+	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
 )
 
 // Runtime is the local scripted runtime.
@@ -144,8 +145,8 @@ func (r *Runtime) answer(ctx context.Context, e *emitter, turn runtime.Turn) {
 		e.text(fmt.Sprintf("Hello. I'm %s, running on the local runtime. Ask me the time, for a map of a city, a table, a chart, or your schedule.", name(turn)))
 	case hasAny(text, "what time", "the time", "what's the time", "time is it"):
 		r.timeScenario(ctx, e, turn)
-	case hasAny(text, "map of", "where is", "show me ", "directions"):
-		r.mapScenario(e, text)
+	// The specific subjects come before the map: "show me a table" is a
+	// table, not Lisbon (review 2026-10-30 round 3).
 	case hasAny(text, "table", "inventory", "stock"):
 		r.tableScenario(e)
 	case hasAny(text, "chart", "trend", "graph", "temperature this week"):
@@ -156,6 +157,8 @@ func (r *Runtime) answer(ctx context.Context, e *emitter, turn runtime.Turn) {
 		r.reminderScenario(e, turn)
 	case hasAny(text, "weather"):
 		r.weatherScenario(e, turn)
+	case hasAny(text, "map of", "where is", "show me ", "directions"):
+		r.mapScenario(e, text)
 	case hasAny(text, "simulate a failure", "fail on purpose"):
 		// What a broken turn looks like, without a cloud runtime: a partial
 		// reply, then a fatal error. The session turns it into a spoken
@@ -290,15 +293,85 @@ func (r *Runtime) scheduleScenario(e *emitter, turn runtime.Turn) {
 	e.text("Three things today: standup, the design review at eleven, and a call with Ana at half past three.")
 }
 
-var atRe = regexp.MustCompile(`\b([01]?\d|2[0-3]):([0-5]\d)\b`)
+var (
+	// "at 17:00", "at 9", "at 9:30pm", "at 7 am"
+	atRe = regexp.MustCompile(`(?i)\bat\s+([01]?\d|2[0-3])(?::([0-5]\d))?\s*(am|pm)?\b`)
+	// "in 5 minutes", "in an hour", "in 2 hours", "in 1 hour 30 minutes"
+	inRe = regexp.MustCompile(`(?i)\bin\s+(\d+|an?)\s+(minutes?|mins?|hours?|hrs?)\b(?:\s+(?:and\s+)?(\d+)\s+(?:minutes?|mins?))?`)
+	// The reminder's own words: what follows "to" ("remind me at 9 to stretch").
+	toRe = regexp.MustCompile(`(?i)\bto\s+(.+)$`)
+)
+
+// reminderWhen reads the time out of a reminder phrase: a clock time as
+// "HH:MM", or a number of minutes from now. Neither means 17:00, the demo's
+// default (review 2026-10-30 round 3: "remind me in 5 minutes" and "remind
+// me at 9" both proposed 17:00).
+func reminderWhen(text string) (at string, inMinutes int) {
+	if mm := inRe.FindStringSubmatch(text); mm != nil {
+		n := 1
+		if mm[1] != "a" && mm[1] != "an" {
+			fmt.Sscan(mm[1], &n)
+		}
+		if strings.HasPrefix(strings.ToLower(mm[2]), "h") {
+			n *= 60
+			if mm[3] != "" {
+				extra := 0
+				fmt.Sscan(mm[3], &extra)
+				n += extra
+			}
+		}
+		if n >= 1 {
+			return "", n
+		}
+	}
+	if mm := atRe.FindStringSubmatch(text); mm != nil {
+		h := 0
+		fmt.Sscan(mm[1], &h)
+		minute := "00"
+		if mm[2] != "" {
+			minute = mm[2]
+		}
+		switch strings.ToLower(mm[3]) {
+		case "pm":
+			if h < 12 {
+				h += 12
+			}
+		case "am":
+			if h == 12 {
+				h = 0
+			}
+		}
+		return fmt.Sprintf("%02d:%s", h, minute), 0
+	}
+	return "17:00", 0
+}
+
+// reminderText keeps the reminder's subject: "stretch" from "remind me in
+// 5 minutes to stretch", "call Ana" from "remind me to call Ana at 17:00".
+// Without a "to", the whole phrase minus its time.
+func reminderText(text string) string {
+	text = strings.TrimSpace(text)
+	if mm := toRe.FindStringSubmatch(text); mm != nil && strings.TrimSpace(mm[1]) != "" {
+		text = mm[1]
+	}
+	for _, re := range []*regexp.Regexp{inRe, atRe} {
+		text = re.ReplaceAllString(text, " ")
+	}
+	text = strings.Join(strings.Fields(text), " ")
+	return strings.TrimRight(text, " ,.")
+}
 
 func (r *Runtime) reminderScenario(e *emitter, turn runtime.Turn) {
-	at := "17:00"
-	if mm := atRe.FindStringSubmatch(turn.Text); mm != nil {
-		at = fmt.Sprintf("%02s:%s", mm[1], mm[2])
+	at, mins := reminderWhen(turn.Text)
+	args := m{"text": reminderText(turn.Text)}
+	when := "for " + at
+	if mins > 0 {
+		args["in_minutes"] = float64(mins)
+		when = "in " + builtin.Duration(float64(mins))
+	} else {
+		args["at"] = at
 	}
-	args := m{"text": strings.TrimSpace(turn.Text), "at": at}
-	p := &runtime.Proposal{ID: e.nextID("p"), Tool: "set_reminder", Args: args, Label: "Set a reminder for " + at, Risk: "low"}
+	p := &runtime.Proposal{ID: e.nextID("p"), Tool: "set_reminder", Args: args, Label: "Set a reminder " + when, Risk: "low"}
 	if turn.Context.Tools != nil {
 		callID := e.nextID("call")
 		e.send(runtime.Event{Kind: runtime.EventToolCall, CallID: callID, Tool: "set_reminder", Args: args})
@@ -309,7 +382,7 @@ func (r *Runtime) reminderScenario(e *emitter, turn runtime.Turn) {
 		e.send(runtime.Event{Kind: runtime.EventToolResult, CallID: callID, Tool: "set_reminder", Result: &runtime.ToolResult{Content: res.Content}})
 	}
 	e.send(runtime.Event{Kind: runtime.EventProposal, Proposal: p})
-	e.text(fmt.Sprintf("I can set that reminder for %s. Say \"do it\" or press Enter to confirm.", at))
+	e.text(fmt.Sprintf("I can set that reminder %s. Say \"do it\" or press Enter to confirm.", when))
 }
 
 func (r *Runtime) weatherScenario(e *emitter, turn runtime.Turn) {

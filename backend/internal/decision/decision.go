@@ -81,6 +81,9 @@ type Rules struct {
 	AutoCardTTL time.Duration
 }
 
+// ReminderLeadIn opens the speech of a fired reminder.
+const ReminderLeadIn = "Reminder: "
+
 // NewRules returns the defaults.
 func NewRules() *Rules { return &Rules{ShortReply: 48, AutoCardTTL: 60 * time.Second} }
 
@@ -96,7 +99,9 @@ func (r *Rules) Decide(in Input) Decision {
 		}
 		if in.Proactive == "reminder" {
 			d.Modality = ModalityBoth
-			d.Speech = Sentences(text)
+			// Said with a lead-in: a bare "stretch" out of nowhere is not
+			// understood as a reminder (review 2026-10-30 round 3).
+			d.Speech = Sentences(ReminderLeadIn + text)
 			d.Reason = "reminder: glance card and speech"
 		} else {
 			d.Modality = ModalityGlance

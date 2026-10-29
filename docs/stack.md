@@ -37,7 +37,7 @@ Every `/api` request passes, in order: a trusted-proxy real-IP rewrite (only whe
 |---|---|
 | `GET /healthz` | ok, version, dev mode, client heartbeat age |
 | `GET /api/config`, `GET /api/session`, `GET /api/catalog`, `GET /api/memory` | Inspection (tool definitions reach the model through the runtime prompt) |
-| `GET /api/events` | SSE: `session` snapshot, replay after `Last-Event-ID`, live events, heartbeats |
+| `GET /api/events` | SSE: `session` snapshot, then the events after its seq (the buffer before it is in the snapshot), live events, heartbeats |
 | `POST /api/turn`, `POST /api/turn/cancel` | Turns (a confirm/reject phrase applies to the pending proposal instead) |
 | `POST /api/action`, `POST /api/action/confirm`, `POST /api/action/reject` | Spec actions and proposals |
 | `POST /api/screen/clear`, `POST /api/screen/remove` | Screen state from the client (Escape, decay) |

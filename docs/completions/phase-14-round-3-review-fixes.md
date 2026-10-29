@@ -73,4 +73,4 @@ Verified here: `pnpm check` green; `gofmt -l` clean; the smoke test's overlap st
 
 - The owner's two runs (checklist A and B): the VISION 7 decision and spike report, and the Mac voice run.
 - Carried over from Phase 13: a cancelled turn's partial reply still goes into history; the directions origin is the Lisbon constant; no speech prefetch with server TTS; no `Risk: "high"` tool; a bound `Image.src` is covered by the CSP only; fit-ranking does not narrow the prompt; Ctrl+Space is not configurable.
-- Small items the review listed and this phase did not take: the bare reminder text with no "Reminder:" lead-in, "in 1 minutes", the empty key chip on lower proposals, SSE replay from the snapshot's seq, a `packageManager` field for corepack, the local demo's table and chart phrasings.
+- Small items the review listed and this phase did not take: the bare reminder text with no "Reminder:" lead-in, "in 1 minutes", the empty key chip on lower proposals, SSE replay from the snapshot's seq, a `packageManager` field for corepack, the local demo's table and chart phrasings. Taken in [Phase 15](phase-15-round-3-remaining-items.md).

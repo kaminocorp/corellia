@@ -272,6 +272,10 @@ export interface TranscriptEntry {
    * True for the apology of a failed turn: shown and spoken, but left out of the history the model sees.
    */
   failed?: boolean;
+  /**
+   * True for the partial reply of a cancelled turn: kept on screen as what was said, but left out of the history the model sees.
+   */
+  cancelled?: boolean;
   [k: string]: unknown;
 }
 /**

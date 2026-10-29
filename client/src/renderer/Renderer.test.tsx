@@ -128,4 +128,22 @@ describe("floating overlays", () => {
     screen.getByText("Do it").parentElement!.click();
     expect(fire).toHaveBeenCalledWith("yes", "confirm_p1_card");
   });
+
+  it("shows no key cap for a confirm action below the top card", () => {
+    const spec = build([
+      { op: "set_action", id: "p1_yes", action: { kind: "tool", tool: "confirm_proposal", args: { proposal_id: "p1" } } },
+      { op: "set_action", id: "p1_no", action: { kind: "tool", tool: "reject_proposal", args: { proposal_id: "p1" } } },
+      { op: "set_action", id: "p2_yes", action: { kind: "tool", tool: "confirm_proposal", args: { proposal_id: "p2" } } },
+      { op: "set_action", id: "p2_no", action: { kind: "tool", tool: "reject_proposal", args: { proposal_id: "p2" } } },
+      { op: "add_node", id: "c1", node: { type: "Confirm", props: { proposal_id: "p1", title: "Top" }, actions: { confirm: { id: "p1_yes", label: "Do it", hotkey: "enter" }, reject: { id: "p1_no", label: "Cancel", hotkey: "escape" } } } },
+      { op: "add_node", id: "c2", node: { type: "Confirm", props: { proposal_id: "p2", title: "Lower" }, actions: { confirm: { id: "p2_yes", label: "Do it" }, reject: { id: "p2_no", label: "Cancel" } } } },
+      { op: "add_node", id: "o1", node: { type: "Overlay", props: { position: "bottom_right" }, slots: { content: ["c1"] } } },
+      { op: "add_node", id: "o2", node: { type: "Overlay", props: { position: "bottom_right" }, slots: { content: ["c2"] } } },
+    ]);
+    const { container } = render(<Renderer spec={spec} fire={vi.fn()} />);
+    const caps = Array.from(container.querySelectorAll("kbd")).map((k) => k.textContent);
+    expect(caps).toEqual(["Enter", "Esc", "1"]);
+    expect(container.querySelector('[data-action="p2_yes"] kbd')).toBeNull();
+    expect(container.querySelector('[data-action="p2_yes"]')?.textContent).toBe("Do it");
+  });
 });

@@ -373,12 +373,21 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 			// the apology becomes the reply the user sees and hears.
 			text = failureReply(text, failure)
 		}
+		if status == gen.TurnDoneEventStatusCancelled {
+			// What was said before the interruption, marked as cut off.
+			text = ellipsize(text)
+		}
 		if text != "" {
 			entry := gen.TranscriptEntry{Role: gen.TranscriptEntryRoleAgent, Text: text, Ts: s.o.Now(), TurnID: ptr(gen.TurnID(turn.ID))}
-			if status == gen.TurnDoneEventStatusFailed {
+			switch status {
+			case gen.TurnDoneEventStatusFailed:
 				// Shown and spoken, but never fed back to the model as its
 				// own words (historyLocked skips it).
 				entry.Failed = ptr(true)
+			case gen.TurnDoneEventStatusCancelled:
+				// Shown, but a half reply would anchor the next turn on half
+				// a thought (phase 13 follow-up): historyLocked skips it.
+				entry.Cancelled = ptr(true)
 			}
 			s.appendTranscriptLocked(entry)
 		}
@@ -658,6 +667,9 @@ func (s *Session) historyLocked() []runtime.Message {
 	for _, e := range s.transcript[start:] {
 		if e.Failed != nil && *e.Failed {
 			continue // an apology for a failed turn is not the model's reply
+		}
+		if e.Cancelled != nil && *e.Cancelled {
+			continue // a reply cut by the user is not what the model said
 		}
 		out = append(out, runtime.Message{Role: string(e.Role), Text: e.Text})
 	}

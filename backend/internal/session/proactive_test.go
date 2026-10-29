@@ -29,7 +29,7 @@ func TestProactiveReminderDeliveredWhenIdle(t *testing.T) {
 	if kinds[0] != "proactive" || !strings.Contains(strings.Join(kinds, ","), "spec_op") {
 		t.Fatalf("kinds = %v", kinds)
 	}
-	if evs[len(evs)-1]["text"] != "Call Ana." {
+	if evs[len(evs)-1]["text"] != "Reminder: Call Ana." {
 		t.Fatalf("speech = %v", evs[len(evs)-1])
 	}
 	spec := s.Spec()

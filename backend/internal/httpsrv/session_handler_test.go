@@ -157,30 +157,45 @@ func TestEventsStreamSnapshotThenLive(t *testing.T) {
 	}
 }
 
-func TestEventsStreamReplaysAfterLastEventID(t *testing.T) {
-	h, sess := sessionServer(t)
-	srv := httptest.NewServer(h)
-	defer srv.Close()
-	id, _, _ := sess.StartTurn("hello", runtime.SourceKeyboard)
-	sess.WaitTurn(id)
+// A new connection, with or without a Last-Event-ID, gets the snapshot and
+// then only what the snapshot does not hold: events after its seq. The
+// buffer before it is not replayed (review 2026-10-30 round 3).
+func TestEventsStreamReplaysFromSnapshotSeq(t *testing.T) {
+	for _, lastID := range []string{"", "2"} {
+		t.Run("last-event-id="+lastID, func(t *testing.T) {
+			h, sess := sessionServer(t)
+			srv := httptest.NewServer(h)
+			defer srv.Close()
+			id, _, _ := sess.StartTurn("hello", runtime.SourceKeyboard)
+			sess.WaitTurn(id)
+			if sess.Seq() < 3 {
+				t.Fatalf("seq = %d, want a buffer to skip", sess.Seq())
+			}
 
-	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/events", nil)
-	req.Header.Set("Last-Event-ID", "2")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	evs := readSSE(t, bufio.NewReader(resp.Body), "turn_done", 2*time.Second)
-	// snapshot + events 3..seq(turn_done)
-	last := int(evs[len(evs)-1]["seq"].(float64))
-	if len(evs) != 1+(last-2) {
-		t.Fatalf("got %d events, want %d", len(evs), 1+(last-2))
-	}
-	if int(evs[1]["seq"].(float64)) != 3 {
-		t.Fatalf("first replayed seq = %v", evs[1]["seq"])
+			req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/events", nil)
+			if lastID != "" {
+				req.Header.Set("Last-Event-ID", lastID)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			br := bufio.NewReader(resp.Body)
+			snap := readSSE(t, br, "session", 2*time.Second)
+			if len(snap) != 1 || int(snap[0]["seq"].(float64)) != sess.Seq() {
+				t.Fatalf("snapshot = %v, want one at seq %d", snap, sess.Seq())
+			}
+			// Nothing of the finished turn is replayed; the next turn streams live
+			// from the snapshot's seq + 1.
+			next, _, _ := sess.StartTurn("what time is it", runtime.SourceKeyboard)
+			evs := readSSE(t, br, "turn_done", 3*time.Second)
+			if evs[0]["type"] != "turn_started" || evs[0]["turn_id"] != next || int(evs[0]["seq"].(float64)) != int(snap[0]["seq"].(float64))+1 {
+				t.Fatalf("first event after the snapshot = %v", evs[0])
+			}
+		})
 	}
 }
 

@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # The version comes from `packageManager` in package.json (the action
+      # refuses a `version` input that differs from it).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 12
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -39,9 +39,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # The version comes from `packageManager` in package.json (the action
+      # refuses a `version` input that differs from it).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 12
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -57,9 +57,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # The version comes from `packageManager` in package.json (the action
+      # refuses a `version` input that differs from it).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 12
       - uses: actions/setup-node@v4
         with:
           node-version: 24

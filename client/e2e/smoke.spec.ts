@@ -140,12 +140,14 @@ test("a failed turn is visible and spoken in plain words, and the connection sta
 
 /**
  * A full-screen visual (a map, a table, a chart) and the transcript never
- * share pixels, at a laptop viewport and a large one: the generated-UI zone
- * ends above the measured footer (review 2026-10-30 round 3, item 3).
+ * share pixels, at a laptop viewport, a large one and a 4K one (the three
+ * the review measured): the generated-UI zone ends above the measured
+ * footer (review 2026-10-30 round 3, item 3).
  */
 for (const viewport of [
   { width: 1440, height: 790 },
   { width: 1920, height: 1080 },
+  { width: 3840, height: 2160 },
 ]) {
   test(`a full visual never overlaps the transcript at ${viewport.width}×${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);

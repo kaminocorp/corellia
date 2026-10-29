@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -371,6 +372,32 @@ func ParseWhen(now time.Time, at string, inMinutes float64) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("cannot parse time %q (use HH:MM, RFC3339 or in_minutes)", at)
 }
 
+// Duration says a number of minutes in words: "1 minute", "5 minutes",
+// "1 hour", "1 hour 30 minutes", "2 hours" (review 2026-10-30 round 3:
+// "in 1 minutes").
+func Duration(minutes float64) string {
+	total := int(math.Round(minutes))
+	if total < 1 {
+		return "under a minute"
+	}
+	h, m := total/60, total%60
+	var parts []string
+	if h > 0 {
+		parts = append(parts, plural(h, "hour"))
+	}
+	if m > 0 {
+		parts = append(parts, plural(m, "minute"))
+	}
+	return strings.Join(parts, " ")
+}
+
+func plural(n int, unit string) string {
+	if n == 1 {
+		return "1 " + unit
+	}
+	return fmt.Sprintf("%d %ss", n, unit)
+}
+
 func reminderTool(o Options) *tools.Tool {
 	return &tools.Tool{
 		Name:            "set_reminder",
@@ -383,7 +410,7 @@ func reminderTool(o Options) *tools.Tool {
 				return fmt.Sprintf("Set a reminder for %s", at)
 			}
 			if mins, ok := a["in_minutes"].(float64); ok {
-				return fmt.Sprintf("Set a reminder in %.0f minutes", mins)
+				return "Set a reminder in " + Duration(mins)
 			}
 			return "Set a reminder"
 		},

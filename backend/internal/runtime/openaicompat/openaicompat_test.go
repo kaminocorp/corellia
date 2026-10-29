@@ -3,6 +3,7 @@ package openaicompat
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,6 +90,31 @@ func TestHTTPErrorIsFatal(t *testing.T) {
 	evs := rttest.Collect(ch)
 	if evs[0].Kind != runtime.EventError || !strings.Contains(evs[0].Err.Error(), "429") {
 		t.Fatalf("evs = %v", rttest.Kinds(evs))
+	}
+}
+
+func TestFinishReasonLengthIsTruncation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		chunk(w, `{"role":"assistant","content":"The answer is that the"}`, "")
+		chunk(w, `{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"show_ui","arguments":"{\"ops\":["}}]}`, "")
+		chunk(w, `{}`, "length")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer srv.Close()
+	tools := &rttest.Tools{}
+	rt := New(Options{APIKey: "key", BaseURL: srv.URL, MaxTokens: 50})
+	ch, _ := rt.Start(context.Background(), runtime.Turn{Text: "x", Context: runtime.Context{Tools: tools}})
+	evs := rttest.Collect(ch)
+	if kinds := strings.Join(rttest.Kinds(evs), ","); !strings.HasPrefix(kinds, "text_delta,error") {
+		t.Fatalf("kinds = %s", kinds)
+	}
+	last := evs[1]
+	if !last.Fatal || !errors.Is(last.Err, runtime.ErrTruncated) || !strings.Contains(last.Err.Error(), "50") {
+		t.Fatalf("error = %v (fatal %v)", last.Err, last.Fatal)
+	}
+	if len(tools.Calls) != 0 {
+		t.Fatalf("a cut tool call ran: %v", tools.Calls)
 	}
 }
 

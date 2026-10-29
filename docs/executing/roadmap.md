@@ -1,6 +1,6 @@
 # Corellia vision implementation roadmap
 
-**Status:** Phase 13 (beta readiness: the round-2 review's blocking gaps that need no key or microphone) done on 2026-10-29. Phases 11 and 12 (review fixes; verifiable cloud runtime, streamed speech, strict CSP) were done the same day, as were Phases 0-10. The second independent review ([`review-2026-10-30.md`](review-2026-10-30.md)) rated `0c40505` an alpha; the third ([`review-2026-10-30-round3.md`](review-2026-10-30-round3.md), against `1368df5`) found Phase 13 holding and called the build "alpha, at the beta threshold" with three cheap defects left, fixed in Phase 14. What stands between the build and a beta is the owner's two runs in [`owner-checklist.md`](owner-checklist.md) (live model, Mac microphone). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
+**Status:** Phase 15 (the round-3 review's remaining non-blocking items and the Phase 13 follow-up on cancelled replies) done on 2026-10-29, after Phase 14 (the round-3 review's three blocking defects) the same day; with it every roadmap phase and every review item that can be done without a key or a microphone is done. Phase 13 (beta readiness: the round-2 review's blocking gaps that need no key or microphone) was done on 2026-10-29. Phases 11 and 12 (review fixes; verifiable cloud runtime, streamed speech, strict CSP) were done the same day, as were Phases 0-10. The second independent review ([`review-2026-10-30.md`](review-2026-10-30.md)) rated `0c40505` an alpha; the third ([`review-2026-10-30-round3.md`](review-2026-10-30-round3.md), against `1368df5`) found Phase 13 holding and called the build "alpha, at the beta threshold" with three cheap defects left, fixed in Phase 14; its small items were taken in Phase 15. What stands between the build and a beta is the owner's two runs in [`owner-checklist.md`](owner-checklist.md) (live model, Mac microphone). Written 2026-10-29 before any code change; updated at each phase boundary (the "Progress" table at the end).
 **Scope:** implement [`../VISION.md`](../VISION.md) end to end: an always-on personal agent workspace (3D agent, keyboard + voice, generated UI from a closed catalog, propose/confirm actions, decision layer, swappable agent runtime, display-box deployment).
 **Branch:** all work on `feat/vision-implementation`, pushed only to that branch. No merges, no PRs, no deploys.
 **Companion records:** one `docs/completions/phase-NN-<name>.md` per completed phase, one `docs/changelog.md` entry per phase.
@@ -268,9 +268,23 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 - **Dependencies:** Phase 13.
 - **Acceptance:** `pnpm check` green; seven smoke tests in real Chromium; a test for each blocking item (overlap measured in the browser, error line in vitest and the browser, `max_tokens` in the runtime and the session) and for the status classification, the tile probe and the held speech.
 
+### Phase 15: Round-3 review, remaining items
+
+- **Scope:** the small non-blocking items of the third review that Phase 14 listed as not taken, the Phase 13 follow-up on cancelled replies, and two Phase 14 known gaps that cost little. Nothing here needs a key or a microphone. Added after Phase 14.
+- **Deliverables:**
+  - **Reminders.** A fired reminder is spoken with a lead-in ("Reminder: stretch", `decision.ReminderLeadIn`); the proposal label says "in 1 minute", "in 1 hour 30 minutes" (`builtin.Duration`), not "in 1 minutes".
+  - **Lower proposals** show their confirm label without an empty key cap (`ActionBar` draws a key cap only for an action that has a key).
+  - **SSE** sends the snapshot and then only the events after its seq; the buffer before it (up to 1000 events on every reload) is no longer replayed, with or without a `Last-Event-ID`.
+  - **A cancelled turn's partial reply** is kept on screen ending in "…" and marked `cancelled` in the transcript entry (contract: `events.schema.json`), and `historyLocked` leaves it out of what the model sees, as it does the apology of a failed turn.
+  - **OpenAI-compatible runtime:** `finish_reason: length` is `runtime.ErrTruncated`, like `max_tokens` on the Anthropic runtime; a tool call cut with it never runs.
+  - **Local demo:** "show me a table" and "show me a chart" are a table and a chart (the specific intents come before the map); "remind me in 5 minutes", "in an hour and 15 minutes", "at 9", "at 9:30pm" set that time, not 17:00; the reminder's words are the subject ("call Ana"), not the whole phrase.
+  - **Repo and docs:** `packageManager: pnpm@12.16.1` for corepack (CI reads it instead of its own `version` input); the smoke test's overlap measurement adds 3840×2160; the owner checklist says how to read first-speech numbers on tool turns (Opus 5.5 thinking blocks); `docs/stack.md` describes the SSE replay.
+- **Dependencies:** Phase 14.
+- **Acceptance:** `pnpm check` green (type-check, lint, vitest, every Go package, eight smoke tests in real Chromium); gofmt clean; a test for each item.
+
 ## 4. Versioning and records
 
-- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11), 0.15.12 (Phase 12), 0.15.13 (Phase 13) and 0.15.14 (Phase 14).
+- Changelog entries continue the existing series: 0.15.0 (roadmap), 0.15.1 (Phase 1), 0.15.2 (Phase 2), and so on to 0.15.10, then 0.15.11 (Phase 11), 0.15.12 (Phase 12), 0.15.13 (Phase 13), 0.15.14 (Phase 14) and 0.15.15 (Phase 15).
 - Completion notes: `docs/completions/phase-NN-<name>.md` with sections: Summary, What was built, Design decisions, Files changed, How to run, How to test, Known gaps, Follow-ups.
 - Commits: one per phase at minimum, conventional subject `phase N: <name>`; pushed to `origin/feat/vision-implementation` only.
 
@@ -303,3 +317,4 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 12 Verifiable cloud runtime, streamed speech, strict CSP, review items | done 2026-10-29 | [`../completions/phase-12-cloud-runtime-speech-csp.md`](../completions/phase-12-cloud-runtime-speech-csp.md) | 0.15.12 |
 | 13 Beta readiness (round-2 review) | done 2026-10-29 | [`../completions/phase-13-beta-readiness.md`](../completions/phase-13-beta-readiness.md) | 0.15.13 |
 | 14 Round-3 review fixes | done 2026-10-29 | [`../completions/phase-14-round-3-review-fixes.md`](../completions/phase-14-round-3-review-fixes.md) | 0.15.14 |
+| 15 Round-3 review, remaining items | done 2026-10-29 | [`../completions/phase-15-round-3-remaining-items.md`](../completions/phase-15-round-3-remaining-items.md) | 0.15.15 |

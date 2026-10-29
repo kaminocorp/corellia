@@ -26,7 +26,7 @@ Direction: [`docs/VISION.md`](docs/VISION.md). Implementation plan and status: [
 
 ## Run it
 
-Requirements: Go 1.26, Node 24, pnpm 12. No credentials needed.
+Requirements: Go 1.26, Node 24, pnpm 12 (`packageManager` in `package.json` pins the version for corepack and for pnpm itself). No credentials needed.
 
 ```bash
 pnpm install
