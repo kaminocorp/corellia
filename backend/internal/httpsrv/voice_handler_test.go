@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hejijunhao/corellia/backend/internal/config"
+	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
 	"github.com/hejijunhao/corellia/backend/internal/voice"
 )
 
@@ -73,5 +74,19 @@ func TestVoiceNoneProviders(t *testing.T) {
 	}
 	if rec := post(h, "/api/voice/tts", `{"text":"x"}`); rec.Code != 501 {
 		t.Fatalf("tts none: %d", rec.Code)
+	}
+}
+
+type fakeMemory struct{}
+
+func (fakeMemory) Notes() []builtin.Note       { return []builtin.Note{{ID: "m1", Text: "oat milk"}} }
+func (fakeMemory) Pending() []builtin.Reminder { return nil }
+
+func TestMemoryEndpoint(t *testing.T) {
+	cfg := config.Config{Port: 8080, AgentName: "Corellia", ClientDir: t.TempDir()}
+	h := New(Deps{Config: cfg, Memory: NewMemoryHandler(fakeMemory{})})
+	rec := get(h, "/api/memory", "127.0.0.1:1")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "oat milk") || !strings.Contains(rec.Body.String(), `"reminders":[]`) {
+		t.Fatalf("memory: %d %s", rec.Code, rec.Body.String())
 	}
 }

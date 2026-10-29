@@ -247,5 +247,5 @@ Each phase is independently committable, keeps `go test ./...` and `pnpm -C clie
 | 6 Decision layer, actions, tools | done 2026-10-29 | [`../completions/phase-06-decision-actions-tools.md`](../completions/phase-06-decision-actions-tools.md) | 0.15.6 |
 | 7 Cloud runtimes and spike | done 2026-10-29 | [`../completions/phase-07-cloud-runtimes-and-spike.md`](../completions/phase-07-cloud-runtimes-and-spike.md) | 0.15.7 |
 | 8 Voice | done 2026-10-29 | [`../completions/phase-08-voice.md`](../completions/phase-08-voice.md) | 0.15.8 |
-| 9 Memory, persistence, proactivity | pending | | |
+| 9 Memory, persistence, proactivity | done 2026-10-29 | [`../completions/phase-09-memory-persistence-proactivity.md`](../completions/phase-09-memory-persistence-proactivity.md) | 0.15.9 |
 | 10 Display box, hardening, docs | pending | | |

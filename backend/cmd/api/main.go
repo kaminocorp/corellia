@@ -20,8 +20,11 @@ import (
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/decision"
 	"github.com/hejijunhao/corellia/backend/internal/httpsrv"
+	"github.com/hejijunhao/corellia/backend/internal/memory"
+	"github.com/hejijunhao/corellia/backend/internal/proactive"
 	"github.com/hejijunhao/corellia/backend/internal/runtime/rtselect"
 	"github.com/hejijunhao/corellia/backend/internal/session"
+	"github.com/hejijunhao/corellia/backend/internal/store"
 	"github.com/hejijunhao/corellia/backend/internal/tools"
 	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
 	"github.com/hejijunhao/corellia/backend/internal/voice"
@@ -63,8 +66,20 @@ func main() {
 	}
 	slog.Info("runtime selected", "runtime", rt.Name(), "requested", cfg.Runtime, "detail", detail)
 
+	st, err := store.New(cfg.DataDir)
+	if err != nil {
+		slog.Error("store", "err", err)
+		os.Exit(1)
+	}
+	mem, err := memory.Open(st, time.Now)
+	if err != nil {
+		slog.Error("memory", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("memory loaded", "dir", st.Dir(), "notes", len(mem.Notes()), "reminders", len(mem.Pending()))
+
 	toolReg := tools.NewRegistry()
-	builtin.Register(toolReg, builtin.Options{})
+	builtin.Register(toolReg, builtin.Options{Memory: mem, Reminders: mem})
 	gate := actions.New(toolReg, 2*time.Minute, time.Now)
 	slog.Info("tools registered", "tools", toolReg.Names())
 
@@ -72,16 +87,22 @@ func main() {
 	slog.Info("voice providers", "stt", voiceProviders.STT.Name(), "tts", voiceProviders.TTS.Name(), "mode", voiceProviders.Mode)
 
 	sess := session.New(session.Options{
-		AgentName: cfg.AgentName,
-		Runtime:   rt,
-		Registry:  reg,
-		Tools:     toolReg,
-		Gate:      gate,
-		Decider:   decision.NewRules(),
-		STT:       voiceProviders.STT.Name(),
-		TTS:       voiceProviders.TTS.Name(),
+		AgentName:  cfg.AgentName,
+		Runtime:    rt,
+		Registry:   reg,
+		Tools:      toolReg,
+		Gate:       gate,
+		Decider:    decision.NewRules(),
+		STT:        voiceProviders.STT.Name(),
+		TTS:        voiceProviders.TTS.Name(),
+		Memory:     mem,
+		Transcript: mem,
 	})
 	defer sess.Close()
+
+	schedCtx, stopSched := context.WithCancel(context.Background())
+	defer stopSched()
+	go proactive.New(mem, sess, time.Now, time.Local).Run(schedCtx, time.Second)
 
 	handler := httpsrv.New(httpsrv.Deps{
 		Config:  cfg,
@@ -89,6 +110,7 @@ func main() {
 		Session: httpsrv.NewSessionHandler(sess, reg),
 		Events:  httpsrv.NewEventsHandler(sess),
 		Voice:   httpsrv.NewVoiceHandler(voiceProviders),
+		Memory:  httpsrv.NewMemoryHandler(mem),
 	})
 
 	srv := &http.Server{

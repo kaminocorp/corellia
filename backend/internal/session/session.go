@@ -20,6 +20,7 @@ import (
 	"github.com/hejijunhao/corellia/backend/internal/contract"
 	"github.com/hejijunhao/corellia/backend/internal/contract/gen"
 	"github.com/hejijunhao/corellia/backend/internal/decision"
+	"github.com/hejijunhao/corellia/backend/internal/proactive"
 	"github.com/hejijunhao/corellia/backend/internal/runtime"
 	"github.com/hejijunhao/corellia/backend/internal/uispec"
 )
@@ -37,6 +38,12 @@ type Options struct {
 	Decider decision.Decider
 	// ExpireEvery is the proposal expiry sweep interval (0: 5s).
 	ExpireEvery time.Duration
+	// Memory renders the memory summary for prompts (nil: none).
+	Memory MemorySummariser
+	// Transcript persists the conversation (nil: in-memory only).
+	Transcript TranscriptStore
+	// MemoryNotes is how many notes go into the prompt (0: 30).
+	MemoryNotes int
 	// Now is the wall clock; defaults to time.Now.
 	Now func() time.Time
 	// HistoryLimit is how many transcript entries a runtime sees.
@@ -53,6 +60,17 @@ type Options struct {
 	STT, TTS string
 }
 
+// MemorySummariser renders memory for the runtime prompt.
+type MemorySummariser interface {
+	Summarise(limit int) string
+}
+
+// TranscriptStore persists transcript entries.
+type TranscriptStore interface {
+	AppendTranscript(e gen.TranscriptEntry) error
+	LoadTranscript(limit int) ([]gen.TranscriptEntry, error)
+}
+
 // Session is safe for concurrent use.
 type Session struct {
 	o   Options
@@ -61,14 +79,18 @@ type Session struct {
 
 	catalogDesc string
 
-	mu         sync.Mutex
-	state      gen.AgentState
-	spec       gen.UISpec
-	transcript []gen.TranscriptEntry
-	proposals  map[string]pendingProposal
-	active     *activeTurn
-	baseCtx    context.Context
-	cancelAll  context.CancelFunc
+	mu           sync.Mutex
+	state        gen.AgentState
+	spec         gen.UISpec
+	transcript   []gen.TranscriptEntry
+	proposals    map[string]pendingProposal
+	held         []proactive.Item
+	releaseTimer *time.Timer
+	// speakingUntil estimates when the client finishes the last speech.
+	speakingUntil time.Time
+	active        *activeTurn
+	baseCtx       context.Context
+	cancelAll     context.CancelFunc
 }
 
 type pendingProposal struct {
@@ -123,6 +145,9 @@ func New(o Options) *Session {
 	if o.ExpireEvery <= 0 {
 		o.ExpireEvery = 5 * time.Second
 	}
+	if o.MemoryNotes <= 0 {
+		o.MemoryNotes = 30
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{
 		o:         o,
@@ -141,14 +166,29 @@ func New(o Options) *Session {
 			o.Logger.Error("session: dropped off-contract event", "type", ev["type"], "err", err)
 		}
 	}
+	if o.Transcript != nil {
+		if entries, err := o.Transcript.LoadTranscript(o.TranscriptLimit); err != nil {
+			o.Logger.Error("session: load transcript", "err", err)
+		} else {
+			s.transcript = entries
+		}
+	}
 	if o.Gate != nil {
 		go s.expireLoop(o.ExpireEvery)
 	}
 	return s
 }
 
-// Close cancels any running turn.
-func (s *Session) Close() { s.cancelAll() }
+// Close cancels any running turn and pending timers.
+func (s *Session) Close() {
+	s.cancelAll()
+	s.mu.Lock()
+	if s.releaseTimer != nil {
+		s.releaseTimer.Stop()
+		s.releaseTimer = nil
+	}
+	s.mu.Unlock()
+}
 
 // ID returns the session id.
 func (s *Session) ID() string { return s.o.ID }
@@ -191,10 +231,7 @@ func (s *Session) Snapshot() map[string]any {
 			pending = append(pending, toGen(p))
 		}
 	}
-	transcript := s.transcript
-	if len(transcript) > 50 {
-		transcript = transcript[len(transcript)-50:]
-	}
+	transcript := s.todaysTranscriptLocked(50)
 	return map[string]any{
 		"session_id":        s.o.ID,
 		"agent_name":        s.o.AgentName,
@@ -248,6 +285,10 @@ func (s *Session) StartTurn(text string, source runtime.Source) (turnID string, 
 	s.appendTranscriptLocked(gen.TranscriptEntry{Role: gen.TranscriptEntryRoleUser, Text: text, Ts: now, TurnID: ptr(gen.TurnID(turnID)), Source: ptr(gen.TranscriptEntrySource(source))})
 	history := s.historyLocked()
 	screen := s.screenSummaryLocked()
+	memory := ""
+	if s.o.Memory != nil {
+		memory = s.o.Memory.Summarise(s.o.MemoryNotes)
+	}
 	ctx, cancel := context.WithCancel(s.baseCtx)
 	at := &activeTurn{id: turnID, cancel: cancel, done: make(chan struct{})}
 	s.active = at
@@ -262,7 +303,7 @@ func (s *Session) StartTurn(text string, source runtime.Source) (turnID string, 
 		Text:    text,
 		Source:  source,
 		History: history,
-		Context: runtime.Context{AgentName: s.o.AgentName, Tools: s.o.Tools, Now: s.o.Now, CatalogDescription: s.catalogDesc, ScreenSummary: screen},
+		Context: runtime.Context{AgentName: s.o.AgentName, Tools: s.o.Tools, Now: s.o.Now, CatalogDescription: s.catalogDesc, ScreenSummary: screen, MemorySummary: memory},
 	}
 	go s.run(ctx, at, turn)
 	return turnID, cancelled, nil
@@ -329,6 +370,7 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 		}
 		s.bus.Publish("turn_done", map[string]any{"turn_id": turn.ID, "status": status, "text": text, "modality": modality})
 		s.bus.Publish("state", map[string]any{"state": gen.AgentStateIdle, "turn_id": turn.ID})
+		s.releaseHeld()
 	}
 
 	ch, err := s.o.Runtime.Start(ctx, turn)
@@ -498,6 +540,32 @@ func (s *Session) appendTranscriptLocked(e gen.TranscriptEntry) {
 	if len(s.transcript) > s.o.TranscriptLimit {
 		s.transcript = s.transcript[len(s.transcript)-s.o.TranscriptLimit:]
 	}
+	if s.o.Transcript != nil {
+		if err := s.o.Transcript.AppendTranscript(e); err != nil {
+			s.o.Logger.Error("session: persist transcript", "err", err)
+		}
+	}
+}
+
+// todaysTranscriptLocked returns up to limit entries from the current
+// local day (replay after a reconnect stays bounded).
+func (s *Session) todaysTranscriptLocked(limit int) []gen.TranscriptEntry {
+	now := s.o.Now()
+	y, m, d := now.Date()
+	start := time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+	var out []gen.TranscriptEntry
+	for _, e := range s.transcript {
+		if !e.Ts.In(now.Location()).Before(start) {
+			out = append(out, e)
+		}
+	}
+	if len(out) > limit {
+		out = out[len(out)-limit:]
+	}
+	if out == nil {
+		out = []gen.TranscriptEntry{}
+	}
+	return out
 }
 
 func (s *Session) historyLocked() []runtime.Message {

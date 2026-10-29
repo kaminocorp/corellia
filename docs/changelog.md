@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)](#0159---phase-9-file-store--memoryremindertranscript-persistence--memory-summary-in-prompts--proactive-scheduler-reminders-ambient-clock-with-hold-policy-2026-10-29)
 - [0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)](#0158---phase-8-voice-stttts-seams--openai-audio-provider--endpoints-client-vad-capture-browser-recognition-fallback-speech-playback-with-audio-level-activation-keys-barge-in-mic-indicator-2026-10-29)
 - [0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)](#0157---phase-7-cloud-runtimes-anthropic-streaming--tool-use-openai-compatibledeepseek-hermes-sidecar-deepseek-harness-stub--runtime-selector--runtime-spike-2026-10-29)
 - [0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)](#0156---phase-6-decision-layer-rules--proposeconfirm-gate--tool-registry-with-built-ins-time-geocode-weather-memory-reminders-directions-show_ui--confirm-cards-and-phrases-2026-10-29)
@@ -90,6 +91,18 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)
+
+Roadmap Phase 9. Full notes: [`completions/phase-09-memory-persistence-proactivity.md`](completions/phase-09-memory-persistence-proactivity.md).
+
+### Added
+
+- **`internal/store`** (atomic JSON documents, JSONL logs), **`internal/memory`** (notes, reminders, transcript; `Summarise`), **`internal/proactive`** (scheduler: due reminders, ambient clock on the hour when idle).
+- **Session**: `Proactive`/`Idle` sink with decider-driven hold (turn running or speech playing) and release; proactive cards, speech and transcript entries; memory summary in the runtime context; transcript persistence and today-only replay. `GET /api/memory`.
+- `cmd/api` opens the store under `CORELLIA_DATA_DIR`, wires memory tools and the scheduler.
+
+---
 
 ## 0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)
 

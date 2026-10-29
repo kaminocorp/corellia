@@ -243,6 +243,14 @@ func (s *Session) sayAndRecord(turnID string, text string) {
 }
 
 func (s *Session) publishSpeech(turnID string, pieces []string) {
+	if len(pieces) > 0 {
+		s.mu.Lock()
+		until := s.o.Now().Add(estimateSpeech(pieces))
+		if until.After(s.speakingUntil) {
+			s.speakingUntil = until
+		}
+		s.mu.Unlock()
+	}
 	for i, piece := range pieces {
 		ev := map[string]any{"text": piece, "final": i == len(pieces)-1}
 		if turnID != "" {

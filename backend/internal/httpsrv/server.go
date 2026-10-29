@@ -33,6 +33,7 @@ type Deps struct {
 	Session *SessionHandler
 	Events  http.Handler
 	Voice   *VoiceHandler
+	Memory  *MemoryHandler
 }
 
 // New builds the root http.Handler.
@@ -79,6 +80,9 @@ func New(d Deps) http.Handler {
 		}
 		if d.Events != nil {
 			r.Get("/events", d.Events.ServeHTTP)
+		}
+		if d.Memory != nil {
+			r.Get("/memory", d.Memory.Get)
 		}
 		if d.Voice != nil {
 			r.Get("/voice/capabilities", d.Voice.GetCapabilities)
