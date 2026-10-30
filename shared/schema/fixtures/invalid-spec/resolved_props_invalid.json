@@ -1,0 +1,31 @@
+{
+  "ops": [
+    {
+      "op": "set_data",
+      "value": {
+        "center": [
+          1
+        ]
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Map",
+        "props": {
+          "center": {
+            "bind": "$.center"
+          }
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    }
+  ],
+  "codes": [
+    "invalid_props"
+  ]
+}

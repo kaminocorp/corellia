@@ -1,0 +1,103 @@
+{
+  "ops": [
+    {
+      "op": "set_data",
+      "value": {
+        "place": {
+          "name": "Lisbon",
+          "coords": [
+            38.72,
+            -9.14
+          ]
+        },
+        "meeting": {
+          "summary": "Design review at **11:00**."
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Split",
+        "props": {
+          "ratio": 0.6
+        },
+        "slots": {
+          "left": [
+            "n2"
+          ],
+          "right": [
+            "n3"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n2",
+      "node": {
+        "type": "Map",
+        "props": {
+          "center": {
+            "bind": "$.place.coords"
+          },
+          "zoom": 12
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n3",
+      "node": {
+        "type": "Card",
+        "props": {
+          "title": "Next meeting"
+        },
+        "slots": {
+          "body": [
+            "n4"
+          ]
+        },
+        "actions": {
+          "primary": {
+            "id": "a1",
+            "label": "Navigate"
+          }
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n4",
+      "node": {
+        "type": "Markdown",
+        "props": {
+          "text": {
+            "bind": "$.meeting.summary"
+          }
+        }
+      }
+    },
+    {
+      "op": "set_action",
+      "id": "a1",
+      "action": {
+        "kind": "propose",
+        "tool": "open_directions",
+        "args": {
+          "to": {
+            "bind": "$.place.coords"
+          }
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    },
+    {
+      "op": "done"
+    }
+  ]
+}

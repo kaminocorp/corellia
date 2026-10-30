@@ -1,0 +1,20 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Markdown",
+      "props": {
+        "text": "x"
+      },
+      "actions": {
+        "primary": {
+          "id": "a",
+          "label": "Go"
+        }
+      }
+    }
+  },
+  "code": "unknown_action_slot"
+}

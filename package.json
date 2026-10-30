@@ -1,24 +1,16 @@
 {
   "name": "corellia",
   "private": true,
+  "packageManager": "pnpm@12.16.1",
   "scripts": {
-    "proto:generate": "cd shared/proto && buf generate",
-    "frontend:dev": "pnpm -C frontend dev",
-    "frontend:build": "pnpm -C frontend build",
-    "frontend:type-check": "pnpm -C frontend type-check",
-    "frontend:lint": "pnpm -C frontend lint",
-    "capture:video": "node scripts/capture-login-video.mjs"
-  },
-  "devDependencies": {
-    "puppeteer-core": "^22.0.0"
-  },
-  "pnpm": {
-    "packageExtensions": {
-      "@hookform/resolvers": {
-        "peerDependencies": {
-          "zod": "*"
-        }
-      }
-    }
+    "dev": "pnpm -C client dev",
+    "build": "pnpm -C client build",
+    "test": "pnpm -C client test",
+    "type-check": "pnpm -C client type-check",
+    "lint": "pnpm -C client lint",
+    "check": "pnpm type-check && pnpm lint && pnpm test && cd backend && go vet ./... && go test ./... && cd .. && ./box/test.sh && pnpm e2e",
+  "test:box": "./box/test.sh",
+    "contracts:generate": "./scripts/contracts-generate.sh",
+    "e2e": "./scripts/e2e.sh"
   }
 }

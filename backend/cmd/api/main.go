@@ -1,137 +1,170 @@
+// Command api runs the Corellia backend: the session API, the SSE event
+// stream and the static display client, in one binary.
 package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"sort"
-	"strings"
+	"os/signal"
+	"syscall"
+	"time"
 
 	_ "github.com/joho/godotenv/autoload"
 
-	"github.com/hejijunhao/corellia/backend/internal/adapters"
-	"github.com/hejijunhao/corellia/backend/internal/agents"
-	"github.com/hejijunhao/corellia/backend/internal/auth"
+	"github.com/hejijunhao/corellia/backend/internal/actions"
 	"github.com/hejijunhao/corellia/backend/internal/config"
-	"github.com/hejijunhao/corellia/backend/internal/db"
-	"github.com/hejijunhao/corellia/backend/internal/deploy"
+	"github.com/hejijunhao/corellia/backend/internal/contract"
+	"github.com/hejijunhao/corellia/backend/internal/decision"
 	"github.com/hejijunhao/corellia/backend/internal/httpsrv"
-	"github.com/hejijunhao/corellia/backend/internal/organizations"
+	"github.com/hejijunhao/corellia/backend/internal/memory"
+	"github.com/hejijunhao/corellia/backend/internal/proactive"
+	"github.com/hejijunhao/corellia/backend/internal/runtime/rtselect"
+	"github.com/hejijunhao/corellia/backend/internal/session"
+	"github.com/hejijunhao/corellia/backend/internal/store"
 	"github.com/hejijunhao/corellia/backend/internal/tools"
-	"github.com/hejijunhao/corellia/backend/internal/users"
+	"github.com/hejijunhao/corellia/backend/internal/tools/builtin"
+	"github.com/hejijunhao/corellia/backend/internal/voice"
+)
+
+// Set via -ldflags "-X main.version=... -X main.commit=...".
+var (
+	version = "dev"
+	commit  = "unknown"
 )
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
-	cfg := config.Load()
-	ctx := context.Background()
-
-	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("db pool", "err", err)
+		slog.Error("config", "err", err)
 		os.Exit(1)
 	}
-	defer pool.Close()
-
-	jwksURL := strings.TrimRight(cfg.SupabaseURL, "/") + "/auth/v1/.well-known/jwks.json"
-	verifier, err := auth.NewJWKSVerifier(ctx, jwksURL)
+	if cfg.DevMode() {
+		slog.Warn("CORELLIA_DEVICE_TOKEN not set: dev mode, loopback clients only", "listen", cfg.ListenAddr())
+	}
+	loc, err := cfg.Location()
 	if err != nil {
-		slog.Error("jwks verifier", "err", err, "url", jwksURL)
+		slog.Error("config", "err", err)
 		os.Exit(1)
 	}
-	slog.Info("jwks initialised", "url", jwksURL)
+	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
+		slog.Error("data dir", "dir", cfg.DataDir, "err", err, "hint", "CORELLIA_DATA_DIR must be a directory the server's user can create or write")
+		os.Exit(1)
+	}
 
-	queries := db.New(pool)
-	usersSvc := users.NewService(queries)
-	orgsSvc := organizations.NewService(queries, usersSvc)
-	adaptersSvc := adapters.NewService(queries)
+	reg, err := contract.Load()
+	if err != nil {
+		slog.Error("contract", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("contract loaded", "components", len(reg.ComponentNames()))
 
-	flyTarget, err := deploy.NewFlyDeployTarget(ctx, deploy.FlyCredentials{
-		APIToken: cfg.FlyAPIToken,
-		OrgSlug:  cfg.FlyOrgSlug,
+	rt, detail, err := rtselect.Select(cfg)
+	if err != nil {
+		slog.Error("runtime", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("runtime selected", "runtime", rt.Name(), "requested", cfg.Runtime, "detail", detail)
+
+	// store.New proves the directory is writable: a backend that cannot
+	// persist must not start and quietly forget every note, reminder and
+	// transcript line (the Docker /data volume, review 2026-10-30 round 5).
+	st, err := store.New(cfg.DataDir)
+	if err != nil {
+		slog.Error("store", "err", err, "hint", "CORELLIA_DATA_DIR is not writable by this user; chown it (in Docker: the /data volume) or point CORELLIA_DATA_DIR elsewhere")
+		os.Exit(1)
+	}
+	mem, err := memory.Open(st, time.Now)
+	if err != nil {
+		slog.Error("memory", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("memory loaded", "dir", st.Dir(), "notes", len(mem.Notes()), "reminders", len(mem.Pending()))
+
+	// show_ui validates its batch through the session, which exists only
+	// after the tools do; the closure binds late.
+	var sess *session.Session
+	uiCheck := func(ops []json.RawMessage) []string {
+		if sess == nil {
+			return nil
+		}
+		var out []string
+		for _, is := range sess.DryRunOps(ops) {
+			out = append(out, fmt.Sprintf("op %d (%s): %s", is.Index, is.Code, is.Message))
+		}
+		return out
+	}
+	toolReg := tools.NewRegistry()
+	builtin.Register(toolReg, builtin.Options{Memory: mem, Reminders: mem, Location: loc, UICheck: uiCheck})
+	gate := actions.New(toolReg, 2*time.Minute, time.Now)
+	slog.Info("tools registered", "tools", toolReg.Names())
+
+	voiceProviders := voice.Select(cfg)
+	slog.Info("voice providers", "stt", voiceProviders.STT.Name(), "tts", voiceProviders.TTS.Name(), "mode", voiceProviders.Mode)
+
+	sess = session.New(session.Options{
+		AgentName:  cfg.AgentName,
+		Runtime:    rt,
+		Registry:   reg,
+		Tools:      toolReg,
+		Gate:       gate,
+		Decider:    decision.NewRules(),
+		STT:        voiceProviders.STT.Name(),
+		TTS:        voiceProviders.TTS.Name(),
+		Memory:     mem,
+		Transcript: mem,
+		ImageHosts: append([]string{}, cfg.ImageHosts...),
+		Location:   loc,
 	})
-	if err != nil {
-		slog.Error("fly deploy target", "err", err)
-		os.Exit(1)
-	}
-	localTarget := deploy.NewLocalDeployTarget()
-	awsTarget := deploy.NewAWSDeployTarget()
-	deployTargets := map[string]deploy.DeployTarget{
-		flyTarget.Kind():   flyTarget,
-		localTarget.Kind(): localTarget,
-		awsTarget.Kind():   awsTarget,
-	}
-	slog.Info("deploy targets initialised",
-		"kinds", strings.Join(keysOf(deployTargets), ","),
-		"fly_org", cfg.FlyOrgSlug)
-	deployResolver := deploy.NewStaticResolver(deployTargets)
+	defer sess.Close()
 
-	toolsSvc := tools.NewService(queries, tools.WithTransactor(tools.NewPgxTransactor(pool)))
-
-	// v1.5 Pillar B: wire manifest issuer into the spawn flow if
-	// CORELLIA_API_URL is configured. When it's absent, agents spawn
-	// without tools governance — safe for local dev and pre-Pillar-B
-	// deployments.
-	agentOpts := []agents.ServiceOption{}
-	if cfg.CorelliaAPIURL != "" {
-		agentOpts = append(agentOpts, agents.WithManifestIssuer(toolsSvc, cfg.CorelliaAPIURL))
-		slog.Info("tools governance: manifest issuer wired", "api_url", cfg.CorelliaAPIURL)
-	} else {
-		slog.Info("tools governance: CORELLIA_API_URL not set — manifest token generation disabled")
-	}
-	// Phase 7: tools audit hook for the operator-driven RestartInstance path.
-	// Always wired when toolsSvc exists (which it always does post-Phase 1 —
-	// the Phase 6 curation page also calls into toolsSvc); independent of
-	// CORELLIA_API_URL because audit-row writes work whether or not the
-	// adapter-side manifest endpoint is reachable.
-	agentOpts = append(agentOpts, agents.WithToolsAuditAppender(toolsSvc))
-
-	agentsSvc := agents.NewService(queries, adaptersSvc, deployResolver, agents.NewPgxTransactor(pool), agentOpts...)
-
-	// Boot-time stale-pending sweep (spawn-flow plan decision 32). Reaps
-	// any agent_instances row stuck in 'pending' for >5 min — typically
-	// the residue of a process crash mid-spawn whose poll goroutine was
-	// abandoned. Logged warn-level with the IDs so the operator can
-	// cross-reference the crash event.
-	if reaped, err := agentsSvc.ReapStalePending(ctx); err != nil {
-		slog.Error("agents: stale-pending sweep", "err", err)
-	} else if len(reaped) > 0 {
-		slog.Warn("agents: reaped stale pending instances", "count", len(reaped), "ids", reaped)
-	}
-
-	var manifestHandler *httpsrv.ToolManifestHandler
-	if cfg.CorelliaAPIURL != "" {
-		manifestHandler = httpsrv.NewToolManifestHandler(toolsSvc)
-	}
+	schedCtx, stopSched := context.WithCancel(context.Background())
+	defer stopSched()
+	go proactive.New(mem, sess, time.Now, loc).Run(schedCtx, time.Second)
+	slog.Info("time zone", "location", loc.String())
 
 	handler := httpsrv.New(httpsrv.Deps{
-		Config:               cfg,
-		AuthVerifier:         verifier,
-		UsersHandler:         httpsrv.NewUsersHandler(usersSvc),
-		OrganizationsHandler: httpsrv.NewOrganizationsHandler(orgsSvc),
-		AgentsHandler:        httpsrv.NewAgentsHandler(agentsSvc, usersSvc),
-		DeployTargets:        deployResolver,
-		AllowedOrigin:        cfg.FrontendOrigin,
-		ToolManifestHandler:  manifestHandler,
-		ToolsHandler:         httpsrv.NewToolsHandler(toolsSvc, usersSvc),
+		Config:    cfg,
+		Build:     httpsrv.BuildInfo{Version: version, Commit: commit},
+		Session:   httpsrv.NewSessionHandler(sess, reg),
+		Events:    httpsrv.NewEventsHandler(sess),
+		Voice:     httpsrv.NewVoiceHandler(voiceProviders),
+		Memory:    httpsrv.NewMemoryHandler(mem),
+		Heartbeat: httpsrv.NewHeartbeat(time.Now).WithStoreHealth(st.Healthy),
+		StoreHealth: func() error {
+			err, _ := st.Err()
+			return err
+		},
 	})
 
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	slog.Info("listening", "addr", addr)
-	if err := http.ListenAndServe(addr, handler); err != nil {
-		slog.Error("server", "err", err)
-		os.Exit(1)
+	srv := &http.Server{
+		Addr:              cfg.ListenAddr(),
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
-}
 
-func keysOf[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		slog.Info("listening", "addr", srv.Addr, "version", version, "client_dir", cfg.ClientDir)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	slog.Info("shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("shutdown", "err", err)
 	}
-	sort.Strings(out)
-	return out
 }

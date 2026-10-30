@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corellia.dev/schema/ui-spec.schema.json",
+  "title": "UISpec",
+  "description": "A UI spec: a flat map of typed nodes referenced by id, composed through named slots, with data bindings and action records. VISION.md section 5.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spec_version",
+    "root",
+    "nodes",
+    "data",
+    "actions"
+  ],
+  "properties": {
+    "spec_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "root": {
+      "description": "Id of the root node, or null when nothing is on screen.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+    },
+    "nodes": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/NodeId"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/Node"
+      }
+    },
+    "data": {
+      "description": "Data object that bindings resolve against.",
+      "type": "object"
+    },
+    "actions": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/ActionId"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/Action"
+      }
+    }
+  },
+  "$defs": {
+    "NodeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+    },
+    "ActionId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+    },
+    "ComponentType": {
+      "description": "A component name from the catalog.",
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9]{0,31}$"
+    },
+    "Binding": {
+      "description": "A prop value that resolves from the spec's data object. Path syntax: `$` followed by `.key` and `[index]` segments.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bind"
+      ],
+      "properties": {
+        "bind": {
+          "$ref": "#/$defs/BindPath"
+        }
+      }
+    },
+    "BindPath": {
+      "type": "string",
+      "pattern": "^\\$(\\.[A-Za-z_][A-Za-z0-9_]*|\\[[0-9]+\\])*$"
+    },
+    "Node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ComponentType"
+        },
+        "props": {
+          "description": "Component props. Each value is a literal or a Binding. Validated against the component's props schema from the catalog.",
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Binding"
+              },
+              {}
+            ]
+          }
+        },
+        "slots": {
+          "description": "Named slots to ordered child node ids.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/SlotName"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/NodeId"
+            },
+            "maxItems": 64
+          }
+        },
+        "actions": {
+          "description": "Action slots exposed by the component (for example `primary`) bound to action records.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/SlotName"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/ActionRef"
+          }
+        },
+        "ttl_ms": {
+          "description": "Decay: the client removes the node this many milliseconds after it was last touched. Absent means no decay.",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 86400000
+        },
+        "pinned": {
+          "description": "Hint for the decision layer: pinned nodes are re-emitted after a `clear` issued by the replace policy. The reducer itself treats pinned and unpinned nodes alike.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "SlotName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$"
+    },
+    "ActionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ActionId"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "hotkey": {
+          "description": "Optional keyboard hint. The renderer assigns digits 1-9 when absent.",
+          "type": "string",
+          "pattern": "^[1-9]$|^enter$|^escape$"
+        }
+      }
+    },
+    "Action": {
+      "description": "A typed action record. `propose` goes through the confirm gate; `tool` runs a read-only tool directly; `navigate` switches the focused panel; `dismiss` removes a node; `send_message` sends text as a user turn.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "propose",
+            "tool",
+            "navigate",
+            "dismiss",
+            "send_message"
+          ]
+        },
+        "tool": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "args": {
+          "type": "object"
+        },
+        "target": {
+          "$ref": "#/$defs/NodeId"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "risk": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default": "low"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "propose",
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "tool"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "tool",
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "tool"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "navigate",
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "target"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "dismiss",
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "target"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "send_message",
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "message"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Stack",
+      "props": {
+        "direction": {
+          "bind": "$.dir"
+        }
+      }
+    }
+  },
+  "code": "binding_not_bindable"
+}

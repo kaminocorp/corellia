@@ -1,0 +1,35 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "n2"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n2",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "n1"
+          ]
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    }
+  ],
+  "codes": [
+    "cycle"
+  ]
+}

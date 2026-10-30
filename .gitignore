@@ -5,16 +5,25 @@
 # Go
 backend/tmp/
 backend/bin/
+backend/data/
+data/
 
-# Node (will be used by frontend later)
+# Display box release (box/release.sh output: a ~20 MB static binary and a
+# client build; copy to the box, never commit)
+box/release/
+
+# Node
 node_modules/
-.next/
-.turbo/
+client/dist/
+.vite/
 
 # Editor
 .vscode/
 .idea/
 .DS_Store
 
-# Generated assets (upload to GitHub CDN, don't commit binaries)
-docs/assets/login-animation.mp4
+# Browser smoke test
+client/.chromium-libs/
+client/.chromium-libs.*/
+client/test-results/
+client/playwright-report/

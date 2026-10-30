@@ -1,0 +1,61 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Stack",
+        "slots": {
+          "children": [
+            "n2",
+            "n3"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n2",
+      "node": {
+        "type": "Card",
+        "props": {
+          "title": "A"
+        },
+        "slots": {
+          "body": [
+            "n4"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n3",
+      "node": {
+        "type": "Stat",
+        "props": {
+          "label": "L",
+          "value": "V"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "n4",
+      "node": {
+        "type": "Markdown",
+        "props": {
+          "text": "t"
+        }
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "n1"
+    },
+    {
+      "op": "remove_node",
+      "id": "n1"
+    }
+  ]
+}

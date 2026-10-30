@@ -1,0 +1,27 @@
+# The Docker build context is the repository root (docker build -f
+# backend/Dockerfile .). Nothing here reaches the final image either way;
+# this keeps secrets and host-only trees out of the context and the
+# intermediate layers (review 2026-10-30 round 4).
+.git
+**/.env
+**/.env.*
+!**/.env.example
+backend/data
+backend/bin
+backend/tmp
+data
+node_modules
+**/node_modules
+client/dist
+client/.vite
+client/.chromium-libs
+client/.chromium-libs.*
+client/test-results
+client/playwright-report
+docs
+box
+adapters
+.github
+.vscode
+.idea
+.DS_Store

@@ -1,0 +1,20 @@
+[Unit]
+Description=Corellia backend (API, event stream, display client)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=corellia
+Group=corellia
+EnvironmentFile=/etc/corellia/api.env
+WorkingDirectory=/opt/corellia
+ExecStart=/opt/corellia/api
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/corellia
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

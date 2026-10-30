@@ -1,0 +1,23 @@
+{
+  "before": [
+    {
+      "op": "add_node",
+      "id": "n1",
+      "node": {
+        "type": "Stat",
+        "props": {
+          "label": "L",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "op": {
+    "op": "set_props",
+    "id": "n1",
+    "props": {
+      "trend": "sideways"
+    }
+  },
+  "code": "invalid_props"
+}

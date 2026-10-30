@@ -1,0 +1,17 @@
+{
+  "ops": [
+    {
+      "op": "set_data",
+      "value": {
+        "a": 1
+      }
+    },
+    {
+      "op": "set_data",
+      "path": "$",
+      "value": {
+        "b": 2
+      }
+    }
+  ]
+}

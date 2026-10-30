@@ -1,0 +1,38 @@
+{
+  "ops": [
+    {
+      "op": "add_node",
+      "id": "o",
+      "node": {
+        "type": "Overlay",
+        "props": {
+          "position": "top_right"
+        },
+        "slots": {
+          "content": [
+            "s"
+          ]
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "id": "s",
+      "node": {
+        "type": "Status",
+        "props": {
+          "level": "ok",
+          "text": "Reminder set for 17:00."
+        },
+        "ttl_ms": 8000
+      }
+    },
+    {
+      "op": "set_root",
+      "id": "o"
+    },
+    {
+      "op": "done"
+    }
+  ]
+}

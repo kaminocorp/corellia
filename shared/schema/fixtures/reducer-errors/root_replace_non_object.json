@@ -1,0 +1,11 @@
+{
+  "before": [],
+  "op": {
+    "op": "set_data",
+    "path": "$",
+    "value": [
+      1
+    ]
+  },
+  "code": "invalid_op"
+}

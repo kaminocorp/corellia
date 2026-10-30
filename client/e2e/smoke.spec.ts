@@ -1,0 +1,195 @@
+import { expect, test, type ConsoleMessage, type Page } from "@playwright/test";
+
+/**
+ * The three entry points the roadmap names, in a real Chromium against the
+ * Go server: the display renders and completes a turn on the local
+ * runtime, the gallery renders every component, the debug pane shows the
+ * stream. Any console error fails the test: a Content-Security-Policy
+ * violation, a React render loop (the blank-display bug of 2026-10-29),
+ * an off-contract event.
+ */
+
+/** Network noise that is not a client defect (tiles need the internet; headless has no GPU). */
+const BENIGN = [/tile\.openstreetmap\.org/, /net::ERR_(INTERNET_DISCONNECTED|NAME_NOT_RESOLVED|CONNECTION|ADDRESS_UNREACHABLE|TIMED_OUT)/, /Failed to load resource: net::/, /WebGL|GPU process|swiftshader/i];
+
+function watchConsole(page: Page): string[] {
+  const errors: string[] = [];
+  const record = (text: string) => {
+    if (!BENIGN.some((re) => re.test(text))) errors.push(text);
+  };
+  page.on("console", (msg: ConsoleMessage) => {
+    if (msg.type() === "error") record(msg.text());
+  });
+  page.on("pageerror", (err) => record(`pageerror: ${err.message}`));
+  return errors;
+}
+
+test("display renders, connects, and completes a turn on the local runtime", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/");
+  const input = page.getByLabel("Message");
+  await expect(input).toBeVisible();
+  await expect(input).toBeFocused();
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+  await expect(page.getByTestId("runtime")).toHaveText("local demo");
+
+  await input.fill("what time is it");
+  await input.press("Enter");
+  await expect(page.getByRole("list", { name: "Transcript" })).toContainText("what time is it");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+  const agentLines = page.getByRole("list", { name: "Transcript" }).locator("li", { hasText: /^agent/ });
+  await expect(agentLines.first()).toBeVisible();
+  // Nothing of the 2026-10-29 blank-display bug: the input is still there after a full turn.
+  await expect(input).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Enter sends a message without confirming the pending proposal", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/");
+  const input = page.getByLabel("Message");
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+
+  await input.fill("remind me at 17:00 to call Ana");
+  await input.press("Enter");
+  const card = page.locator('[data-type="Confirm"]');
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+
+  // Review item 3: this Enter used to send the message and confirm the card.
+  await input.fill("what time is it");
+  await input.press("Enter");
+  await expect(page.getByRole("list", { name: "Transcript" })).toContainText("what time is it");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+  await expect(card).toBeVisible();
+
+  // Enter on the empty input is the confirmation.
+  await expect(input).toHaveValue("");
+  await input.press("Enter");
+  await expect(card).toBeHidden({ timeout: 10_000 });
+  expect(errors).toEqual([]);
+});
+
+test("gallery renders every content component", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/?gallery=1");
+  await expect(page.getByRole("heading", { name: "Component gallery" })).toBeVisible();
+  for (const type of ["Card", "Markdown", "Stat", "List", "Table", "Chart", "Timeline", "Image", "Map", "Confirm", "Status"]) {
+    await expect(page.locator(`[data-node="ex_${type}"]`).first()).toBeAttached();
+  }
+  await expect(page.locator("canvas").first()).toBeAttached({ timeout: 20_000 }).catch(() => {
+    /* no WebGL in this headless build: the Map falls back to a card, which is also fine */
+  });
+  expect(errors).toEqual([]);
+});
+
+test("debug pane shows the stream, and the raw error of a failed turn, and no error is logged", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/?debug=1");
+  await expect(page.getByText(/debug · seq \d+ · runtime local/)).toBeVisible();
+  const input = page.getByLabel("Message");
+  await expect(input).toBeFocused();
+  await input.fill("please simulate a failure");
+  await input.press("Enter");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+  // With ?debug=1 the error line carries the raw text; without it, nothing (next test).
+  await expect(page.getByTestId("error-line")).toContainText("runtime: simulated failure");
+  expect(errors).toEqual([]);
+});
+
+test("a failed turn is visible and spoken in plain words, and the connection stays online (review 2026-10-30, item 1)", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/");
+  const input = page.getByLabel("Message");
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+
+  await input.fill("what time is it");
+  await input.press("Enter");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+
+  await input.fill("please simulate a failure");
+  await input.press("Enter");
+  await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+  const transcript = page.getByRole("list", { name: "Transcript" });
+  await expect(transcript).toContainText("Sorry, that didn't work on my side. A simulated failure");
+  await expect(transcript).not.toContainText("local demo): the user asked"); // the raw error is not shown or spoken
+  // The status card says why in plain words; the always-on error line stays
+  // empty outside debug mode (review 2026-10-30 round 3, item 4).
+  await expect(page.locator('[data-node="status_card_text"]')).toBeVisible();
+  await expect(page.locator('[data-node="status_card_text"]')).toContainText("That didn't work: A simulated failure");
+  await expect(page.getByTestId("error-line")).toHaveCount(0);
+  await expect(page.getByText(/local demo\): the user asked/)).toHaveCount(0);
+  // The server's `session_error` event must not read as a connection error.
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+  await expect(page.getByRole("status").filter({ hasText: /connection lost|unreachable/ })).toHaveCount(0);
+  // The glance root and the status card share top_right: stacked, both visible, not overlapping.
+  const group = page.locator('[data-overlay-group="top_right"]');
+  await expect(group.locator("[data-floating]")).toHaveCount(2);
+  const boxes = await group.locator("[data-floating] > [data-node]").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
+  expect(boxes).toHaveLength(2);
+  expect(boxes[1].top).toBeGreaterThanOrEqual(boxes[0].bottom);
+
+  // Every reload replays the buffered events: the banner must not come back.
+  await page.reload();
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId("connection")).toHaveText(/online/);
+  await expect(page.getByRole("status").filter({ hasText: /connection lost|unreachable/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+/**
+ * A full-screen visual (a map, a table, a chart) and the transcript never
+ * share pixels, at a laptop viewport, a large one and a 4K one (the three
+ * the review measured): the generated-UI zone ends above the measured
+ * footer (review 2026-10-30 round 3, item 3).
+ */
+for (const viewport of [
+  { width: 1440, height: 790 },
+  { width: 1920, height: 1080 },
+  { width: 3840, height: 2160 },
+]) {
+  test(`a full visual never overlaps the transcript at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = watchConsole(page);
+    await page.goto("/");
+    const input = page.getByLabel("Message");
+    await expect(page.getByTestId("connection")).toHaveText(/online/);
+    // Fill the transcript first, then a map (Split root: full placement).
+    for (const text of ["what time is it", "what's on my schedule", "show me Lisbon on the map"]) {
+      await input.fill(text);
+      await input.press("Enter");
+      await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+    }
+    await expect(page.locator("[data-placement]")).toHaveAttribute("data-placement", "full");
+    const zone = page.getByTestId("ui-zone");
+    await expect(zone.locator("[data-node]").first()).toBeVisible();
+    // Let the zone's transition settle before measuring.
+    await page.waitForTimeout(700);
+    const zoneBox = (await zone.boundingBox())!;
+    const footerBox = (await page.getByTestId("footer").boundingBox())!;
+    const transcriptBox = (await page.getByRole("list", { name: "Transcript" }).boundingBox())!;
+    expect(zoneBox.y + zoneBox.height).toBeLessThanOrEqual(footerBox.y + 1);
+    expect(zoneBox.y + zoneBox.height).toBeLessThanOrEqual(transcriptBox.y + 1);
+    // The zone still has room for the visual.
+    expect(zoneBox.height).toBeGreaterThan(viewport.height * 0.45);
+    // A card that arrives while the visual is up goes to the gutter beside
+    // it, not over its data (review 2026-10-30 round 5): the reminder's
+    // confirm card and reply card land in one column that the visual's zone
+    // does not touch.
+    await input.fill("remind me in 5 minutes to stretch");
+    await input.press("Enter");
+    await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+    const gutter = page.locator('[data-overlay-group="gutter"]');
+    await expect(gutter).toBeVisible();
+    await expect(page.locator("[data-placement]")).toHaveAttribute("data-gutter", "1");
+    await page.waitForTimeout(700);
+    const gutterBox = (await gutter.boundingBox())!;
+    const zoneAfter = (await zone.boundingBox())!;
+    expect(gutterBox.width).toBeGreaterThan(200);
+    expect(zoneAfter.x + zoneAfter.width).toBeLessThanOrEqual(gutterBox.x + 1);
+    expect(page.locator('[data-overlay-group="top_right"], [data-overlay-group="bottom_right"]')).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    expect(errors).toEqual([]);
+  });
+}

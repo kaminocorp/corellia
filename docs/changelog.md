@@ -2,6 +2,24 @@
 
 Index - short one-liners:
 
+- [0.15.17 - Phase 17: Round-5 Review: One Voice for Mac and Box (Speaker Policy, Ctrl+Shift+M, ?quiet=) + Per-Client Heartbeat for the Watchdog + Dev Mode Refuses Proxied Requests + Loud Store (Boot Probe, /healthz, Banner) and Docker /data Ownership + Stable History Cache Prefix (CORELLIA_CACHE_TTL) + Cards in a Gutter beside Full Visuals + box/release Ignored (2026-10-30)](#01517---phase-17-round-5-review-one-voice-for-mac-and-box-speaker-policy-ctrlshiftm-quiet--per-client-heartbeat-for-the-watchdog--dev-mode-refuses-proxied-requests--loud-store-boot-probe-healthz-banner-and-docker-data-ownership--stable-history-cache-prefix-corelliacachettl--cards-in-a-gutter-beside-full-visuals--boxrelease-ignored-2026-10-30)
+- [0.15.16 - Phase 16: Round-4 Review, Deployment Fixes: Model Clock Follows CORELLIA_TZ + Voice Needs HTTPS or localhost (Indicator, Kiosk Flag, Topologies) + Kiosk Owns tty1 + release.sh and --release Install + Refusal Said Separately and out of History + Prompt Caching with a Stable Prefix + .dockerignore + Watchdog Restarts a Never-Loaded Kiosk + Local Demo Intents (2026-10-30)](#01516---phase-16-round-4-review-deployment-fixes-model-clock-follows-corellia_tz--voice-needs-https-or-localhost-indicator-kiosk-flag-topologies--kiosk-owns-tty1--releasesh-and---release-install--refusal-said-separately-and-out-of-history--prompt-caching-with-a-stable-prefix--dockerignore--watchdog-restarts-a-never-loaded-kiosk--local-demo-intents-2026-10-30)
+- [0.15.15 - Phase 15: Round-3 Review, Remaining Items: Reminder Lead-In + Minute Wording + No Empty Key Cap + SSE Replay from the Snapshot + Cancelled Replies out of History + finish_reason length = Cut Off + Local Demo Intents and Times + packageManager Pin (2026-10-29)](#01515---phase-15-round-3-review-remaining-items-reminder-lead-in--minute-wording--no-empty-key-cap--sse-replay-from-the-snapshot--cancelled-replies-out-of-history--finishreason-length--cut-off--local-demo-intents-and-times--packagemanager-pin-2026-10-29)
+- [0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)](#01514---phase-14-round-3-review-fixes-footer-aware-layout-no-transcript-over-visuals--plain-words-error-line--max_tokens--cut-off-cap-64000-corellia_max_tokens--failures-classified-by-http-status--osm-attribution-referer-and-block-detection--held-speech-until-a-gesture--owner-checklist-corrections-2026-10-29)
+- [0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)](#01513---phase-13-beta-readiness-session_error-event-no-false-offline-banner--mic-open-race--speech-abortdeadline--failures-in-plain-words--truncated-stream--error--ci-pinned-go-jsonschema-ubuntu-2404--overlay-stacking--owner-checklist-2026-10-29)
+- [0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)](#01512---phase-12-anthropic-contract-goldens--live-check-runtime-check--streamed-speech-per-sentence--precompiled-validators-no-unsafe-eval--proposal-stack-digit-grace-period-keyboard-scroll-barge-in-setting-ptt-flush-2026-10-29)
+- [0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)](#01511---phase-11-review-fixes-stable-store-selectors--browser-smoke-test-playwright--enterproposal-fix--dev-mode-request-guards-and-csp--visible-failures--reconnecttoken-prompt--ci-2026-10-29)
+- [0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)](#01510---phase-10-display-box-provisioning-kiosk-watchdog-systemd--heartbeat-request-logging-dockerfile--client-error-boundary-offline-banner-soak--docs-rewrite-2026-10-29)
+- [0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)](#0159---phase-9-file-store--memoryremindertranscript-persistence--memory-summary-in-prompts--proactive-scheduler-reminders-ambient-clock-with-hold-policy-2026-10-29)
+- [0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)](#0158---phase-8-voice-stttts-seams--openai-audio-provider--endpoints-client-vad-capture-browser-recognition-fallback-speech-playback-with-audio-level-activation-keys-barge-in-mic-indicator-2026-10-29)
+- [0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)](#0157---phase-7-cloud-runtimes-anthropic-streaming--tool-use-openai-compatibledeepseek-hermes-sidecar-deepseek-harness-stub--runtime-selector--runtime-spike-2026-10-29)
+- [0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)](#0156---phase-6-decision-layer-rules--proposeconfirm-gate--tool-registry-with-built-ins-time-geocode-weather-memory-reminders-directions-show_ui--confirm-cards-and-phrases-2026-10-29)
+- [0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)](#0155---phase-5-3d-agent-r3f-nebula-state-machine-audio-hook-adaptive-resolution-fallback-stats-overlay-2026-10-29)
+- [0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)](#0154---phase-4-component-library-15-components--renderer-bindings-hotkeys-decay-placement--catalog-describerank--action-and-screen-endpoints-2026-10-29)
+- [0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)](#0153---phase-3-agentruntime-seam--local-runtime--session-with-sse-event-stream--client-session-store-2026-10-29)
+- [0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)](#0152---phase-2-shared-contract-json-schemas--v1-catalog--gots-codegen--validators--reducers-with-shared-fixtures-2026-10-29)
+- [0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)](#0151---phase-1-legacy-control-plane-removed--go-backend-skeleton-device-token-static-client--vite-client-skeleton-2026-10-29)
+- [0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)](#0150---vision-roadmap-ten-phase-implementation-plan--section-11-defaults-2026-10-29)
 - [0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)](#0141---vision-default-client-approach-web-client-browser-on-macos-kiosk-or-shell-on-the-box-2026-10-29)
 - [0.14.0 — Direction Reset: Personal Agent Workspace Vision + Docs Archive Cleanup (2026-10-28)](#0140--direction-reset-personal-agent-workspace-vision--docs-archive-cleanup-2026-10-28)
 - [0.13.12 — Presentation Deck Restructure (4 Problem Slides + Tangle/Thesis Redesign) + Tools Inventory Grid + Carousel Icon Buttons + Layout Overflow Fixes](#01312--presentation-deck-restructure-4-problem-slides--tanglethesis-redesign--tools-inventory-grid--carousel-icon-buttons--layout-overflow-fixes-2026-04-27)
@@ -81,6 +99,393 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.17 - Phase 17: Round-5 Review: One Voice for Mac and Box (Speaker Policy, Ctrl+Shift+M, ?quiet=) + Per-Client Heartbeat for the Watchdog + Dev Mode Refuses Proxied Requests + Loud Store (Boot Probe, /healthz, Banner) and Docker /data Ownership + Stable History Cache Prefix (CORELLIA_CACHE_TTL) + Cards in a Gutter beside Full Visuals + box/release Ignored (2026-10-30)
+
+Roadmap Phase 17: every non-blocking finding of the fifth independent review ([`executing/review-2026-10-30-round5.md`](executing/review-2026-10-30-round5.md), against `681651a`: "alpha-ready to deploy today; beta-ready in everything that can be checked without the owner"). Full notes: [`completions/phase-17-round-5-mac-and-box.md`](completions/phase-17-round-5-mac-and-box.md). Every item has a test; two were also verified live against the built binary. No code blocker is known for a deployable beta; what remains is the owner's three runs (live model, Mac audio, first box provisioning) in [`executing/owner-checklist.md`](executing/owner-checklist.md) and [`../box/README.md`](../box/README.md).
+
+### Added
+
+- **Speaker policy** (`client/src/voice/speaker.ts`): the kiosk always speaks; a browser is silent while a kiosk is connected to the same backend ("sound on the display" in the mic indicator); **`Ctrl+Shift+M`**, **`?quiet=1`** and **`?quiet=0`** override, remembered per browser. `VoiceStatus.speaker`, `VoiceController.setSpeaker`.
+- **Tagged heartbeats**: `POST /api/heartbeat` takes `{"client":"kiosk"|"browser"}` and answers with `kiosk_heartbeat_age_s` and `store_ok`; `/healthz` adds **`kiosk_heartbeat_age_s`**, `store_ok` and `store_error`, and `ok` is false while the store cannot write.
+- **Dev-mode proxy guard**: a request carrying `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `X-Forwarded-Host`/`-Proto`, `Via` or a `Tailscale-*` header is refused with 403 "dev mode: requests through a proxy need CORELLIA_DEVICE_TOKEN" (logged once); `CORELLIA_TRUSTED_PROXIES` peers are exempt.
+- **Store health**: `store.New` proves the data directory writable (the server exits with the fix in the message otherwise); `Store.Err`/`Healthy` track later write failures; the session publishes a `session_error` code **`persist`**; the client shows a persistent **"can't save"** banner (`StoreBanner`) until the store writes again.
+- **`session.Options.HistoryStep`** (default 10): the history window drops ten entries at a time so the cached prefix is identical across turns.
+- **`CORELLIA_CACHE_TTL`** (`5m` default, `1h`): the system breakpoint's cache lifetime for the anthropic runtime (`anthropic.Options.CacheTTL`).
+- **Overlay gutter**: floating cards render in their own layer; beside a full visual they share a right-hand column and the visual ends before it (`overlayAnchor`, `needsGutter`, `Renderer layer`); beside a panel they move to the agent's side.
+- **`.gitignore`**: `box/release/`.
+
+### Fixed
+
+- **Two voices with the Mac and the box on one backend**: every client spoke every reply (review round 5, Mac-and-box group). Now one does.
+- **A Mac tab's heartbeat hid a hung kiosk from the watchdog**: the watchdog reads the kiosk's own age; the kiosk script keeps `kiosk=1` in the URL whatever `CORELLIA_KIOSK_QUERY` says.
+- **Dev mode behind a same-host proxy was open to everyone the proxy served** (`tailscale serve` connects from loopback): refused with the fix named.
+- **The Docker image could not write `/data` and reported itself healthy** while every note, reminder and transcript line was lost: `/data` is created and owned by the app user before `VOLUME`; an unwritable data dir stops the server at boot; later failures are visible on `/healthz`, on the page and on the stream.
+- **The history cache stopped hitting after about ten exchanges**: the window slid by one pair per turn once the transcript passed 20 entries; it now moves once per ten entries.
+- **Glance cards covered a chart's data** after "show me a chart" then a reminder: cards go to the gutter beside a full visual, and the smoke test asserts it at three viewports.
+- **`box/release/` was one `git add -A` from a commit.**
+
+### Edited
+
+- `README.md` (dev mode, HTTPS line, "Two displays on one backend", writable data dir), `box/README.md` (fourth topology row, `tailscale serve` and dev mode, watchdog field, gitignored release), `docs/stack.md` (health and heartbeat fields, guard order, `CORELLIA_CACHE_TTL`, Docker `/data`), `.env.example`, `backend/Dockerfile` (comment), `docs/executing/owner-checklist.md` (cache usage to read during A; the one-voice check), the roadmap (status, Phase 17, versioning, progress).
+
+## 0.15.16 - Phase 16: Round-4 Review, Deployment Fixes: Model Clock Follows CORELLIA_TZ + Voice Needs HTTPS or localhost (Indicator, Kiosk Flag, Topologies) + Kiosk Owns tty1 + release.sh and --release Install + Refusal Said Separately and out of History + Prompt Caching with a Stable Prefix + .dockerignore + Watchdog Restarts a Never-Loaded Kiosk + Local Demo Intents (2026-10-30)
+
+Roadmap Phase 16: the three fixable blockers and the non-blocking items of the fourth independent review ([`executing/review-2026-10-30-round4.md`](executing/review-2026-10-30-round4.md), against `6477d0f`: "a beta on the Mac; not yet a deployable beta"). Full notes: [`completions/phase-16-round-4-deployment-fixes.md`](completions/phase-16-round-4-deployment-fixes.md). Every item has a test, the box scripts included (`box/test.sh`, now in `pnpm check` and CI). The owner's two runs in [`executing/owner-checklist.md`](executing/owner-checklist.md) and the first box provisioning remain.
+
+### Added
+
+- **`session.Options.Location`**: the zone the session's clock reads in; `cmd/api` and `cmd/runtime-spike` pass `CORELLIA_TZ`.
+- **`runtime.ErrRefused`**: a reply the provider's safety layer declined (`stop_reason: refusal`), a sentinel like `ErrTruncated`.
+- **`prompt.TurnContext`** (screen state and clock) and **`prompt.Full`** (`System` + `TurnContext`); `prompt.System` is the stable, cacheable part.
+- **`VoiceDeps.secureContext`** and **`INSECURE_CONTEXT_ERROR`** ("voice needs HTTPS or localhost; this page is plain HTTP at a network address") in the client.
+- **`box/release.sh`**: builds the Linux amd64 binary and the client on the development machine; **`provision.sh --release <dir>`** installs them into `/opt/corellia`.
+- **`box/test.sh`**: the kiosk's Chromium flags per backend URL and the watchdog's restart decisions against a fake `/healthz`, without a box; `pnpm check`, `pnpm test:box` and a CI `box` job run it.
+- **`.dockerignore`** at the repository root: `.env` files, `backend/data`, `node_modules`, `client/dist` and the rest stay out of the Docker build context.
+- **`CORELLIA_WATCHDOG_MAX_NOCLIENT`** (default 10 checks): the watchdog restarts a kiosk that never posted a heartbeat.
+- **`CORELLIA_KIOSK_PRINT=1`**: `corellia-kiosk.sh` prints the Chromium command instead of running it.
+
+### Fixed
+
+- **The model was told the wrong time under `CORELLIA_TZ`** (review blocker 3): the prompt printed the process zone while `get_time`, the clock card and the scheduler used the configured one. The session's clock now follows `CORELLIA_TZ`.
+- **Voice was dead, with a generic error, when the display reached the backend over plain HTTP at a network address** (blocker 4): the mic indicator now says voice needs HTTPS or localhost; the kiosk marks its one `http://` LAN origin as secure for Chromium (`--unsafely-treat-insecure-origin-as-secure`); `box/README.md`, README and the Dockerfile explain the three topologies and recommend the box's own backend or `tailscale serve`.
+- **The getty and the kiosk both claimed tty1, and nothing installed the binary** (blocker 5): the kiosk unit has `Conflicts=getty@tty1.service`, `After=… corellia-api.service` and `-keeptty`; `provision.sh` removes the old auto-login override, writes `Xwrapper.config`, installs a release, creates `api.env` as `0600` and warns when the binary or client is missing.
+- **A refusal was glued onto the partial reply and kept in history** ("Sure, the first step is toI can't help with that one."): the fragment ends in "…", the decline is its own piece, the entry is skipped by `historyLocked`, and no error card is shown.
+- **Prompt caching never hit across turns**: the clock and the screen summary sat in the only cached block. They now travel in the current user message; the system block and the last history message carry breakpoints, and a third moves along the request's last message for tool rounds.
+- **The watchdog never restarted a kiosk stuck on Chromium's error page** (`client_heartbeat_age_s: -1` forever).
+- **Local demo:** "what's the weather today" showed the schedule; "weather in Lisbon tomorrow" gave current conditions without saying so; "directions to the airport" announced Lisbon; "hey" fired inside "they" and "hi" inside "sushi".
+- **Doc drift:** `docs/stack.md` said `Referrer-Policy: no-referrer`; it is `strict-origin-when-cross-origin` since Phase 14.
+
+### Edited
+
+- Request goldens (`backend/internal/runtime/anthropic/testdata/golden/`) regenerated for the new layout; `.env.example` (`CORELLIA_TZ`), `README.md` (secure context, box section, `pnpm check`), `box/README.md` (rewritten around the topologies), `docs/executing/owner-checklist.md` (B1: open `http://localhost:8080`), the roadmap (status, Phase 16, versioning, progress).
+
+---
+
+## 0.15.15 - Phase 15: Round-3 Review, Remaining Items: Reminder Lead-In + Minute Wording + No Empty Key Cap + SSE Replay from the Snapshot + Cancelled Replies out of History + finish_reason length = Cut Off + Local Demo Intents and Times + packageManager Pin (2026-10-29)
+
+Roadmap Phase 15: the small non-blocking items of the third independent review ([`executing/review-2026-10-30-round3.md`](executing/review-2026-10-30-round3.md)) that Phase 14 left, the Phase 13 follow-up on cancelled replies, and two cheap Phase 14 gaps. Full notes: [`completions/phase-15-round-3-remaining-items.md`](completions/phase-15-round-3-remaining-items.md). With this phase every roadmap phase and every review item that needs no key or microphone is done; the owner's two runs in [`executing/owner-checklist.md`](executing/owner-checklist.md) remain.
+
+### Added
+
+- **`TranscriptEntry.cancelled`** (contract, `events.schema.json`; Go and TS regenerated): the partial reply of a cancelled turn, kept on screen ending in "…" and left out of the history the model sees.
+- **`decision.ReminderLeadIn`** ("Reminder: "): what a fired reminder's speech starts with.
+- **`builtin.Duration`**: minutes in words ("1 minute", "1 hour 30 minutes", "2 hours") for the reminder proposal label.
+- **`packageManager: pnpm@12.16.1`** in `package.json`, for corepack and pnpm's own version management (pnpm records it in `pnpm-lock.yaml`; CI's `pnpm/action-setup` steps now take the version from the field instead of a `version: 12` input).
+- The smoke test's overlap measurement runs at 3840×2160 as well (eight smoke tests).
+
+### Fixed
+
+- **A reminder spoke its bare text** ("stretch"): it says "Reminder: stretch", the same words as its transcript entry.
+- **"Set a reminder in 1 minutes."**
+- **Lower proposals drew an empty key cap** next to "Do it" (confirm actions below the top card get no digit by design): the label stands alone.
+- **Every SSE connection replayed the whole bus buffer** (up to 1000 events) on a reload, which the client then dropped by seq: the handler takes the snapshot first and subscribes from its seq.
+- **A cancelled turn's partial reply went into the model's history** (Phase 13 follow-up): marked and skipped, like the apology of a failed turn.
+- **`finish_reason: length` on the OpenAI-compatible runtime passed as a completed turn**: it is `runtime.ErrTruncated` (a Phase 14 known gap); a tool call cut with it never runs.
+- **Local demo:** "show me a table" and "show me a chart" showed Lisbon on the map; "remind me in 5 minutes" and "remind me at 9" both proposed 17:00; the reminder's text was the whole phrase. Specific intents come before the map; "in N minutes/hours", "in an hour and 15 minutes", "at 9", "at 9:30pm" are parsed; the text is the subject after "to", minus the time.
+
+### Edited
+
+- `docs/stack.md` (SSE row), `README.md` (pnpm pin), the owner checklist (step A3: how to read first-speech numbers on tool turns, since Opus 5.5 returns text between tool calls as thinking blocks), the roadmap (status, Phase 15, progress), the Phase 14 note (follow-ups).
+
+---
+
+## 0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)
+
+Roadmap Phase 14: the three blocking defects of the third independent review ([`executing/review-2026-10-30-round3.md`](executing/review-2026-10-30-round3.md), against `1368df5`, verdict "alpha, at the beta threshold") and its non-blocking items that need no key or microphone. Full notes: [`completions/phase-14-round-3-review-fixes.md`](completions/phase-14-round-3-review-fixes.md). The owner-only runs stay in [`executing/owner-checklist.md`](executing/owner-checklist.md).
+
+### Added
+
+- **`runtime.StatusError`** and **`runtime.ErrTruncated`** on the AgentRuntime seam: the provider's HTTP status travels as a value (Anthropic and OpenAI-compatible runtimes), and a reply stopped at the output-token cap is a typed failure.
+- **`CORELLIA_MAX_TOKENS`** (config, `.env.example`): the per-response cap for the Anthropic runtime; default `anthropic.DefaultMaxTokens` = 64000 (was 4096; thinking counts toward it on Opus 5.5).
+- **`--footer-h`**: the display publishes the footer's measured extent (`ResizeObserver`) and the Stage ends its panel and full zones above it. Two smoke-test steps measure zone against footer and transcript at 1440×790 and 1920×1080.
+- **`components/mapTiles.ts`**: tile coordinates, the OSM attribution string, and `probeTile`, which reads one tile back after load and recognises OSM's "access blocked" image (HTTP 200 with `Cache-Control: no-cache` and a fixed SHA-256).
+- **`SpeechBlockedError`** and held speech: a backend the browser refuses before a gesture (speechSynthesis `not-allowed`, a suspended `AudioContext`) hands its pieces back; the player holds them, `VoiceStatus.sound` becomes `blocked`, the mic indicator says "press any key for sound", and the first key press or click (`pointerdown` is now a gesture too) plays them.
+- `app/errorWords.ts` (`plainWords`): what the error line says for the client's own failures.
+
+### Fixed
+
+- **The transcript drew over every full-screen visual** (111-180 px at the three viewports the review measured): the zones were sized from a fixed `bottom-36`, not from the transcript. While a panel or full visual is up the transcript also keeps only two entries.
+- **The error line showed raw provider errors (URL and JSON body) for 12 s in every mode, and flagged routine `show_ui` rejections after turns that worked.** Outside `?debug=1` it now shows only client-side failures in plain words; a failed turn is its apology and status card. With `?debug=1` every error shows raw (the smoke test asserts both).
+- **A reply cut by `max_tokens` passed as complete, and a `show_ui` call cut the same way was dropped silently.** The Anthropic runtime returns `ErrTruncated`: the partial is spoken with "…", then "My reply was cut off before it finished"; the cut tool call never runs; the fragment is not fed back as history.
+- **`describeFailure` matched substrings anywhere in the raw error**: a request id `req_011CXyz4019` made every failure "rejected my credentials". Classification is by status first; substrings only for errors without one, and bare numbers no longer count.
+- **A dropped stream's half sentence was spoken glued to the apology** ("…is that the Sorry, that didn't work"): the fragment is its own piece ending in "…".
+- **OSM tiles without a Referer and without attribution**: the page's `Referrer-Policy` is `strict-origin-when-cross-origin`; the Map shows attribution; a blocked tile server falls back to the card with the reason instead of drawing the block notice as the map.
+- **Speech silent after a reload until the first key press** (a reminder that fired before any key showed its card and said nothing): held and played on the first gesture, with a hint meanwhile.
+- `cmd/runtime-check`'s no-key diagnosis suggested `ant auth status`, which cannot apply since the SDK's environment defaults are off; owner checklist step A4 said the header shows the model name (it shows the runtime name, `anthropic`).
+
+### Edited
+
+- `README.md` and the owner checklist say that keyless voice sends microphone audio to Google (Chrome's recognition service); the checklist also covers the sound hint and `CORELLIA_MAX_TOKENS`. Roadmap (status, Phase 14, progress). The round-3 review file is committed.
+- `backend/internal/runtime/anthropic/testdata/golden/request-*.json`: `max_tokens` 64000.
+
+---
+
+## 0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)
+
+Roadmap Phase 13: the blocking gaps of the second independent review ([`executing/review-2026-10-30.md`](executing/review-2026-10-30.md), verdict alpha) that need no API key or microphone, plus its cheap non-blocking items. Full notes: [`completions/phase-13-beta-readiness.md`](completions/phase-13-beta-readiness.md). The two owner-only items are one checklist: [`executing/owner-checklist.md`](executing/owner-checklist.md).
+
+### Added
+
+- **`session_error` event** (contract): the failure/rejected-op event, renamed from `error` because an SSE event of that name reaches `EventSource.onerror` and read as a lost connection, on the failed turn and on every reload after it. `TranscriptEntry.failed` marks the apology of a failed turn.
+- **Local runtime failure intent** ("simulate a failure", "fail on purpose") and a fifth smoke-test step that drives it: apology in plain words, error line, status card, header still online before and after a reload.
+- **`session.describeFailure`**: the short spoken reason for a failed turn (credentials, model, rate limit, overloaded, internal error, dropped connection, timeout, unreachable); the raw error stays in the event and the log.
+- **`docs/executing/owner-checklist.md`**: the live model run and the Mac microphone run, with pass criteria and what to record.
+- `ANTHROPIC_BASE_URL` as a config field; `forbidden` connection status; `ErrorBoundary.fallback`; `VoiceController.refreshCapabilities`; `overlayGroups`/`OverlayStack`; `PlayBackend.speak(text, signal)` with a per-piece deadline.
+
+### Fixed
+
+- **False "connection lost" banner** after any failed turn (and the `e.data.slice` page error on a real network error).
+- **Mic-open race**: a close while `getUserMedia` is pending wins and releases the stream; push-to-talk releases on blur; a fatal recognition error turns the indicator off.
+- **Speech queue**: a piece stopped during its TTS fetch no longer plays late over the next one (and no longer leaks its level meter); a piece whose end never comes is skipped at its deadline; Escape silences playback before anything else; the browser backend holds its utterance.
+- **Raw provider errors** were spoken and shown with URL and JSON body, and fed back to the model as its own words; **a stream dropped mid-reply** counted as a completed turn (Anthropic runtime: no stop reason is now an error).
+- **CI**: the contract job ran a different go-jsonschema than the committed types (now `go run ...@v0.24.1`); the smoke job ran on an image without a Playwright Chromium (now `ubuntu-24.04`).
+- **Overlay collisions**: overlays sharing an anchor stack in one column; the top anchors clear the top bar; the offline banner sits in the top bar; the error line is its own footer row.
+- Enter auto-repeat confirmed a proposal; digits reached "Do it" on lower proposals; voice capabilities were fetched once; no error boundary around the 3D agent; a `network` recognition error was fatal and barge-in worked only for the first utterance; the renderer updated the store during render; `pendingSpeech` not reset; the token prompt on a 403; snapshot and seq read in two calls; the Anthropic SDK read `ANTHROPIC_*` from the environment; `open_directions` asked for confirmation; the Vite dev origin allowed in token mode; `transcript.jsonl` 0644.
+
+### Edited
+
+- `README.md`, `.env.example`, roadmap (status, Phase 13, progress), the review file committed.
+
+---
+
+## 0.15.12 - Phase 12: Anthropic Contract Goldens + Live Check (runtime-check) + Streamed Speech per Sentence + Precompiled Validators (No unsafe-eval) + Proposal Stack, Digit Grace Period, Keyboard Scroll, Barge-In Setting, PTT Flush (2026-10-29)
+
+Roadmap Phase 12: the follow-ups Phase 11 left open plus the review's remaining non-blocking items. Full notes: [`completions/phase-12-cloud-runtime-speech-csp.md`](completions/phase-12-cloud-runtime-speech-csp.md).
+
+### Added
+
+- **Anthropic runtime contract test**: recorded Messages API streams (`runtime/anthropic/testdata/recorded/`) replayed from an `httptest` server; every request the runtime sends is compared with committed goldens (`testdata/golden/`, `go test ./internal/runtime/anthropic -update`). Found and recorded: the SDK sends the key as `Authorization: Bearer`.
+- **`cmd/runtime-check`** + **`scripts/anthropic-live-check.sh`**: a live plain turn, tool turn with `show_ui` and cancel against the configured runtime, with a pass/fail table and a diagnosis naming the setting to change; the script then runs the VISION 7 spike. `TestLiveAnthropic` (`CORELLIA_LIVE=1`) is the in-test twin.
+- **Streamed speech**: `decision.SentenceStream` and the `decision.Streamer` seam; the session publishes each completed sentence as a `speech` event during the turn and the remainder at `turn_done`; the spike reports time to first speech.
+- **Precompiled validators**: `scripts/gen-validators.mjs` (Ajv standalone) → `client/src/contract/gen/validators.js`, run by `pnpm contracts:generate` and drift-tested; `client/src/contract/validatorRuntime.ts` holds the two runtime helpers. Ajv is no longer in the bundle.
+- `CORELLIA_VOICE_BARGE_IN=auto|off` (reported as `barge_in` in `/api/voice/capabilities`); `Outcome.Handled: held`.
+
+### Changed
+
+- CSP `script-src` is `'self'` (no `'unsafe-eval'`); the smoke test runs under it.
+- Pending proposals render as one stacked overlay (newest on top, only the top card bound to Enter/Escape); `risk: high` proposals ignore spoken confirmation phrases and ask for a key press.
+- A lone digit hotkey fires after a 350 ms grace period and a digit followed by typing starts a message; the UI zone scrolls by keyboard (arrows, PageUp/PageDown) instead of clipping.
+- Push-to-talk delivers the utterance in flight at key-up; `decision.Sentences` shares the stream's splitting rule (short pieces wait for the next sentence; minimum 8 characters).
+
+### Removed
+
+- Dead `confirmProposal`/`rejectProposal` client API functions.
+
+### Edited
+
+- `README.md`, `CLAUDE.md`, `docs/stack.md`, `.env.example`, roadmap (Phase 12 and progress).
+
+---
+
+## 0.15.11 - Phase 11: Review Fixes: Stable Store Selectors + Browser Smoke Test (Playwright) + Enter/Proposal Fix + Dev-Mode Request Guards and CSP + Visible Failures + Reconnect/Token Prompt + CI (2026-10-29)
+
+Roadmap Phase 11, added after the independent review ([`executing/review-2026-10-29.md`](executing/review-2026-10-29.md)) found the build not usable. Full notes: [`completions/phase-11-review-fixes.md`](completions/phase-11-review-fixes.md).
+
+### Fixed
+
+- **Blank display**: `useSessionState` returns a stable snapshot (cached, shallow-compared selector); `App` is mounted in a test with a fake `EventSource` and `fetch`.
+- **Enter sent a message and confirmed the pending proposal**: the input marks the submitting Enter as handled and the global key handler ignores handled events; vitest and browser regression tests.
+- **Dev-mode bypass**: `RealIP` dropped unless `CORELLIA_TRUSTED_PROXIES` names the peer; `CORELLIA_BIND` (loopback by default in dev mode); dev-mode Host guard; Origin guard (403 for foreign origins); JSON-only POSTs; CSP and security headers.
+- **Silent failures**: failed turns end with an apology in the transcript and speech plus an error card; the client shows the latest error outside `?debug=1`; `CORELLIA_ANTHROPIC_FALLBACKS` escape hatch.
+- **Replay re-spoke old replies** on reload: only unseen events reach the voice controller.
+- **Fresh snapshot dropped** (`transcript: null`) and **Confirm card removed by the next turn's `clear`**: both found by the new smoke test.
+- Image host allowlist (`CORELLIA_IMAGE_HOSTS`); keyed component rendering (no Map WebGL leak); tile failures no longer kill a map; error boundary resets on spec change; decay timers survive reconnects; UTF-8-safe truncation; blank turns rejected; Confirm leaves the state alone during a turn; `auto` no longer switches to OpenAI on `OPENAI_API_KEY` alone; `CORELLIA_TZ`; typing stops playback without cancelling; scene stays `speaking` during playback; Cmd no longer toggles the mic; recognition stops after fatal errors; audio primed on first key press; voice survives StrictMode.
+
+### Added
+
+- **Browser smoke test**: `client/e2e/smoke.spec.ts` (Playwright 1.60, real Chromium against the Go server; fails on any console error), `pnpm e2e`, part of `pnpm check`; `scripts/chromium-libs.sh` makes it run on Linux without sudo.
+- **SSE reconnect with backoff**, `unauthorized` state, token prompt; `?token=` removed from the address bar.
+- `show_ui` reports rejected ops to the model (`Session.DryRunOps`); header names the runtime ("local demo"); speech outside a turn reaches the transcript.
+- `.github/workflows/check.yml`: client checks, `go vet`, `go test -race`, gofmt, contract drift, smoke test.
+
+### Edited
+
+- `README.md`, `CLAUDE.md`, `docs/stack.md`, `box/README.md`, `.env.example`, `backend/Dockerfile`, roadmap (Phase 11 and progress), catalog Image example (contracts regenerated).
+
+---
+
+## 0.15.10 - Phase 10: Display Box Provisioning (Kiosk, Watchdog, systemd) + Heartbeat, Request Logging, Dockerfile + Client Error Boundary, Offline Banner, Soak + Docs Rewrite (2026-10-29)
+
+Roadmap Phase 10, the last phase of the vision implementation. Full notes: [`completions/phase-10-display-box-hardening-docs.md`](completions/phase-10-display-box-hardening-docs.md).
+
+### Added
+
+- **`box/`**: `provision.sh`, Chromium kiosk script and X session, `corellia-kiosk.service`, heartbeat watchdog script/service/timer, `corellia-api.service`, README with the 30 fps and audio test procedures (untested on hardware).
+- **Backend**: `POST /api/heartbeat` and `client_heartbeat_age_s` on `/healthz`; structured request logging; `backend/Dockerfile` (client + backend in one image).
+- **Client**: heartbeat every 30 s, offline banner, error boundary around the generated UI, `?soak=1` scripted-turn driver. 4 tests.
+
+### Edited
+
+- `README.md`, `CLAUDE.md`, `docs/stack.md`, `docs/README.md`, `docs/blueprints/toolchain-overview.md`, `docs/blueprints/codegen-cheatsheet.md` rewritten for the new system. Roadmap progress table complete.
+
+---
+
+## 0.15.9 - Phase 9: File Store + Memory/Reminder/Transcript Persistence + Memory Summary in Prompts + Proactive Scheduler (Reminders, Ambient Clock) with Hold Policy (2026-10-29)
+
+Roadmap Phase 9. Full notes: [`completions/phase-09-memory-persistence-proactivity.md`](completions/phase-09-memory-persistence-proactivity.md).
+
+### Added
+
+- **`internal/store`** (atomic JSON documents, JSONL logs), **`internal/memory`** (notes, reminders, transcript; `Summarise`), **`internal/proactive`** (scheduler: due reminders, ambient clock on the hour when idle).
+- **Session**: `Proactive`/`Idle` sink with decider-driven hold (turn running or speech playing) and release; proactive cards, speech and transcript entries; memory summary in the runtime context; transcript persistence and today-only replay. `GET /api/memory`.
+- `cmd/api` opens the store under `CORELLIA_DATA_DIR`, wires memory tools and the scheduler.
+
+---
+
+## 0.15.8 - Phase 8: Voice (STT/TTS Seams + OpenAI Audio Provider + Endpoints; Client VAD Capture, Browser Recognition Fallback, Speech Playback with Audio Level, Activation Keys, Barge-In, Mic Indicator) (2026-10-29)
+
+Roadmap Phase 8. Full notes: [`completions/phase-08-voice.md`](completions/phase-08-voice.md).
+
+### Added
+
+- **Backend** `internal/voice` (`STT`/`TTS` interfaces, `None`, `OpenAI` audio provider, `Select`), endpoints `GET /api/voice/capabilities`, `POST /api/voice/stt`, `POST /api/voice/tts`; config `CORELLIA_STT`, `CORELLIA_TTS`, `CORELLIA_TTS_VOICE`, `CORELLIA_VOICE_MODE`.
+- **Client** platform adapter (browser; shell stub), energy VAD, mic capture with utterance segmentation, browser `SpeechRecognition` fallback, speech player with server TTS (analyser → 3D audio level) and `speechSynthesis` backends, activation state machine (`Ctrl+Space` toggle / push-to-talk, `Ctrl+M` mute), `VoiceController` with barge-in on speech or typing, `MicIndicator`, `transcribe`/`synthesize` API calls. 13 new tests.
+
+### Edited
+
+- `App.tsx` mounts the voice controller and indicator; the agent shows `listening` while capturing. `.env.example` documents the voice variables.
+
+---
+
+## 0.15.7 - Phase 7: Cloud Runtimes (Anthropic Streaming + Tool Use, OpenAI-Compatible/DeepSeek, Hermes Sidecar, DeepSeek-Harness Stub) + Runtime Selector + Runtime Spike (2026-10-29)
+
+Roadmap Phase 7. Full notes: [`completions/phase-07-cloud-runtimes-and-spike.md`](completions/phase-07-cloud-runtimes-and-spike.md).
+
+### Added
+
+- **`runtime/anthropic`**: Claude via the Anthropic Go SDK (beta Messages API): streaming text, manual tool loop over the registry, `show_ui` → spec ops, effort (`CORELLIA_EFFORT`, default low), server-side refusal fallbacks on by default, model `claude-opus-5-5` by default.
+- **`runtime/openaicompat`**: streaming chat completions with function tools for any OpenAI-shaped endpoint (DeepSeek: `OPENAI_BASE_URL=https://api.deepseek.com/v1`).
+- **`runtime/hermes`**: sidecar `/chat` adapter with session priming and fenced ```corellia-ui``` ops. **`runtime/deepseek`**: `NotImplemented` stub for the OpenWorld harness.
+- **`runtime/prompt`** (shared system prompt) and **`runtime/toolexec`** (tool execution with proposal and op events). **`runtime/rtselect`** resolves `CORELLIA_RUNTIME` (`auto` by credentials). Config vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `CORELLIA_MODEL`, `CORELLIA_EFFORT`, `CORELLIA_HERMES_URL`, `CORELLIA_HERMES_TOKEN`.
+- **`cmd/runtime-spike`** runs the VISION 7 script and writes a report; `docs/executing/spikes/local-2026-10-29.md` committed.
+- Fixture-driven tests for all three wire formats; shared `rttest` doubles.
+
+### Edited
+
+- Session passes the catalog description and a screen summary to runtimes. `.env.example` documents the runtime variables.
+
+---
+
+## 0.15.6 - Phase 6: Decision Layer (Rules) + Propose/Confirm Gate + Tool Registry with Built-ins (Time, Geocode, Weather, Memory, Reminders, Directions, show_ui) + Confirm Cards and Phrases (2026-10-29)
+
+Roadmap Phase 6. Full notes: [`completions/phase-06-decision-actions-tools.md`](completions/phase-06-decision-actions-tools.md).
+
+### Added
+
+- **`internal/tools`** registry (schema-validated calls, gated tools return proposals, `Execute` for the gate) and **`tools/builtin`**: `get_time`, `geocode`, `get_weather` (Open-Meteo), `remember`/`recall`/`forget`, `set_reminder`, `open_directions` (OSRM, straight-line fallback), `show_ui`; in-memory stores until Phase 9. Tool results may carry spec ops.
+- **`internal/actions`** gate: propose, confirm (executes once), reject, expiry.
+- **`internal/decision`**: `Decider` seam, `Rules` default (modality, speech sentences, auto text card, proactive hold), `Sentences`.
+- **Session**: `Handle` with confirm/reject phrase detection, floating `Confirm` cards (`Enter`/`Esc`), confirm/reject/expire with status events, `tool` and `propose` action kinds with bound-arg resolution, decider-driven speech and reply cards, tool-result ops. Endpoints `POST /api/action/confirm` and `/reject`; `TurnResponse.handled`.
+- **Client**: floating overlays rendered beside the root with hotkeys; confirm/reject API calls.
+
+### Edited
+
+- Local runtime uses the registry for time, reminders (parses `HH:MM`) and weather. `cmd/api` wires tools, gate and decider. `REDUCER.md` documents floating overlays.
+
+---
+
+## 0.15.5 - Phase 5: 3D Agent (R3F Nebula, State Machine, Audio Hook, Adaptive Resolution, Fallback, Stats Overlay) (2026-10-29)
+
+Roadmap Phase 5. Full notes: [`completions/phase-05-3d-agent.md`](completions/phase-05-3d-agent.md).
+
+### Added
+
+- **`client/src/agent3d/`**: per-state palettes; `AgentStateMachine` easing shape, motion and colour between idle/listening/thinking/speaking/error with audio modulation while speaking; `AdaptiveResolution` (frame-time EMA → render scale with hysteresis and cooldown); `audioLevel` hook for the Phase 8 analyser; render stats; `Nebula` (lazy R3F scene, two additive point layers, 12 000 + 1 200 particles by default, uniforms from the machine every frame, DPR from the controller); `Agent3D` (WebGL2 + reduced-motion probe, SVG fallback, Suspense) and `StatsOverlay` (`?stats=1`); `?particles=N`.
+- `uBrightness` uniform in the salvaged nebula fragment shaders.
+
+### Edited
+
+- `App.tsx` mounts the 3D agent in the Stage; the Stage's full-visual agent zone is larger.
+
+---
+
+## 0.15.4 - Phase 4: Component Library (15 Components) + Renderer (Bindings, Hotkeys, Decay, Placement) + Catalog Describe/Rank + Action and Screen Endpoints (2026-10-29)
+
+Roadmap Phase 4. Full notes: [`completions/phase-04-component-library-and-renderer.md`](completions/phase-04-component-library-and-renderer.md).
+
+### Added
+
+- **Client components** for every catalog entry (layout: Stack, Grid, Split, Overlay; content: Card, Markdown, Stat, List, Table, Chart, Timeline, Image, Map; Confirm; Status), a safe Markdown subset parser, SVG chart geometry, MapLibre GL map over OSM raster tiles (lazy chunk, static fallback), and a registry whose test asserts parity with the catalog.
+- **Renderer**: binding resolution with catalog defaults and per-node validation, slot mounting, depth cap, hotkey assignment (explicit keys kept, digits 1–9 assigned), `Stage` placement (glance / panel / full) around the agent, decay via `ttl_ms`, global keys (`Esc` cancel → escape action → clear; `Enter`; digits) that stay inert while typing.
+- **Backend** `internal/catalog` (`Describe`, `Rank`, `Classify`), session `FireAction`/`ClearScreen`/`RemoveNode`, endpoints `POST /api/action`, `POST /api/screen/clear`, `POST /api/screen/remove`.
+- `?gallery=1` component gallery. Store `touched` map and `applyLocal`.
+
+### Edited
+
+- `App.tsx` mounts the Stage; `CommandInput` reports its value; Vite chunk warning limit raised for the lazy MapLibre chunk.
+
+---
+
+## 0.15.3 - Phase 3: AgentRuntime Seam + Local Runtime + Session with SSE Event Stream + Client Session Store (2026-10-29)
+
+Roadmap Phase 3. Full notes: [`completions/phase-03-session-events-local-runtime.md`](completions/phase-03-session-events-local-runtime.md).
+
+### Added
+
+- **`backend/internal/runtime`**: the `AgentRuntime` interface and event/tool types (the only seam to any model or harness). **`runtime/local`**: keyless scripted runtime (time with tool call, map of a city, table, chart, schedule, weather, reminder proposal, clear) emitting streamed text and valid spec ops.
+- **`backend/internal/session`**: event bus (seq numbers, replay, fan-out, on-contract validation) and the session (transcript, spec, agent state, proposals, one active turn with cancel-on-new-input, validated op application, `speech` and `turn_done` events).
+- **HTTP API**: `GET /api/session`, `POST /api/turn`, `POST /api/turn/cancel`, `GET /api/catalog`, `GET /api/events` (SSE with snapshot, replay via `Last-Event-ID`, heartbeats). `CORELLIA_RUNTIME` config var.
+- **Client**: device-token auth helpers, turn API, session store with the shared reducer, `EventSource` stream with per-event contract validation, transcript pane, agent-state header, `Esc` cancel, `?debug=1` pane.
+
+### Edited
+
+- `cmd/api/main.go` wires contract, runtime, session and handlers. `httpsrv.Deps` gains `Session` and `Events`.
+
+---
+
+## 0.15.2 - Phase 2: Shared Contract (JSON Schemas + v1 Catalog + Go/TS Codegen + Validators + Reducers with Shared Fixtures) (2026-10-29)
+
+Roadmap Phase 2. Full notes: [`completions/phase-02-shared-contract.md`](completions/phase-02-shared-contract.md).
+
+### Added
+
+- **`shared/schema/`**: `ui-spec`, `ops`, `events`, `api`, `catalog` JSON Schemas (draft 2020-12); `REDUCER.md` (normative reducer and validation semantics, error codes); `fixtures/` (reducer goldens, valid, invalid, reducer-errors, invalid-spec; 41 cases).
+- **`shared/catalog/catalog.json`**: v1 catalog, 15 components (Stack, Grid, Split, Overlay, Card, Markdown, Stat, List, Table, Chart, Timeline, Image, Map, Confirm, Status) with props schemas, bindable props, slots, actions, fit hints, tags, examples.
+- **Codegen**: `scripts/contracts-generate.sh` + `scripts/gen-ts-types.mjs` (`pnpm contracts:generate`); generated `backend/internal/contract/gen/*.go`, embedded copies `backend/internal/contract/embed/*.json`, `client/src/contract/gen/*.ts`; drift tests in both languages.
+- **Backend** `internal/contract` (compiled validators, catalog, bound-prop rule, op decoding) and `internal/uispec` (binding paths, reducer, catalog-aware op and whole-spec validation).
+- **Client** `src/contract/` (Ajv validators, paths, pure reducer, op and whole-spec checks) with the shared-fixture test.
+
+### Edited
+
+- `backend/go.mod` (+ santhosh-tekuri/jsonschema v6), `client/package.json` (+ ajv, ajv-formats, json-schema-to-typescript), root `package.json` (`contracts:generate`).
+
+---
+
+## 0.15.1 - Phase 1: Legacy Control Plane Removed + Go Backend Skeleton (Device Token, Static Client) + Vite Client Skeleton (2026-10-29)
+
+Roadmap Phase 1. Full notes: [`completions/phase-01-restructure-and-skeletons.md`](completions/phase-01-restructure-and-skeletons.md).
+
+### Removed
+
+- The v1 control plane: `frontend/` (Next.js), all of `backend/internal/` (agents, adapters, Supabase auth, sqlc db, Fly deploy, generated Connect code, tools governance, orgs, users), migrations, queries, `shared/proto/`, Fly config, Dockerfile, smoke-deploy command, video capture script. `adapters/hermes/` stays. Go dependencies pruned to env, chi and godotenv.
+
+### Added
+
+- **Backend**: `internal/config` (new var set: `PORT`, `CORELLIA_DEVICE_TOKEN`, `CORELLIA_CLIENT_DIR`, `CORELLIA_DATA_DIR`, `CORELLIA_AGENT_NAME`, `CORELLIA_DEV_ORIGINS`; `Load` returns errors, `Validate`, `DevMode`), `internal/auth` (device-token middleware; dev mode = loopback only), `internal/httpsrv` (`/healthz`, `/api/config`, CORS for dev origins, static client with SPA fallback and immutable asset caching, 503 hint when not built), `cmd/api` (graceful shutdown, build info ldflags). 10 tests.
+- **Client** (`client/`): Vite 7 + React 19 + TS 5.9 + Tailwind 4 + R3F/three (unused until Phase 5) + vitest/Testing Library + eslint flat config. Full-screen dark shell, always-focused `CommandInput` (Enter submits, Esc clears, refocus on blur and on any printable key), `/healthz` connection indicator, design tokens reduced from v1, salvaged shader sources under `src/agent3d/shaders/`. 8 tests.
+- Root workspace: `package.json` scripts (`dev`, `build`, `test`, `type-check`, `lint`, `check`), `pnpm-workspace.yaml` with `allowBuilds` for esbuild (pnpm 12), new `pnpm-lock.yaml`, `Procfile` (Vite + air), `.gitignore`, `.env.example` rewritten.
+
+### Edited
+
+- `CLAUDE.md` rewritten for the new layout, rules and commands (interim until Phase 10). `README.md` and `docs/stack.md` carry a note that the described v1 code is removed. Roadmap progress table updated.
+
+---
+
+## 0.15.0 - Vision Roadmap: Ten-Phase Implementation Plan + Section 11 Defaults (2026-10-29)
+
+**Docs-only.** First commit on `feat/vision-implementation`, the branch that carries the end-to-end implementation of [`VISION.md`](VISION.md). No code change.
+
+### Added
+
+- **`docs/executing/roadmap.md`**: the implementation plan. Ground truth about the repo and the dev environment (no credentials, no Postgres, no `buf`), a stated default for each of the eleven open questions in VISION.md section 11, the target repo layout, architecture rules for the new direction, and ten phases (restructure, shared contract, session + local runtime, component renderer, 3D agent, decision layer + actions + tools, cloud runtimes + spike, voice, memory + proactivity, display box + hardening + docs) each with scope, deliverables, dependencies and acceptance criteria.
+- **`docs/completions/phase-00-roadmap.md`**: completion note for the roadmap step.
+
+### Decisions recorded (defaults, each behind a seam)
+
+JSON Schema + SSE/JSON HTTP replace protobuf/Connect; Vite static client replaces Next.js; device token + local file state replace Supabase + Postgres; `AgentRuntime` with `local`, `anthropic`, `openai-compatible` and `hermes` implementations and a `NotImplemented` DeepSeek-harness stub; decision layer in the backend with a rules default; own voice pipeline with a keyless browser path; VAD-gated mic toggled by key, off at boot; particle-nebula 3D agent with adaptive resolution; Chromium kiosk on the box.
+
+---
 
 ## 0.14.1 - Vision: Default Client Approach (Web Client, Browser on macOS, Kiosk or Shell on the Box) (2026-10-29)
 

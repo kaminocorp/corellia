@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corellia.dev/schema/catalog.schema.json",
+  "title": "Catalog",
+  "description": "Shape of shared/catalog/catalog.json: the closed component catalog (VISION.md 5.1). It is the single source for the model-facing description, server validation and the client registry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog_version",
+    "components"
+  ],
+  "properties": {
+    "catalog_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "components": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Za-z0-9]{0,31}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/ComponentDef"
+      }
+    }
+  },
+  "$defs": {
+    "Fit": {
+      "description": "Size and fit hint. glance: small card readable across the room, panel: beside the agent, full: takes the screen.",
+      "type": "string",
+      "enum": [
+        "glance",
+        "panel",
+        "full"
+      ]
+    },
+    "ComponentDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "category",
+        "fit",
+        "props"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "layout",
+            "content",
+            "action",
+            "status"
+          ]
+        },
+        "fit": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Fit"
+          },
+          "minItems": 1
+        },
+        "props": {
+          "description": "JSON Schema (object) for the props.",
+          "type": "object"
+        },
+        "bindable": {
+          "description": "Prop names that accept a Binding instead of a literal.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "slots": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,31}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/SlotDef"
+          }
+        },
+        "actions": {
+          "description": "Action slot names the component can fire.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,31}$"
+          },
+          "default": []
+        },
+        "tags": {
+          "description": "Content hints used by fit-ranking (for example `place`, `numeric`, `list`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "example": {
+          "description": "A props example shown to the model.",
+          "type": "object"
+        }
+      }
+    },
+    "SlotDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepts"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "accepts": {
+          "description": "Allowed child component types, or [\"*\"] for any.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    }
+  }
+}

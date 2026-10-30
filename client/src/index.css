@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Corellia display tokens.
+
+   Carried over from the v1 frontend's Mission Control x Deep Space tokens
+   (docs/refs/design-system.md sections 5, 6, 8, 9) and reduced to what an
+   always-on, pointer-free display needs. Dark only: the screen is black.
+   Colors are HSL channels so consumers can compose alpha with
+   `hsl(var(--token) / 0.5)`.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  --color-background: hsl(0 0% 0%);
+  --color-foreground: hsl(0 0% 90%);
+  --color-card: hsl(0 0% 4%);
+  --color-card-foreground: hsl(0 0% 90%);
+  --color-muted: hsl(0 0% 9%);
+  --color-muted-foreground: hsl(0 0% 55%);
+  --color-elevated: hsl(0 0% 15%);
+  --color-primary: hsl(142 71% 45%);
+  --color-primary-foreground: hsl(0 0% 4%);
+  --color-destructive: hsl(0 84% 60%);
+  --color-border: hsl(0 0% 15%);
+  --color-ring: hsl(142 71% 45%);
+
+  --color-state-idle: hsl(0 0% 55%);
+  --color-state-listening: hsl(189 94% 43%);
+  --color-state-thinking: hsl(43 96% 56%);
+  --color-state-speaking: hsl(142 71% 45%);
+  --color-state-error: hsl(0 84% 60%);
+
+  --color-accent-cyan: hsl(189 94% 43%);
+  --color-accent-violet: hsl(258 90% 76%);
+  --color-accent-blue: hsl(213 94% 68%);
+  --color-accent-rose: hsl(351 95% 71%);
+  --color-accent-amber: hsl(32 95% 58%);
+
+  /* Offline-safe type stack: the box has no font CDN access. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    overflow: hidden;
+  }
+  html {
+    /* Scales with the display: readable from across a room at 1080p,
+       not oversized at 4K thanks to clamp. */
+    font-size: clamp(16px, 1.1vw, 26px);
+  }
+  * {
+    border-color: var(--color-border);
+  }
+  ::selection {
+    background: hsl(142 71% 45% / 0.35);
+  }
+  /* Pointer-free product: hide the cursor on the display. Development in a
+     browser keeps it unless the kiosk flag is set on <html>. */
+  html[data-kiosk="1"] * {
+    cursor: none !important;
+  }
+}
+
+/* Pulse for live-state indicators (status dots, telemetry). */
+@keyframes telemetry-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.animate-telemetry {
+  animation: telemetry-pulse 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-telemetry {
+    animation: none;
+  }
+}
+
+/* MapLibre attribution, kept legible on the darkened tiles (OSM asks for it). */
+.maplibregl-ctrl-attrib {
+  background: hsl(0 0% 0% / 0.55) !important;
+  color: var(--color-muted-foreground) !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-muted-foreground) !important;
+}
+
+/* MapLibre marker (the Map component creates these elements). */
+.corellia-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px hsl(142 71% 45% / 0.3), 0 0 18px hsl(142 71% 45% / 0.6);
+}

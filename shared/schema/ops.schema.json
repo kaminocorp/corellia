@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corellia.dev/schema/ops.schema.json",
+  "title": "SpecOp",
+  "description": "Incremental spec operations streamed from the backend to the client (VISION.md section 5.4). The client applies them to its local spec through a reducer; the server validates each against the catalog before forwarding.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/AddNodeOp"
+    },
+    {
+      "$ref": "#/$defs/SetPropsOp"
+    },
+    {
+      "$ref": "#/$defs/SetSlotOp"
+    },
+    {
+      "$ref": "#/$defs/SetDataOp"
+    },
+    {
+      "$ref": "#/$defs/SetActionOp"
+    },
+    {
+      "$ref": "#/$defs/RemoveNodeOp"
+    },
+    {
+      "$ref": "#/$defs/SetRootOp"
+    },
+    {
+      "$ref": "#/$defs/ClearOp"
+    },
+    {
+      "$ref": "#/$defs/DoneOp"
+    }
+  ],
+  "$defs": {
+    "AddNodeOp": {
+      "description": "Insert or replace a node. Children referenced in slots may arrive later.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "id",
+        "node"
+      ],
+      "properties": {
+        "op": {
+          "const": "add_node",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "ui-spec.schema.json#/$defs/NodeId"
+        },
+        "node": {
+          "$ref": "ui-spec.schema.json#/$defs/Node"
+        }
+      }
+    },
+    "SetPropsOp": {
+      "description": "Shallow-merge props into an existing node.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "id",
+        "props"
+      ],
+      "properties": {
+        "op": {
+          "const": "set_props",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "ui-spec.schema.json#/$defs/NodeId"
+        },
+        "props": {
+          "type": "object"
+        }
+      }
+    },
+    "SetSlotOp": {
+      "description": "Replace the ordered children of a slot on an existing node.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "id",
+        "slot",
+        "children"
+      ],
+      "properties": {
+        "op": {
+          "const": "set_slot",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "ui-spec.schema.json#/$defs/NodeId"
+        },
+        "slot": {
+          "$ref": "ui-spec.schema.json#/$defs/SlotName"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "ui-spec.schema.json#/$defs/NodeId"
+          },
+          "maxItems": 64
+        }
+      }
+    },
+    "SetDataOp": {
+      "description": "Write into the data object. Without `path`, `value` must be an object and is shallow-merged into the root. With `path`, `value` is set at that path, creating intermediate objects.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "value"
+      ],
+      "properties": {
+        "op": {
+          "const": "set_data",
+          "type": "string"
+        },
+        "path": {
+          "$ref": "ui-spec.schema.json#/$defs/BindPath"
+        },
+        "value": {}
+      }
+    },
+    "SetActionOp": {
+      "description": "Insert or replace a spec-level action record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "id",
+        "action"
+      ],
+      "properties": {
+        "op": {
+          "const": "set_action",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "ui-spec.schema.json#/$defs/ActionId"
+        },
+        "action": {
+          "$ref": "ui-spec.schema.json#/$defs/Action"
+        }
+      }
+    },
+    "RemoveNodeOp": {
+      "description": "Remove a node and its slot descendants, and drop it from any parent's slot.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "id"
+      ],
+      "properties": {
+        "op": {
+          "const": "remove_node",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "ui-spec.schema.json#/$defs/NodeId"
+        }
+      }
+    },
+    "SetRootOp": {
+      "description": "Set the root node. The node may arrive later in the same stream.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "id"
+      ],
+      "properties": {
+        "op": {
+          "const": "set_root",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "ui-spec.schema.json#/$defs/NodeId"
+        }
+      }
+    },
+    "ClearOp": {
+      "description": "Remove every node and reset the root. With `all: true` the data object and action records are cleared too; otherwise they are kept so a follow-up can rebuild the tree over the same data.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op"
+      ],
+      "properties": {
+        "op": {
+          "const": "clear",
+          "type": "string"
+        },
+        "all": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "DoneOp": {
+      "description": "Marks the end of a spec stream for this turn. Carries no change; the server runs whole-spec checks (dangling refs, budget) when it sees it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op"
+      ],
+      "properties": {
+        "op": {
+          "const": "done",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

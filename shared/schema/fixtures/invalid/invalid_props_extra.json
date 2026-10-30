@@ -1,0 +1,15 @@
+{
+  "before": [],
+  "op": {
+    "op": "add_node",
+    "id": "n1",
+    "node": {
+      "type": "Markdown",
+      "props": {
+        "text": "x",
+        "html": "<b>"
+      }
+    }
+  },
+  "code": "invalid_props"
+}

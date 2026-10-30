@@ -1,0 +1,6 @@
+[Unit]
+Description=Corellia kiosk watchdog check
+
+[Service]
+Type=oneshot
+ExecStart=/opt/corellia/corellia-watchdog.sh
