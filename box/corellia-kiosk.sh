@@ -9,7 +9,16 @@ BOX_ENV="${CORELLIA_BOX_ENV:-/etc/corellia/box.env}"
 # shellcheck disable=SC1090
 [ -f "$BOX_ENV" ] && . "$BOX_ENV"
 : "${CORELLIA_URL:?CORELLIA_URL is not set}"
-URL="${CORELLIA_URL%/}/?${CORELLIA_KIOSK_QUERY:-kiosk=1}"
+QUERY="${CORELLIA_KIOSK_QUERY:-kiosk=1}"
+# kiosk=1 is what makes the page the display: it tags the heartbeats the
+# watchdog reads and makes this client the one that speaks. A custom query
+# (--query particles=6000) must not drop it, or the watchdog would restart a
+# healthy kiosk every few minutes for never checking in.
+case "&${QUERY}&" in
+  *"&kiosk=1&"*) ;;
+  *) QUERY="kiosk=1&${QUERY}" ;;
+esac
+URL="${CORELLIA_URL%/}/?${QUERY}"
 if [ -n "${CORELLIA_DEVICE_TOKEN:-}" ]; then
   URL="${URL}&token=${CORELLIA_DEVICE_TOKEN}"
 fi

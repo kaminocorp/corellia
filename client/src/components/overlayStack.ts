@@ -2,7 +2,10 @@ import { createContext } from "react";
 
 /**
  * Where an overlay anchor sits. The top anchors clear the top bar (header,
- * offline banner, mic indicator); the bottom anchors clear the footer.
+ * offline banner, mic indicator); the bottom anchors clear the footer. The
+ * gutter is a column on the right that a full visual leaves free for the
+ * floating cards (reply, status, confirm, reminder), so they never cover
+ * the data the agent just chose to show (review 2026-10-30 round 5).
  */
 export const OVERLAY_ANCHOR: Record<string, string> = {
   top_left: "top-14 left-6",
@@ -10,7 +13,11 @@ export const OVERLAY_ANCHOR: Record<string, string> = {
   bottom_left: "bottom-28 left-6",
   bottom_right: "bottom-28 right-6",
   center: "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+  gutter: "top-14 right-6 w-[24rem] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
 };
+
+/** The gutter's width plus its gaps: how far a full visual's right edge moves in while cards are up. */
+export const GUTTER_INSET = "calc(24rem + 2.25rem)";
 
 /**
  * True inside a renderer column that already anchors its overlays, so each

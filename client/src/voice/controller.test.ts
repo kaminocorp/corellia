@@ -273,3 +273,44 @@ describe("VoiceController review items (2026-10-30)", () => {
     detach();
   });
 });
+
+describe("VoiceController speaker (phase 17)", () => {
+  it("drops speech while this client is not the speaker and stops what is playing", async () => {
+    const { d, backend } = deps();
+    const c = new VoiceController(d);
+    await c.init();
+    expect(c.getStatus().speaker).toBe("on");
+    c.onStreamEvent({ type: "speech", seq: 1, ts: "x", text: "First." } as SessionEvent);
+    await flush();
+    expect(backend.spoken).toEqual(["First."]);
+    c.setSpeaker("display");
+    expect(backend.stop).toHaveBeenCalled();
+    c.onStreamEvent({ type: "speech", seq: 2, ts: "x", text: "Second." } as SessionEvent);
+    await flush();
+    expect(backend.spoken).toEqual(["First."]);
+    expect(c.getStatus().speaker).toBe("display");
+    c.setSpeaker("on");
+    c.onStreamEvent({ type: "speech", seq: 3, ts: "x", text: "Third." } as SessionEvent);
+    await flush();
+    expect(backend.spoken).toEqual(["First.", "Third."]);
+  });
+
+  it("Ctrl+Shift+M toggles the speaker and does not mute the mic", async () => {
+    const toggleSpeaker = vi.fn();
+    const { d } = deps({ toggleSpeaker });
+    const c = new VoiceController(d);
+    await c.init();
+    c.handleKeyDown(ctrlSpace());
+    await flush();
+    expect(c.getStatus().mic).toBe("listening");
+    const e = new KeyboardEvent("keydown", { key: "M", code: "KeyM", ctrlKey: true, shiftKey: true, cancelable: true });
+    c.handleKeyDown(e);
+    expect(toggleSpeaker).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
+    expect(c.getStatus().mic).toBe("listening");
+    // Plain Ctrl+M still mutes the mic.
+    c.handleKeyDown(new KeyboardEvent("keydown", { key: "m", code: "KeyM", ctrlKey: true }));
+    expect(c.getStatus().mic).toBe("muted");
+    expect(toggleSpeaker).toHaveBeenCalledTimes(1);
+  });
+});

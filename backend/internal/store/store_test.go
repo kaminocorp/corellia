@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -57,5 +58,62 @@ func TestJSONL(t *testing.T) {
 	}
 	if err := s.ReadJSONL("nope.jsonl", func([]byte) error { return nil }); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNewRefusesAnUnwritableDir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can write anywhere")
+	}
+	dir := filepath.Join(t.TempDir(), "ro")
+	if err := os.Mkdir(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	_, err := New(dir)
+	if err == nil {
+		t.Fatal("New accepted a read-only data dir")
+	}
+	for _, want := range []string{"not writable", "/data volume", dir} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q lacks %q", err, want)
+		}
+	}
+}
+
+func TestWriteFailuresAreRecordedAndCleared(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can write anywhere")
+	}
+	dir := t.TempDir()
+	s, err := New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.Healthy() {
+		t.Fatal("fresh store unhealthy")
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if err := s.WriteJSON("doc.json", map[string]int{"n": 1}); err == nil {
+		t.Fatal("WriteJSON succeeded on a read-only dir")
+	}
+	if s.Healthy() {
+		t.Fatal("failure not recorded")
+	}
+	if err := s.AppendJSONL("log.jsonl", map[string]int{"i": 1}); err == nil {
+		t.Fatal("AppendJSONL succeeded on a read-only dir")
+	}
+	if last, at := s.Err(); last == nil || at.IsZero() {
+		t.Fatalf("Err = %v, %v", last, at)
+	}
+	_ = os.Chmod(dir, 0o700)
+	if err := s.AppendJSONL("log.jsonl", map[string]int{"i": 2}); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Healthy() {
+		t.Fatal("a successful write did not clear the failure")
 	}
 }

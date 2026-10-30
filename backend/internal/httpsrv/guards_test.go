@@ -148,3 +148,55 @@ func TestSecurityHeaders(t *testing.T) {
 		t.Errorf("wildcard CSP = %s", any)
 	}
 }
+
+// Dev mode trusts the TCP peer; a same-host proxy connects from loopback.
+// Requests that carry a proxy's headers are refused with the fix in the
+// message (review 2026-10-30 round 5).
+func TestProxyGuardInDevMode(t *testing.T) {
+	h := newTestServer(t, t.TempDir(), "")
+	for _, hdr := range [][2]string{
+		{"X-Forwarded-For", "100.64.1.9"},
+		{"X-Real-IP", "100.64.1.9"},
+		{"Forwarded", "for=100.64.1.9"},
+		{"X-Forwarded-Host", "box.tail1234.ts.net"},
+		{"X-Forwarded-Proto", "https"},
+		{"Tailscale-User-Login", "owner@example.com"},
+		{"Tailscale-Whatever", "x"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+		req.Host = "localhost:8080"
+		req.RemoteAddr = "127.0.0.1:4000"
+		req.Header.Set(hdr[0], hdr[1])
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("%s: status %d, want 403", hdr[0], rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), "CORELLIA_DEVICE_TOKEN") {
+			t.Fatalf("%s: body %q does not name the fix", hdr[0], rec.Body.String())
+		}
+	}
+	// A direct loopback request is unaffected; /healthz stays open for the watchdog.
+	if rec := get(h, "/api/config", "127.0.0.1:4000"); rec.Code != 200 {
+		t.Fatalf("direct loopback: %d", rec.Code)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.Header.Set("X-Forwarded-For", "100.64.1.9")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("/healthz behind a proxy: %d", rec.Code)
+	}
+	// With a token the guard is off: the proxy is the supported path.
+	tok := newTestServer(t, t.TempDir(), "0123456789abcdef0123456789abcdef")
+	req = httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req.Host = "box.tail1234.ts.net"
+	req.RemoteAddr = "127.0.0.1:4000"
+	req.Header.Set("X-Forwarded-For", "100.64.1.9")
+	req.Header.Set("Authorization", "Bearer 0123456789abcdef0123456789abcdef")
+	rec = httptest.NewRecorder()
+	tok.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("token mode behind a proxy: %d %s", rec.Code, rec.Body.String())
+	}
+}

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Restarts the kiosk when the client heartbeat is stale (page hung), when no
-# client has checked in for a long time after boot (Chromium sits on its own
+# Restarts the kiosk when the kiosk's heartbeat is stale (page hung), when no
+# kiosk has checked in for a long time after boot (Chromium sits on its own
 # error page, which posts no heartbeat), or when the backend has been
 # unreachable for several checks in a row. Runs every 30 s from the timer.
+# Only the kiosk's heartbeats count (the page tags them via ?kiosk=1); a
+# browser on another machine using the same backend is ignored.
 #
 # Overridable for box/test.sh: CORELLIA_BOX_ENV (env file), CORELLIA_URL,
 # CORELLIA_WATCHDOG_STATE_DIR (default /run), CORELLIA_WATCHDOG_SYSTEMCTL
@@ -46,7 +48,11 @@ if [ -z "$body" ]; then
   exit 0
 fi
 echo 0 > "$FAILS"
-age=$(echo "$body" | jq -r '.client_heartbeat_age_s // -1')
+# The kiosk's own age when the backend reports one (phase 17): a Mac tab on
+# the same backend posts heartbeats too, and its age must not stand in for
+# a hung kiosk (review 2026-10-30 round 5). Older backends only have the
+# generic age.
+age=$(echo "$body" | jq -r 'if has("kiosk_heartbeat_age_s") then .kiosk_heartbeat_age_s else (.client_heartbeat_age_s // -1) end')
 if [ "$age" = "-1" ]; then
   # No client has checked in since the backend started.
   noclient=$(cat "$NOCLIENT" 2>/dev/null || echo 0)

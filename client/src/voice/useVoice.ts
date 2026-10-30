@@ -6,8 +6,12 @@ import { defaultDeps, VoiceController } from "./controller";
 
 export type { VoiceStatus } from "./controller";
 
-/** Creates the controller once, keeps it informed of the active turn, and exposes its status. */
-export function useVoice(activeTurnId: string | null) {
+/**
+ * Creates the controller once, keeps it informed of the active turn, and
+ * exposes its status. `onToggleSpeaker` is what Ctrl+Shift+M does (the app
+ * owns the speaker preference); the latest callback is used.
+ */
+export function useVoice(activeTurnId: string | null, onToggleSpeaker?: () => void) {
   const controller = useMemo(
     () =>
       new VoiceController(
@@ -21,6 +25,9 @@ export function useVoice(activeTurnId: string | null) {
       ),
     [],
   );
+  useEffect(() => {
+    controller.setSpeakerToggle(onToggleSpeaker);
+  }, [controller, onToggleSpeaker]);
   useEffect(() => {
     controller.setActiveTurn(activeTurnId);
   }, [controller, activeTurnId]);

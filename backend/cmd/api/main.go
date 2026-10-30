@@ -54,7 +54,7 @@ func main() {
 		os.Exit(1)
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
-		slog.Error("data dir", "dir", cfg.DataDir, "err", err)
+		slog.Error("data dir", "dir", cfg.DataDir, "err", err, "hint", "CORELLIA_DATA_DIR must be a directory the server's user can create or write")
 		os.Exit(1)
 	}
 
@@ -72,9 +72,12 @@ func main() {
 	}
 	slog.Info("runtime selected", "runtime", rt.Name(), "requested", cfg.Runtime, "detail", detail)
 
+	// store.New proves the directory is writable: a backend that cannot
+	// persist must not start and quietly forget every note, reminder and
+	// transcript line (the Docker /data volume, review 2026-10-30 round 5).
 	st, err := store.New(cfg.DataDir)
 	if err != nil {
-		slog.Error("store", "err", err)
+		slog.Error("store", "err", err, "hint", "CORELLIA_DATA_DIR is not writable by this user; chown it (in Docker: the /data volume) or point CORELLIA_DATA_DIR elsewhere")
 		os.Exit(1)
 	}
 	mem, err := memory.Open(st, time.Now)
@@ -133,7 +136,11 @@ func main() {
 		Events:    httpsrv.NewEventsHandler(sess),
 		Voice:     httpsrv.NewVoiceHandler(voiceProviders),
 		Memory:    httpsrv.NewMemoryHandler(mem),
-		Heartbeat: httpsrv.NewHeartbeat(time.Now),
+		Heartbeat: httpsrv.NewHeartbeat(time.Now).WithStoreHealth(st.Healthy),
+		StoreHealth: func() error {
+			err, _ := st.Err()
+			return err
+		},
 	})
 
 	srv := &http.Server{

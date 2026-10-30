@@ -11,21 +11,24 @@ Browsers give a page the microphone only in a **secure context**: `https://` any
 | **Backend on the box** (`--with-backend`) | `http://127.0.0.1:8080` | works | Loopback is a secure context. No token needed (dev mode serves loopback). Leave `CORELLIA_TZ` empty: the box's zone (`timedatectl set-timezone …`) is used. |
 | **Backend elsewhere, over HTTPS** | `https://<host>…` | works | On the backend host, `tailscale serve --bg --https=443 http://127.0.0.1:8080` publishes it as `https://<host>.<tailnet>.ts.net` with a valid certificate (the box must be on the tailnet). Any reverse proxy with a certificate the box trusts does the same. Run the backend with `CORELLIA_DEVICE_TOKEN` set. |
 | **Backend elsewhere, plain HTTP** | `http://<lan-ip>:8080` | works in the kiosk only | `corellia-kiosk.sh` adds `--unsafely-treat-insecure-origin-as-secure=<origin>` for a non-loopback `http://` URL, which makes Chromium treat that one origin as secure for our profile. A Mac browser opening the same URL still has no voice. The token travels in clear on the LAN. |
+| **Mac and box on one backend** | box: `http://127.0.0.1:8080` or `https://<host>…`; Mac: `https://<host>.<tailnet>.ts.net` | works on both | The backend (on the box or elsewhere) runs with `CORELLIA_DEVICE_TOKEN` set and `tailscale serve --bg --https=443 http://127.0.0.1:8080` in front; the Mac opens the `https://…ts.net` URL and enters the token once. Dev mode cannot do this: it refuses proxied requests (below). Only the kiosk speaks; the Mac says "sound on the display" and `Ctrl+Shift+M` or `?quiet=0` overrides. The watchdog reads the kiosk's own heartbeat (`kiosk_heartbeat_age_s`), so the Mac tab cannot mask a hung kiosk. |
 
-The Docker image (`backend/Dockerfile`) is the second or third row: a browser on the Docker host at `http://localhost:8080` is fine, any other machine needs HTTPS or the kiosk flag.
+The Docker image (`backend/Dockerfile`) is the second or third row: a browser on the Docker host at `http://localhost:8080` is fine, any other machine needs HTTPS or the kiosk flag. The image's `/data` volume belongs to the app user; the server refuses to start on a data directory it cannot write and reports later write failures on `/healthz` (`store_ok: false`) and on the page.
+
+**`tailscale serve` and dev mode.** `tailscale serve` connects to the backend from `127.0.0.1`, so a token-less backend would take its requests as the owner's own and serve the whole tailnet (and, with a Funnel or a public proxy, the internet), confirm gate included. The server therefore refuses, in dev mode, every request that carries a proxy's headers (`X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Tailscale-*`): 403 with "dev mode: requests through a proxy need CORELLIA_DEVICE_TOKEN", logged once. The natural mistake, row 1 today and `tailscale serve` tomorrow "for voice on the Mac", therefore fails loudly instead of opening the agent; add the token to `/etc/corellia/api.env` and `box.env` (`provision.sh --token`) before publishing.
 
 ## What runs where
 
 - The **backend** (`corellia-api.service`, with `--with-backend`) runs `/opt/corellia/api` serving `/opt/corellia/client` on one port: the client, the API and the event stream. Cloud APIs (model, STT, TTS, Open-Meteo, OSRM, map tiles) are outbound from the backend or the browser.
 - The **client** runs in Chromium kiosk mode (`corellia-kiosk.service`) as the `corellia` user on a minimal X session on tty1, pointed at `<backend>/?kiosk=1&token=<device token>`. The page stores the token and strips it from the address bar on first load; an off-box backend must run with `CORELLIA_DEVICE_TOKEN` set, which also makes it listen on all interfaces (dev mode binds loopback only).
-- The **watchdog** (`corellia-watchdog.timer`, every 30 s from two minutes after boot) asks `/healthz` for `client_heartbeat_age_s` (the client posts `/api/heartbeat` every 30 s) and restarts the kiosk when the page has been quiet for more than 90 s, when the backend has been unreachable for five checks in a row, or when no client has checked in for ten checks in a row (Chromium loaded before the backend answered and sits on its own error page, which posts no heartbeat). Thresholds: `CORELLIA_WATCHDOG_MAX_AGE`, `CORELLIA_WATCHDOG_MAX_FAILS`, `CORELLIA_WATCHDOG_MAX_NOCLIENT` in `/etc/corellia/box.env`.
+- The **watchdog** (`corellia-watchdog.timer`, every 30 s from two minutes after boot) asks `/healthz` for `kiosk_heartbeat_age_s` (the kiosk page posts `/api/heartbeat` every 30 s, tagged `{"client":"kiosk"}` because of `?kiosk=1`; a Mac browser's heartbeats are tracked apart and do not count) and restarts the kiosk when its page has been quiet for more than 90 s, when the backend has been unreachable for five checks in a row, or when no kiosk has checked in for ten checks in a row (Chromium loaded before the backend answered and sits on its own error page, which posts no heartbeat). An older backend without the kiosk field falls back to `client_heartbeat_age_s`. Thresholds: `CORELLIA_WATCHDOG_MAX_AGE`, `CORELLIA_WATCHDOG_MAX_FAILS`, `CORELLIA_WATCHDOG_MAX_NOCLIENT` in `/etc/corellia/box.env`. `corellia-kiosk.sh` keeps `kiosk=1` in the URL even when `CORELLIA_KIOSK_QUERY` was set without it.
 
 ## Build the release (on the development machine)
 
 `corellia-api.service` expects the Linux binary at `/opt/corellia/api` and the built client at `/opt/corellia/client`. Build both on the Mac and copy them over:
 
 ```bash
-./box/release.sh                      # -> box/release/api (linux/amd64, static) and box/release/client/
+./box/release.sh                      # -> box/release/api (linux/amd64, static) and box/release/client/ (gitignored)
 scp -r box/release <box>:/tmp/corellia-release
 ```
 
@@ -78,7 +81,7 @@ Reprovisioning is idempotent; the box holds no state that matters (the backend's
 | `release.sh` | Builds the Linux binary and the client on the development machine. |
 | `corellia-kiosk.sh` | Starts Chromium in kiosk mode with the right flags (secure-context flag for a plain LAN URL); restarts it if it exits. |
 | `corellia-kiosk.service` | systemd unit owning tty1 and running the X session for the `corellia` user. |
-| `corellia-watchdog.sh` + `.service` + `.timer` | Restarts the kiosk when the client heartbeat goes stale, when no client has ever checked in, or when the backend is unreachable for too long. |
+| `corellia-watchdog.sh` + `.service` + `.timer` | Restarts the kiosk when the kiosk's heartbeat goes stale, when no kiosk has ever checked in, or when the backend is unreachable for too long. |
 | `corellia-api.service` | Runs the backend binary with `/etc/corellia/api.env`. |
 | `xinitrc` | Minimal X session: no blanking, hidden cursor, kiosk script. |
 | `test.sh` | Checks the kiosk flags and the watchdog decisions without a box (`pnpm check`). |

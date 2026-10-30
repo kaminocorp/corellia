@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applyOps, emptySpec, type SpecOp } from "../contract";
-import { assignHotkeys, floatingOverlays, overlayGroups, placement, resolveNode, withDefaults } from "./resolve";
+import { assignHotkeys, floatingOverlays, needsGutter, overlayAnchor, overlayGroups, placement, resolveNode, withDefaults } from "./resolve";
 
 const build = (ops: SpecOp[]) => applyOps(emptySpec(), ops);
 
@@ -91,5 +91,54 @@ describe("floatingOverlays", () => {
       { op: "set_root", id: "root" },
     ]);
     expect(floatingOverlays(spec)).toEqual(["a", "b"]);
+  });
+});
+
+describe("overlayAnchor and needsGutter (review 2026-10-30 round 5: cards covered a chart)", () => {
+  const chartRoot = (ops: SpecOp[]) =>
+    build([
+      { op: "set_data", value: { pts: [{ x: "Mon", y: 1 }, { x: "Tue", y: 2 }] } },
+      { op: "add_node", id: "chart", node: { type: "Chart", props: { kind: "line", data: { bind: "$.pts" }, x: "x", y: "y" } } },
+      { op: "set_root", id: "chart" },
+      ...ops,
+    ]);
+  const card: SpecOp[] = [
+    { op: "add_node", id: "reply_text", node: { type: "Markdown", props: { text: "Reply" } } },
+    { op: "add_node", id: "reply_card", node: { type: "Overlay", props: { position: "top_right" }, slots: { content: ["reply_text"] } } },
+    { op: "add_node", id: "confirm_stack", node: { type: "Status", props: { text: "Do it?" } } },
+    { op: "add_node", id: "proposals", node: { type: "Overlay", props: { position: "bottom_right" }, slots: { content: ["confirm_stack"] } } },
+  ];
+
+  it("sends every non-centred card to the gutter beside a full visual", () => {
+    expect(overlayAnchor("top_right", "full")).toBe("gutter");
+    expect(overlayAnchor("bottom_left", "full")).toBe("gutter");
+    expect(overlayAnchor("center", "full")).toBe("center");
+    const spec = chartRoot(card);
+    expect(placement(spec)).toBe("full");
+    expect(overlayGroups(spec)).toEqual([{ position: "gutter", ids: ["proposals", "reply_card"] }]);
+    expect(needsGutter(spec)).toBe(true);
+  });
+
+  it("moves cards to the agent's side beside a panel and leaves glances alone", () => {
+    expect(overlayAnchor("top_right", "panel")).toBe("top_left");
+    expect(overlayAnchor("bottom_right", "panel")).toBe("bottom_left");
+    expect(overlayAnchor("top_left", "panel")).toBe("top_left");
+    expect(overlayAnchor("center", "panel")).toBe("center");
+    expect(overlayAnchor("top_right", "glance")).toBe("top_right");
+    expect(overlayAnchor("bottom_right", "none")).toBe("bottom_right");
+  });
+
+  it("needs no gutter without floating cards, with only a centred one, or without a full root", () => {
+    expect(needsGutter(chartRoot([]))).toBe(false);
+    expect(
+      needsGutter(
+        chartRoot([
+          { op: "add_node", id: "t", node: { type: "Markdown", props: { text: "x" } } },
+          { op: "add_node", id: "modal", node: { type: "Overlay", props: { position: "center", dim: true }, slots: { content: ["t"] } } },
+        ]),
+      ),
+    ).toBe(false);
+    const glance = build([{ op: "add_node", id: "t", node: { type: "Markdown", props: { text: "x" } } }, { op: "add_node", id: "g", node: { type: "Overlay", props: { position: "top_right" }, slots: { content: ["t"] } } }, { op: "set_root", id: "g" }, ...card]);
+    expect(needsGutter(glance)).toBe(false);
   });
 });

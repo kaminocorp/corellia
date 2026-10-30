@@ -12,6 +12,7 @@ const PLAIN: Record<string, string> = {
   action_failed: "That action didn't go through.",
   clear_failed: "The screen couldn't be cleared.",
   agent3d: "The 3D agent stopped; showing the still one instead.",
+  persist: "Can't save to the data directory: memory, reminders and the transcript are being lost.",
 };
 
 /** What the error line says for an error outside debug mode, or null for nothing. */

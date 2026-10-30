@@ -53,8 +53,17 @@ type Options struct {
 	// date and time and every timestamp the session writes. nil: the
 	// process zone. Ignored when Now is set.
 	Location *time.Location
-	// HistoryLimit is how many transcript entries a runtime sees.
+	// HistoryLimit is the fewest transcript entries a runtime sees once the
+	// transcript is longer than that (default 20); the window holds up to
+	// HistoryLimit+HistoryStep-1.
 	HistoryLimit int
+	// HistoryStep is how many entries the history window drops at a time
+	// (default 10). A window that slid by one pair every turn changed the
+	// cached prefix on every request once the transcript passed the limit,
+	// so the provider's prompt cache only ever hit the system block
+	// (review 2026-10-30 round 5). Dropping in steps keeps the prefix
+	// identical for several turns in a row.
+	HistoryStep int
 	// BusCapacity is how many events are retained for replay.
 	BusCapacity int
 	// TranscriptLimit caps the in-memory transcript (oldest dropped).
@@ -136,6 +145,9 @@ func New(o Options) *Session {
 	}
 	if o.HistoryLimit <= 0 {
 		o.HistoryLimit = 20
+	}
+	if o.HistoryStep <= 0 {
+		o.HistoryStep = 10
 	}
 	if o.BusCapacity <= 0 {
 		o.BusCapacity = 1000
@@ -646,7 +658,10 @@ func (s *Session) appendTranscriptLocked(e gen.TranscriptEntry) {
 	}
 	if s.o.Transcript != nil {
 		if err := s.o.Transcript.AppendTranscript(e); err != nil {
+			// Loud, not just logged: the client shows a persistent warning
+			// and /healthz reports the store (review 2026-10-30 round 5).
 			s.o.Logger.Error("session: persist transcript", "err", err)
+			s.bus.Publish("session_error", map[string]any{"code": "persist", "message": "could not save the transcript: " + err.Error()})
 		}
 	}
 }
@@ -673,10 +688,7 @@ func (s *Session) todaysTranscriptLocked(limit int) []gen.TranscriptEntry {
 }
 
 func (s *Session) historyLocked() []runtime.Message {
-	start := 0
-	if len(s.transcript) > s.o.HistoryLimit {
-		start = len(s.transcript) - s.o.HistoryLimit
-	}
+	start := historyStart(len(s.transcript), s.o.HistoryLimit, s.o.HistoryStep)
 	var out []runtime.Message
 	for _, e := range s.transcript[start:] {
 		if e.Failed != nil && *e.Failed {
@@ -688,6 +700,21 @@ func (s *Session) historyLocked() []runtime.Message {
 		out = append(out, runtime.Message{Role: string(e.Role), Text: e.Text})
 	}
 	return out
+}
+
+// historyStart is the index the history window begins at: 0 until the
+// transcript exceeds limit, then the largest multiple of step that still
+// leaves at least limit entries. The start moves once every step entries,
+// so between moves each turn only appends to the previous request's
+// messages and the cached prefix holds.
+func historyStart(n, limit, step int) int {
+	if n <= limit {
+		return 0
+	}
+	if step <= 0 {
+		step = 1
+	}
+	return ((n - limit) / step) * step
 }
 
 func newID(prefix string) string {

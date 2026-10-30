@@ -7,11 +7,13 @@ import { ErrorLine } from "./ErrorLine";
 import { MicIndicator } from "./MicIndicator";
 import { OfflineBanner } from "./OfflineBanner";
 import { runtimeLabel } from "./runtimeLabel";
+import { StoreBanner } from "./StoreBanner";
 import { TokenPrompt } from "./TokenPrompt";
 import { Transcript } from "./Transcript";
 import { Agent3D, AgentFallback, StatsOverlay } from "../agent3d/Agent3D";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Gallery } from "../gallery/Gallery";
+import { detectPlatform } from "../platform";
 import { FOOTER_HEIGHT_VAR, Stage } from "../renderer/Stage";
 import { assignHotkeys, placement } from "../renderer/resolve";
 import { useDecay } from "../renderer/useDecay";
@@ -23,18 +25,28 @@ import { startHeartbeat } from "../session/heartbeat";
 import { startSoak } from "../session/soak";
 import { sessionStore, useSessionState } from "../session/store";
 import { SessionStream } from "../session/stream";
+import { kioskIsConnected, readSpeakerPreference, resolveSpeaker, toggledPreference, writeSpeakerPreference, type SpeakerPreference } from "../voice/speaker";
 import { useVoice } from "../voice/useVoice";
 
 /**
  * The display shell: the Stage (agent focal area + generated UI), the
  * transcript and the always-focused input. `?debug=1` adds the debug pane,
- * `?gallery=1` shows every component from its catalog example.
+ * `?gallery=1` shows every component from its catalog example, `?quiet=1`
+ * keeps this client silent (`?quiet=0` makes it speak even beside a kiosk).
  */
 export function App() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   if (params.get("gallery") === "1") return <Gallery />;
   const particles = Number(params.get("particles")) || undefined;
-  return <Display debug={params.get("debug") === "1"} stats={params.get("stats") === "1"} soak={params.get("soak") === "1"} particles={particles} />;
+  return <Display debug={params.get("debug") === "1"} stats={params.get("stats") === "1"} soak={params.get("soak") === "1"} particles={particles} params={params} />;
+}
+
+function localStorageOrNull(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 /** Keyboard scrolling of the generated UI (review 2026-10-29: long content was clipped). */
@@ -70,8 +82,13 @@ function useFooterHeight(root: React.RefObject<HTMLElement | null>, footer: Reac
   }, [root, footer]);
 }
 
-function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boolean; soak: boolean; particles?: number }) {
+function Display({ debug, stats, soak, particles, params }: { debug: boolean; stats: boolean; soak: boolean; particles?: number; params: URLSearchParams }) {
   const [devMode, setDevMode] = useState(false);
+  // Which client speaks (voice/speaker.ts): the kiosk always; a browser
+  // unless a kiosk is connected to the same backend; `?quiet=` and
+  // Ctrl+Shift+M override, remembered per browser.
+  const isKiosk = useMemo(() => detectPlatform().isKiosk(), []);
+  const [speakerPref, setSpeakerPref] = useState<SpeakerPreference>(() => readSpeakerPreference(params, localStorageOrNull()));
   const inputValue = useRef("");
   const inputRef = useRef<CommandInputHandle>(null);
   const rootRef = useRef<HTMLElement>(null);
@@ -80,7 +97,7 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
   const streamRef = useRef<SessionStream | null>(null);
   // Selectors may return fresh objects: useSessionState caches by state
   // version and shallow-compares, so the snapshot stays stable.
-  const { connection, agentName, agentState, activeTurnId, spec, touched, runtime } = useSessionState((s) => ({
+  const { connection, agentName, agentState, activeTurnId, spec, touched, runtime, kioskConnected, storeError } = useSessionState((s) => ({
     connection: s.connection,
     agentName: s.agentName,
     agentState: s.agentState,
@@ -88,10 +105,23 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
     spec: s.spec,
     touched: s.touched,
     runtime: s.capabilities?.runtime,
+    kioskConnected: s.kioskConnected,
+    storeError: s.storeError,
   }));
 
-  const voice = useVoice(activeTurnId);
+  const toggleSpeaker = useCallback(() => {
+    setSpeakerPref((prev) => {
+      const current = resolveSpeaker({ isKiosk, preference: prev, kioskConnected: sessionStore.getState().kioskConnected });
+      const next = toggledPreference(current);
+      writeSpeakerPreference(localStorageOrNull(), next);
+      return next;
+    });
+  }, [isKiosk]);
+  const voice = useVoice(activeTurnId, toggleSpeaker);
   const controller = voice.controller;
+  useEffect(() => {
+    controller.setSpeaker(resolveSpeaker({ isKiosk, preference: speakerPref, kioskConnected }));
+  }, [controller, isKiosk, speakerPref, kioskConnected]);
 
   // Voice capabilities are fetched at init; a page that loaded before the
   // backend was up (or before a token was entered) learns about the server's
@@ -105,7 +135,13 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
     streamRef.current = stream;
     stream.connect();
     void fetchHealth().then((h) => setDevMode(h?.dev_mode ?? false));
-    const stopHeartbeat = startHeartbeat();
+    // Heartbeats are tagged (kiosk or browser) so the box watchdog reads
+    // the kiosk's own age; the answer says whether a kiosk is connected and
+    // whether the store is writing (review 2026-10-30 round 5).
+    const stopHeartbeat = startHeartbeat({
+      client: isKiosk ? "kiosk" : "browser",
+      onStatus: (st) => sessionStore.setServerStatus({ kioskConnected: kioskIsConnected(st.kioskAgeS), storeOk: st.storeOk }),
+    });
     const stopSoak = soak ? startSoak() : () => {};
     return () => {
       stream.disconnect();
@@ -113,7 +149,7 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
       stopHeartbeat();
       stopSoak();
     };
-  }, [controller, soak]);
+  }, [controller, soak, isKiosk]);
 
   const report = (code: string) => (e: Error) => sessionStore.addError(code, e.message);
   const fire = useCallback((actionId: string, nodeId: string) => {
@@ -198,6 +234,7 @@ function Display({ debug, stats, soak, particles }: { debug: boolean; stats: boo
         <MicIndicator status={voice.status} />
       </div>
       <OfflineBanner status={connection} />
+      <StoreBanner error={storeError} connection={connection} />
       {connection === "unauthorized" && <TokenPrompt onSubmit={onToken} />}
 
       <footer ref={footerRef} className="absolute bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 px-6" data-testid="footer">

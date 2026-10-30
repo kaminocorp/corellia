@@ -1,11 +1,14 @@
 package httpsrv
 
 import (
+	"context"
+	"log/slog"
 	"mime"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/hejijunhao/corellia/backend/internal/config"
 )
@@ -24,10 +27,20 @@ func trustedRealIP(nets []*net.IPNet) func(http.Handler) http.Handler {
 				if ip := forwardedFor(r); ip != "" {
 					r.RemoteAddr = net.JoinHostPort(ip, "0")
 				}
+				// The owner named this proxy; its forwarded client is the
+				// client, and the dev-mode proxy guard stands down for it.
+				r = r.WithContext(context.WithValue(r.Context(), trustedProxyKey{}, true))
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+type trustedProxyKey struct{}
+
+func viaTrustedProxy(r *http.Request) bool {
+	v, _ := r.Context().Value(trustedProxyKey{}).(bool)
+	return v
 }
 
 func peerTrusted(remoteAddr string, nets []*net.IPNet) bool {
@@ -123,6 +136,59 @@ func hostGuard(devMode bool) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// proxyHeaders are what reverse proxies add to a forwarded request:
+// the standard and de-facto forwarding headers, and what `tailscale
+// serve` sets about the tailnet user.
+var proxyHeaders = []string{"X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded", "X-Real-IP", "Via", "Tailscale-User-Login", "Tailscale-User-Name", "Tailscale-User-Profile-Pic"}
+
+// ProxyRefusedMessage is the 403 body for a proxied request in dev mode.
+const ProxyRefusedMessage = "dev mode: requests through a proxy need CORELLIA_DEVICE_TOKEN"
+
+// proxyGuard refuses, in dev mode, any request that arrived through a
+// reverse proxy. Dev-mode auth trusts the TCP peer, and a proxy on the
+// same machine (`tailscale serve`, nginx) connects from loopback, so
+// without this everyone the proxy serves could drive the agent and its
+// confirm gate (review 2026-10-30 round 5). A proxy the owner listed in
+// CORELLIA_TRUSTED_PROXIES is exempt: its forwarded address is the client
+// and the loopback rule applies to that. The hint names the fix; the first
+// refusal is also logged, once, so the owner sees it in the journal rather
+// than only in the client's banner.
+func proxyGuard(devMode bool, logger *slog.Logger) func(http.Handler) http.Handler {
+	var once sync.Once
+	return func(next http.Handler) http.Handler {
+		if !devMode {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if h := proxiedBy(r); h != "" && !viaTrustedProxy(r) {
+				once.Do(func() {
+					if logger != nil {
+						logger.Warn("dev mode: refused a request that came through a proxy; set CORELLIA_DEVICE_TOKEN to serve clients behind one", "header", h, "peer", r.RemoteAddr, "host", r.Host)
+					}
+				})
+				writeError(w, http.StatusForbidden, "proxied_in_dev_mode", ProxyRefusedMessage)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// proxiedBy returns the first proxy header the request carries, or "".
+func proxiedBy(r *http.Request) string {
+	for _, h := range proxyHeaders {
+		if r.Header.Get(h) != "" {
+			return h
+		}
+	}
+	for k := range r.Header {
+		if strings.HasPrefix(strings.ToLower(k), "tailscale-") {
+			return k
+		}
+	}
+	return ""
 }
 
 func loopbackHost(hostport string) bool {

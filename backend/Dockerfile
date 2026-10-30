@@ -36,6 +36,15 @@ COPY --from=client /src/client/dist /app/client
 # Put HTTPS in front (a reverse proxy, or `tailscale serve`), or open it
 # from the same machine on http://localhost:8080; see README.md.
 ENV CORELLIA_CLIENT_DIR=/app/client CORELLIA_DATA_DIR=/data PORT=8080 CORELLIA_BIND=0.0.0.0
+# /data must exist and belong to the app user before VOLUME: a path that is
+# not in the image is created root:root, the non-root server then cannot
+# write it, and every note, reminder and transcript line is lost on restart
+# (review 2026-10-30 round 5). The server now refuses to start on an
+# unwritable data dir and reports write failures on /healthz, so a volume
+# mounted over /data with the wrong owner fails loudly instead:
+#   docker run -v corellia-data:/data ...        # named volume: owner copied from the image
+#   docker run -v /srv/corellia:/data ...        # bind mount: chown it to the image's corellia uid first
+RUN mkdir -p /data && chown corellia:corellia /data
 VOLUME ["/data"]
 USER corellia
 EXPOSE 8080

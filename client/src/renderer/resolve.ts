@@ -95,15 +95,36 @@ export function floatingOverlays(spec: UISpec): string[] {
  * by the renderer instead of being drawn on top of each other (review
  * 2026-10-30, item 8).
  */
-export function overlayGroups(spec: UISpec): Array<{ position: string; ids: string[] }> {
+export function overlayGroups(spec: UISpec, mode: Placement = placement(spec)): Array<{ position: string; ids: string[] }> {
   const groups = new Map<string, string[]>();
   const ids = floatingOverlays(spec);
   if (spec.root && spec.nodes[spec.root]?.type === "Overlay") ids.unshift(spec.root);
   for (const id of ids) {
-    const pos = String(spec.nodes[id]?.props?.position ?? "top_right");
+    const pos = overlayAnchor(String(spec.nodes[id]?.props?.position ?? "top_right"), mode);
     groups.set(pos, [...(groups.get(pos) ?? []), id]);
   }
   return [...groups.entries()].map(([position, ids]) => ({ position, ids }));
+}
+
+/**
+ * Where a floating overlay goes given what the root is (review 2026-10-30
+ * round 5: glance cards sat over a chart's data). With a full visual every
+ * corner is data, so the cards share one column on the right (the gutter)
+ * and the visual ends before it. With a panel the right side is the panel,
+ * so the cards move to the agent's side, which is decoration. A centred
+ * overlay (a dimmed modal) stays put. Glance and none are unchanged.
+ */
+export function overlayAnchor(position: string, mode: Placement): string {
+  if (position === "center") return position;
+  if (mode === "full") return "gutter";
+  if (mode === "panel") return position.replace("_right", "_left");
+  return position;
+}
+
+/** True when a full visual must leave the gutter free: floating cards that are not centred. */
+export function needsGutter(spec: UISpec, mode: Placement = placement(spec)): boolean {
+  if (mode !== "full") return false;
+  return floatingOverlays(spec).some((id) => String(spec.nodes[id]?.props?.position ?? "top_right") !== "center");
 }
 
 export type Placement = "none" | "glance" | "panel" | "full";

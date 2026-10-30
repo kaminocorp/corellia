@@ -147,3 +147,29 @@ describe("floating overlays", () => {
     expect(container.querySelector('[data-action="p2_yes"]')?.textContent).toBe("Do it");
   });
 });
+
+describe("Stage gutter (review 2026-10-30 round 5)", () => {
+  it("a full visual ends before the gutter while floating cards are up, and the cards render there", () => {
+    const spec = build([
+      { op: "set_data", value: { pts: [{ x: "Mon", y: 1 }, { x: "Tue", y: 2 }] } },
+      { op: "add_node", id: "chart", node: { type: "Chart", props: { kind: "line", data: { bind: "$.pts" }, x: "x", y: "y" } } },
+      { op: "set_root", id: "chart" },
+      { op: "add_node", id: "reply_text", node: { type: "Markdown", props: { text: "Noted." } } },
+      { op: "add_node", id: "reply_card", node: { type: "Overlay", props: { position: "top_right" }, slots: { content: ["reply_text"] } } },
+    ]);
+    const { container, rerender } = render(<Stage spec={spec} agent={<div />} fire={() => {}} />);
+    const root = container.querySelector("[data-placement]")!;
+    expect(root.getAttribute("data-placement")).toBe("full");
+    expect(root.getAttribute("data-gutter")).toBe("1");
+    const zone = container.querySelector('[data-testid="ui-zone"]') as HTMLElement;
+    // jsdom folds the calc; what matters is that an inline right inset is set at all.
+    expect(zone.style.right).toMatch(/rem/);
+    expect(container.querySelector('[data-overlay-group="gutter"] [data-node="reply_card"]')).not.toBeNull();
+    expect(container.querySelector('[data-overlay-group="top_right"]')).toBeNull();
+    // The card decays: the visual takes the full width again.
+    const after = applyOps(spec, [{ op: "remove_node", id: "reply_card" }]);
+    rerender(<Stage spec={after} agent={<div />} fire={() => {}} />);
+    expect(container.querySelector("[data-placement]")!.getAttribute("data-gutter")).toBeNull();
+    expect((container.querySelector('[data-testid="ui-zone"]') as HTMLElement).style.right).toBe("");
+  });
+});

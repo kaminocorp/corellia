@@ -4,6 +4,7 @@ import { OVERLAY_ANCHOR, OverlayStack } from "../components/overlayStack";
 import { registry } from "../components/registry";
 import type { ResolvedAction } from "../components/types";
 import type { UISpec } from "../contract";
+import { ABOVE_FOOTER } from "./footer";
 import { assignHotkeys, overlayGroups, resolveNode } from "./resolve";
 
 type Props = {
@@ -11,32 +12,46 @@ type Props = {
   fire: (actionId: string, nodeId: string) => void;
   /** Reports nodes that failed validation (debug pane). */
   onInvalid?: (nodeId: string, message: string) => void;
+  /**
+   * What to render: the root tree, the floating overlay groups (and a
+   * glance root), or both (the gallery). The Stage renders the two layers
+   * apart so overlays anchor to the screen, not to the scrolling zone.
+   */
+  layer?: "all" | "root" | "overlays";
 };
 
 /**
  * Renders the spec tree from its root plus floating overlays. Nothing
  * renders unless it validates. Floating overlays that share an anchor are
  * laid out in one column there (a glance root, reply card, status card,
- * reminder, clock), instead of each sitting on the others.
+ * reminder, clock), instead of each sitting on the others; the anchor
+ * depends on the root's placement (overlayAnchor), so cards never cover a
+ * full visual or a panel.
  */
-export function Renderer({ spec, fire, onInvalid }: Props) {
+export function Renderer({ spec, fire, onInvalid, layer = "all" }: Props) {
   const hotkeys = useMemo(() => assignHotkeys(spec), [spec]);
   const groups = useMemo(() => overlayGroups(spec), [spec]);
   const rootIsOverlay = !!spec.root && spec.nodes[spec.root]?.type === "Overlay";
   return (
     <>
-      {spec.root && !rootIsOverlay && <NodeView key={spec.root} id={spec.root} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />}
-      {groups.map(({ position, ids }) => (
-        <div key={position} data-overlay-group={position} className={`absolute flex flex-col gap-3 ${OVERLAY_ANCHOR[position] ?? OVERLAY_ANCHOR.top_right}`}>
-          <OverlayStack.Provider value={true}>
-            {ids.map((id) => (
-              <div key={id} data-floating={id} className="contents">
-                <NodeView id={id} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />
-              </div>
-            ))}
-          </OverlayStack.Provider>
-        </div>
-      ))}
+      {layer !== "overlays" && spec.root && !rootIsOverlay && <NodeView key={spec.root} id={spec.root} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />}
+      {layer !== "root" &&
+        groups.map(({ position, ids }) => (
+          <div
+            key={position}
+            data-overlay-group={position}
+            className={`pointer-events-auto absolute flex flex-col gap-3 ${OVERLAY_ANCHOR[position] ?? OVERLAY_ANCHOR.top_right}`}
+            style={position === "gutter" ? { bottom: ABOVE_FOOTER } : undefined}
+          >
+            <OverlayStack.Provider value={true}>
+              {ids.map((id) => (
+                <div key={id} data-floating={id} className="contents">
+                  <NodeView id={id} spec={spec} hotkeys={hotkeys} fire={fire} onInvalid={onInvalid} depth={0} />
+                </div>
+              ))}
+            </OverlayStack.Provider>
+          </div>
+        ))}
     </>
   );
 }

@@ -37,7 +37,13 @@ type Deps struct {
 	Memory  *MemoryHandler
 	// Heartbeat tracks the client's check-ins; nil disables the endpoint.
 	Heartbeat *Heartbeat
-	Logger    *slog.Logger
+	// StoreHealth reports the data directory's last write failure (nil
+	// when writes succeed); nil disables the report. /healthz carries it
+	// as store_ok and store_error, and ok is false while writes fail, so
+	// a backend that is losing memory and transcript says so instead of
+	// serving a session that silently forgets (review 2026-10-30 round 5).
+	StoreHealth func() error
+	Logger      *slog.Logger
 }
 
 // New builds the root http.Handler.
@@ -69,12 +75,23 @@ func New(d Deps) http.Handler {
 		}
 		if d.Heartbeat != nil {
 			body["client_heartbeat_age_s"] = d.Heartbeat.Age()
+			body["kiosk_heartbeat_age_s"] = d.Heartbeat.KioskAge()
+		}
+		if d.StoreHealth != nil {
+			if err := d.StoreHealth(); err != nil {
+				body["ok"] = false
+				body["store_ok"] = false
+				body["store_error"] = err.Error()
+			} else {
+				body["store_ok"] = true
+			}
 		}
 		writeJSON(w, http.StatusOK, body)
 	})
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(hostGuard(d.Config.DevMode()))
+		r.Use(proxyGuard(d.Config.DevMode(), d.Logger))
 		r.Use(originGuard(d.Config.DevOrigins))
 		r.Use(auth.Middleware(d.Config.DeviceToken))
 		r.Use(requireJSON("/api/voice/stt"))

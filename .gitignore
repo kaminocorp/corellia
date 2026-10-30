@@ -8,6 +8,10 @@ backend/bin/
 backend/data/
 data/
 
+# Display box release (box/release.sh output: a ~20 MB static binary and a
+# client build; copy to the box, never commit)
+box/release/
+
 # Node
 node_modules/
 client/dist/

@@ -1,8 +1,10 @@
 /**
  * Mic activation state (roadmap question 6): off at boot; Ctrl+Space
  * toggles an open, VAD-gated mic (toggle mode) or holds it open (ptt
- * mode); Ctrl+M mutes. Only Ctrl: on macOS Cmd+Space is Spotlight and
- * Cmd+M minimises the window. Pure state machine; the hook wires DOM events.
+ * mode); Ctrl+M mutes the mic; Ctrl+Shift+M (handled by the controller)
+ * silences this client's speaker. Only Ctrl: on macOS Cmd+Space is
+ * Spotlight and Cmd+M minimises the window. Pure state machine; the hook
+ * wires DOM events.
  */
 export type MicState = "off" | "listening" | "capturing" | "muted";
 export type ActivationMode = "toggle" | "ptt";
@@ -23,8 +25,10 @@ export class Activation {
   }
 
   /** Returns the transition caused by a key event, or null. */
-  keydown(e: { key: string; code: string; ctrlKey: boolean; metaKey: boolean; repeat: boolean }): ActivationChange | null {
+  keydown(e: { key: string; code: string; ctrlKey: boolean; metaKey: boolean; repeat: boolean; shiftKey?: boolean }): ActivationChange | null {
     if (!e.ctrlKey || e.metaKey || e.repeat) return null;
+    // Ctrl+Shift+M is the speaker toggle (voice/speaker.ts), not the mic mute.
+    if (e.shiftKey) return null;
     if (e.code === "Space") {
       if (this.state === "muted") return null;
       if (this.mode === "ptt") return this.set("listening");

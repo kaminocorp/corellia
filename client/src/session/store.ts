@@ -30,6 +30,14 @@ export type SessionState = {
   touched: Record<string, number>;
   /** Speech pieces heard outside a turn (confirm results, reminders), joined into a transcript entry on the final piece. */
   pendingSpeech: string[];
+  /**
+   * Server status outside the session (phase 17): whether the data
+   * directory is taking writes, and whether a kiosk is connected to the
+   * same backend (from the heartbeat exchange). `storeError` is the
+   * reason while writes fail, null when they succeed.
+   */
+  storeError: string | null;
+  kioskConnected: boolean;
 };
 
 export const MAX_ERRORS = 20;
@@ -53,6 +61,8 @@ export function initialState(): SessionState {
     recentEvents: [],
     touched: {},
     pendingSpeech: [],
+    storeError: null,
+    kioskConnected: false,
   };
 }
 
@@ -157,6 +167,9 @@ export function reduce(state: SessionState, ev: SessionEvent): SessionState {
     }
     case "session_error":
       next.errors = tail([...state.errors, { code: ev.code, message: ev.message, ts: ev.ts, turnId: ev.turn_id }], MAX_ERRORS);
+      // A persist failure stays on screen until the server says the store
+      // writes again (the heartbeat exchange clears it).
+      if (ev.code === "persist") next.storeError = ev.message;
       return next;
     case "proposal": {
       const others = state.pendingProposals.filter((p) => p.id !== ev.proposal.id);
@@ -206,6 +219,13 @@ export class SessionStore {
 
   setConnection(connection: ConnectionStatus): void {
     if (connection !== this.state.connection) this.set({ ...this.state, connection });
+  }
+
+  /** The heartbeat exchange's answer: kiosk connected, store writing. */
+  setServerStatus(s: { kioskConnected: boolean; storeOk: boolean }): void {
+    const storeError = s.storeOk ? null : (this.state.storeError ?? "the data directory is not taking writes");
+    if (s.kioskConnected === this.state.kioskConnected && storeError === this.state.storeError) return;
+    this.set({ ...this.state, kioskConnected: s.kioskConnected, storeError });
   }
 
   /** Applies an op the client itself issues (decay, dismiss) ahead of the server's echo. */

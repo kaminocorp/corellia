@@ -11,24 +11,73 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 // Store is a directory of documents.
 type Store struct {
 	dir string
 	mu  sync.Mutex
+	// lastErr is the most recent write failure, cleared by the next
+	// successful write. /healthz reports it: a store that cannot write
+	// (the Docker volume owned by root, a full disk) used to log once per
+	// turn while the session served as if nothing was wrong, and memory,
+	// reminders and the transcript were lost on restart (review 2026-10-30
+	// round 5).
+	lastErr   error
+	lastErrAt time.Time
 }
 
-// New creates the directory if needed.
+// New creates the directory if needed and proves it is writable: a store
+// that boots on a read-only directory would silently forget everything.
 func New(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
+	if err := probeWritable(dir); err != nil {
+		return nil, fmt.Errorf("store: %s is not writable: %w (fix the owner or mode of the data directory; in Docker the /data volume must belong to the corellia user)", dir, err)
+	}
 	return &Store{dir: dir}, nil
+}
+
+// probeWritable creates and removes an empty file in dir.
+func probeWritable(dir string) error {
+	f, err := os.CreateTemp(dir, ".write-probe.*")
+	if err != nil {
+		return err
+	}
+	name := f.Name()
+	f.Close()
+	return os.Remove(name)
 }
 
 // Dir returns the directory.
 func (s *Store) Dir() string { return s.dir }
+
+// Err returns the last write failure and when it happened, or nil when the
+// most recent write succeeded (or none has been attempted).
+func (s *Store) Err() (error, time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastErr, s.lastErrAt
+}
+
+// Healthy reports whether the last write succeeded.
+func (s *Store) Healthy() bool {
+	err, _ := s.Err()
+	return err == nil
+}
+
+// record notes the outcome of a write (called with the lock held).
+func (s *Store) record(err error) error {
+	if err != nil {
+		s.lastErr = err
+		s.lastErrAt = time.Now()
+	} else {
+		s.lastErr = nil
+	}
+	return err
+}
 
 func (s *Store) path(name string) string { return filepath.Join(s.dir, name) }
 
@@ -40,6 +89,10 @@ func (s *Store) WriteJSON(name string, v any) error {
 	if err != nil {
 		return err
 	}
+	return s.record(s.writeAtomic(name, raw))
+}
+
+func (s *Store) writeAtomic(name string, raw []byte) error {
 	tmp, err := os.CreateTemp(s.dir, name+".*.tmp")
 	if err != nil {
 		return err
@@ -87,11 +140,11 @@ func (s *Store) AppendJSONL(name string, v any) error {
 	}
 	f, err := os.OpenFile(s.path(name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		return err
+		return s.record(err)
 	}
 	defer f.Close()
 	_, err = f.Write(append(raw, '\n'))
-	return err
+	return s.record(err)
 }
 
 // ReadJSONL calls fn for every line (malformed lines are skipped). A

@@ -36,6 +36,14 @@ type Options struct {
 	MaxToolRounds int
 	// Fallbacks enables server-side refusal fallbacks (default true).
 	Fallbacks *bool
+	// CacheTTL is the prompt-cache lifetime of the system breakpoint: ""
+	// or "5m" (the API default) or "1h". An always-on agent's turns are
+	// often more than five minutes apart, so the static prefix (system
+	// block and tools, the large part) starts cold each time; the hour
+	// option costs more per write and keeps it warm (review 2026-10-30
+	// round 5). Later breakpoints keep the default, which the API allows
+	// (longer lifetimes must come first).
+	CacheTTL string
 }
 
 // DefaultMaxTokens is the output cap when CORELLIA_MAX_TOKENS is unset: the
@@ -217,6 +225,15 @@ func setCache(msg *anthropic.BetaMessageParam, on bool) {
 	}
 }
 
+// systemCache is the system block's breakpoint, with the configured TTL.
+func (r *Runtime) systemCache() anthropic.BetaCacheControlEphemeralParam {
+	cc := anthropic.NewBetaCacheControlEphemeralParam()
+	if r.o.CacheTTL == "1h" {
+		cc.TTL = anthropic.BetaCacheControlEphemeralTTLTTL1h
+	}
+	return cc
+}
+
 func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit) error {
 	system := prompt.System(turn.Context, prompt.Options{IncludeShowUI: turn.Context.Tools != nil})
 	messages := r.history(turn)
@@ -231,7 +248,7 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 		params := anthropic.BetaMessageNewParams{
 			Model:     anthropic.Model(r.o.Model),
 			MaxTokens: r.o.MaxTokens,
-			System:    []anthropic.BetaTextBlockParam{{Text: system, CacheControl: anthropic.NewBetaCacheControlEphemeralParam()}},
+			System:    []anthropic.BetaTextBlockParam{{Text: system, CacheControl: r.systemCache()}},
 			Messages:  messages,
 			Tools:     tools,
 			OutputConfig: anthropic.BetaOutputConfigParam{

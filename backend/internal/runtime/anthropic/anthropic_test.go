@@ -420,3 +420,32 @@ func TestCacheBreakpointsAndTurnContext(t *testing.T) {
 		t.Fatalf("%d message breakpoints in round 1, want 2 (the API allows four in all)", n)
 	}
 }
+
+// CORELLIA_CACHE_TTL=1h puts the hour lifetime on the system breakpoint
+// only; the default sends no ttl (review 2026-10-30 round 5: turns on an
+// always-on agent are often more than five minutes apart).
+func TestCacheTTLOnSystemBreakpoint(t *testing.T) {
+	for _, ttl := range []string{"", "5m", "1h"} {
+		srv, c := server(t, func(_ int, w http.ResponseWriter) { textStream(w, "Hi.", "end_turn") })
+		rt := New(Options{APIKey: "k", BaseURL: srv.URL, CacheTTL: ttl})
+		rttest.Collect(mustStart(t, rt, turn(&rttest.Tools{})))
+		c.mu.Lock()
+		body := c.bodies[0]
+		c.mu.Unlock()
+		sys := body["system"].([]any)[0].(map[string]any)
+		cc := sys["cache_control"].(map[string]any)
+		got, _ := cc["ttl"].(string)
+		want := ""
+		if ttl == "1h" {
+			want = "1h"
+		}
+		if got != want {
+			t.Errorf("CacheTTL %q: system ttl = %q, want %q", ttl, got, want)
+		}
+		msgs := body["messages"].([]any)
+		last := msgs[len(msgs)-1].(map[string]any)["content"].([]any)
+		if cc, ok := last[len(last)-1].(map[string]any)["cache_control"].(map[string]any); !ok || cc["ttl"] != nil {
+			t.Errorf("CacheTTL %q: the moving breakpoint must keep the default lifetime: %v", ttl, cc)
+		}
+	}
+}

@@ -39,3 +39,14 @@ describe("Activation", () => {
     expect(a.keyup({ code: "Space" })).toBeNull();
   });
 });
+
+describe("Activation and the speaker key", () => {
+  it("ignores Ctrl+Shift+M (the speaker toggle) so it does not mute the mic", () => {
+    const a = new Activation("toggle");
+    a.keydown({ key: "", code: "Space", ctrlKey: true, metaKey: false, repeat: false });
+    expect(a.state).toBe("listening");
+    expect(a.keydown({ key: "M", code: "KeyM", ctrlKey: true, metaKey: false, repeat: false, shiftKey: true })).toBeNull();
+    expect(a.state).toBe("listening");
+    expect(a.keydown({ key: "m", code: "KeyM", ctrlKey: true, metaKey: false, repeat: false, shiftKey: false })?.to).toBe("muted");
+  });
+});

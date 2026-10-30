@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.17 - Phase 17: Round-5 Review: One Voice for Mac and Box (Speaker Policy, Ctrl+Shift+M, ?quiet=) + Per-Client Heartbeat for the Watchdog + Dev Mode Refuses Proxied Requests + Loud Store (Boot Probe, /healthz, Banner) and Docker /data Ownership + Stable History Cache Prefix (CORELLIA_CACHE_TTL) + Cards in a Gutter beside Full Visuals + box/release Ignored (2026-10-30)](#01517---phase-17-round-5-review-one-voice-for-mac-and-box-speaker-policy-ctrlshiftm-quiet--per-client-heartbeat-for-the-watchdog--dev-mode-refuses-proxied-requests--loud-store-boot-probe-healthz-banner-and-docker-data-ownership--stable-history-cache-prefix-corelliacachettl--cards-in-a-gutter-beside-full-visuals--boxrelease-ignored-2026-10-30)
 - [0.15.16 - Phase 16: Round-4 Review, Deployment Fixes: Model Clock Follows CORELLIA_TZ + Voice Needs HTTPS or localhost (Indicator, Kiosk Flag, Topologies) + Kiosk Owns tty1 + release.sh and --release Install + Refusal Said Separately and out of History + Prompt Caching with a Stable Prefix + .dockerignore + Watchdog Restarts a Never-Loaded Kiosk + Local Demo Intents (2026-10-30)](#01516---phase-16-round-4-review-deployment-fixes-model-clock-follows-corellia_tz--voice-needs-https-or-localhost-indicator-kiosk-flag-topologies--kiosk-owns-tty1--releasesh-and---release-install--refusal-said-separately-and-out-of-history--prompt-caching-with-a-stable-prefix--dockerignore--watchdog-restarts-a-never-loaded-kiosk--local-demo-intents-2026-10-30)
 - [0.15.15 - Phase 15: Round-3 Review, Remaining Items: Reminder Lead-In + Minute Wording + No Empty Key Cap + SSE Replay from the Snapshot + Cancelled Replies out of History + finish_reason length = Cut Off + Local Demo Intents and Times + packageManager Pin (2026-10-29)](#01515---phase-15-round-3-review-remaining-items-reminder-lead-in--minute-wording--no-empty-key-cap--sse-replay-from-the-snapshot--cancelled-replies-out-of-history--finishreason-length--cut-off--local-demo-intents-and-times--packagemanager-pin-2026-10-29)
 - [0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)](#01514---phase-14-round-3-review-fixes-footer-aware-layout-no-transcript-over-visuals--plain-words-error-line--max_tokens--cut-off-cap-64000-corellia_max_tokens--failures-classified-by-http-status--osm-attribution-referer-and-block-detection--held-speech-until-a-gesture--owner-checklist-corrections-2026-10-29)
@@ -98,6 +99,35 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.17 - Phase 17: Round-5 Review: One Voice for Mac and Box (Speaker Policy, Ctrl+Shift+M, ?quiet=) + Per-Client Heartbeat for the Watchdog + Dev Mode Refuses Proxied Requests + Loud Store (Boot Probe, /healthz, Banner) and Docker /data Ownership + Stable History Cache Prefix (CORELLIA_CACHE_TTL) + Cards in a Gutter beside Full Visuals + box/release Ignored (2026-10-30)
+
+Roadmap Phase 17: every non-blocking finding of the fifth independent review ([`executing/review-2026-10-30-round5.md`](executing/review-2026-10-30-round5.md), against `681651a`: "alpha-ready to deploy today; beta-ready in everything that can be checked without the owner"). Full notes: [`completions/phase-17-round-5-mac-and-box.md`](completions/phase-17-round-5-mac-and-box.md). Every item has a test; two were also verified live against the built binary. No code blocker is known for a deployable beta; what remains is the owner's three runs (live model, Mac audio, first box provisioning) in [`executing/owner-checklist.md`](executing/owner-checklist.md) and [`../box/README.md`](../box/README.md).
+
+### Added
+
+- **Speaker policy** (`client/src/voice/speaker.ts`): the kiosk always speaks; a browser is silent while a kiosk is connected to the same backend ("sound on the display" in the mic indicator); **`Ctrl+Shift+M`**, **`?quiet=1`** and **`?quiet=0`** override, remembered per browser. `VoiceStatus.speaker`, `VoiceController.setSpeaker`.
+- **Tagged heartbeats**: `POST /api/heartbeat` takes `{"client":"kiosk"|"browser"}` and answers with `kiosk_heartbeat_age_s` and `store_ok`; `/healthz` adds **`kiosk_heartbeat_age_s`**, `store_ok` and `store_error`, and `ok` is false while the store cannot write.
+- **Dev-mode proxy guard**: a request carrying `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `X-Forwarded-Host`/`-Proto`, `Via` or a `Tailscale-*` header is refused with 403 "dev mode: requests through a proxy need CORELLIA_DEVICE_TOKEN" (logged once); `CORELLIA_TRUSTED_PROXIES` peers are exempt.
+- **Store health**: `store.New` proves the data directory writable (the server exits with the fix in the message otherwise); `Store.Err`/`Healthy` track later write failures; the session publishes a `session_error` code **`persist`**; the client shows a persistent **"can't save"** banner (`StoreBanner`) until the store writes again.
+- **`session.Options.HistoryStep`** (default 10): the history window drops ten entries at a time so the cached prefix is identical across turns.
+- **`CORELLIA_CACHE_TTL`** (`5m` default, `1h`): the system breakpoint's cache lifetime for the anthropic runtime (`anthropic.Options.CacheTTL`).
+- **Overlay gutter**: floating cards render in their own layer; beside a full visual they share a right-hand column and the visual ends before it (`overlayAnchor`, `needsGutter`, `Renderer layer`); beside a panel they move to the agent's side.
+- **`.gitignore`**: `box/release/`.
+
+### Fixed
+
+- **Two voices with the Mac and the box on one backend**: every client spoke every reply (review round 5, Mac-and-box group). Now one does.
+- **A Mac tab's heartbeat hid a hung kiosk from the watchdog**: the watchdog reads the kiosk's own age; the kiosk script keeps `kiosk=1` in the URL whatever `CORELLIA_KIOSK_QUERY` says.
+- **Dev mode behind a same-host proxy was open to everyone the proxy served** (`tailscale serve` connects from loopback): refused with the fix named.
+- **The Docker image could not write `/data` and reported itself healthy** while every note, reminder and transcript line was lost: `/data` is created and owned by the app user before `VOLUME`; an unwritable data dir stops the server at boot; later failures are visible on `/healthz`, on the page and on the stream.
+- **The history cache stopped hitting after about ten exchanges**: the window slid by one pair per turn once the transcript passed 20 entries; it now moves once per ten entries.
+- **Glance cards covered a chart's data** after "show me a chart" then a reminder: cards go to the gutter beside a full visual, and the smoke test asserts it at three viewports.
+- **`box/release/` was one `git add -A` from a commit.**
+
+### Edited
+
+- `README.md` (dev mode, HTTPS line, "Two displays on one backend", writable data dir), `box/README.md` (fourth topology row, `tailscale serve` and dev mode, watchdog field, gitignored release), `docs/stack.md` (health and heartbeat fields, guard order, `CORELLIA_CACHE_TTL`, Docker `/data`), `.env.example`, `backend/Dockerfile` (comment), `docs/executing/owner-checklist.md` (cache usage to read during A; the one-voice check), the roadmap (status, Phase 17, versioning, progress).
 
 ## 0.15.16 - Phase 16: Round-4 Review, Deployment Fixes: Model Clock Follows CORELLIA_TZ + Voice Needs HTTPS or localhost (Indicator, Kiosk Flag, Topologies) + Kiosk Owns tty1 + release.sh and --release Install + Refusal Said Separately and out of History + Prompt Caching with a Stable Prefix + .dockerignore + Watchdog Restarts a Never-Loaded Kiosk + Local Demo Intents (2026-10-30)
 

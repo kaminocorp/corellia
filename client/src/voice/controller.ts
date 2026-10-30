@@ -10,6 +10,7 @@ import { BrowserStt, browserRecognitionAvailable } from "./browserStt";
 import { MicCapture, type CaptureCallbacks } from "./capture";
 import { fetchVoiceCapabilities, type VoiceCapabilities } from "./capabilities";
 import { BrowserSynthBackend, ServerTtsBackend, SpeechPlayer, type PlayBackend } from "./playback";
+import type { SpeakerState } from "./speaker";
 
 export type VoiceStatus = {
   mic: MicState;
@@ -19,6 +20,8 @@ export type VoiceStatus = {
   speaking: boolean;
   /** blocked: the browser refused to play until a key press or click (speech is held). */
   sound: "ready" | "blocked";
+  /** Whether this client plays speech: on, off (Ctrl+Shift+M, ?quiet=1) or display (the kiosk speaks instead). */
+  speaker: SpeakerState;
   error: string | null;
 };
 
@@ -44,6 +47,8 @@ export type VoiceDeps = {
    * (review 2026-10-30 round 4, item 4).
    */
   secureContext: () => boolean;
+  /** Ctrl+Shift+M: the app flips the speaker preference for this client (voice/speaker.ts). */
+  toggleSpeaker?: () => void;
 };
 
 /** What the mic indicator says when the page cannot have a microphone at all. */
@@ -52,7 +57,7 @@ export const INSECURE_CONTEXT_ERROR = "voice needs HTTPS or localhost; this page
 const silent: PlayBackend = { speak: async () => {}, stop: () => {} };
 
 export class VoiceController {
-  private status: VoiceStatus = { mic: "off", mode: "toggle", stt: "none", tts: "none", speaking: false, sound: "ready", error: null };
+  private status: VoiceStatus = { mic: "off", mode: "toggle", stt: "none", tts: "none", speaking: false, sound: "ready", speaker: "on", error: null };
   private listeners = new Set<() => void>();
   private readonly activation = new Activation("toggle");
   readonly player: SpeechPlayer;
@@ -70,6 +75,8 @@ export class VoiceController {
    * the indicator says off (review 2026-10-30, item 3).
    */
   private micGen = 0;
+  /** What Ctrl+Shift+M does; set by the app (useVoice), falls back to deps.toggleSpeaker. */
+  private speakerToggle: (() => void) | undefined;
 
   constructor(private readonly deps: VoiceDeps) {
     this.player = new SpeechPlayer(silent, {
@@ -140,10 +147,26 @@ export class VoiceController {
     this.activeTurnId = id;
   }
 
-  /** Stream events: speech plays; a new or cancelled turn cuts playback. */
+  /** Registers the Ctrl+Shift+M handler (the app owns the speaker preference). */
+  setSpeakerToggle(fn: (() => void) | undefined): void {
+    this.speakerToggle = fn;
+  }
+
+  /**
+   * Sets whether this client plays speech. Anything queued or playing stops
+   * when the speaker goes quiet; the transcript still shows the words.
+   */
+  setSpeaker(state: SpeakerState): void {
+    if (state === this.status.speaker) return;
+    if (state !== "on") this.player.stop();
+    this.patch({ speaker: state });
+  }
+
+  /** Stream events: speech plays (on this client, if it is the speaker); a new or cancelled turn cuts playback. */
   onStreamEvent(ev: SessionEvent): void {
-    if (ev.type === "speech") this.player.enqueue(ev.text);
-    else if (ev.type === "turn_started" || (ev.type === "turn_done" && ev.status === "cancelled")) this.player.stop();
+    if (ev.type === "speech") {
+      if (this.status.speaker === "on") this.player.enqueue(ev.text);
+    } else if (ev.type === "turn_started" || (ev.type === "turn_done" && ev.status === "cancelled")) this.player.stop();
   }
 
   /** Barge-in: the user started speaking. Playback stops and the running turn is cancelled. */
@@ -182,6 +205,11 @@ export class VoiceController {
 
   handleKeyDown(e: KeyboardEvent): void {
     this.player.prime();
+    if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.repeat && e.key.toLowerCase() === "m") {
+      e.preventDefault();
+      (this.speakerToggle ?? this.deps.toggleSpeaker)?.();
+      return;
+    }
     const change = this.activation.keydown(e);
     if (change || (e.ctrlKey && (e.code === "Space" || e.key.toLowerCase() === "m"))) e.preventDefault();
     void this.apply(change);

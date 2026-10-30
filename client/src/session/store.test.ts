@@ -160,3 +160,20 @@ describe("useSessionState", () => {
     expect(s2.pendingSpeech).toEqual([]);
   });
 });
+
+describe("server status (phase 17)", () => {
+  it("records a persist failure from the stream and clears it when the heartbeat says the store writes", () => {
+    const store = new SessionStore();
+    store.dispatch({ type: "session_error", seq: 1, ts: "2026-10-30T00:00:00Z", code: "persist", message: "could not save the transcript: permission denied" } as SessionEvent);
+    expect(store.getState().storeError).toContain("permission denied");
+    store.setServerStatus({ kioskConnected: true, storeOk: false });
+    expect(store.getState().storeError).toContain("permission denied");
+    expect(store.getState().kioskConnected).toBe(true);
+    store.setServerStatus({ kioskConnected: false, storeOk: true });
+    expect(store.getState().storeError).toBeNull();
+    expect(store.getState().kioskConnected).toBe(false);
+    // A failure the stream never reported still gets a message.
+    store.setServerStatus({ kioskConnected: false, storeOk: false });
+    expect(store.getState().storeError).toBeTruthy();
+  });
+});

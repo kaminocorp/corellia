@@ -151,3 +151,19 @@ func TestHostAllowed(t *testing.T) {
 		t.Error("wildcard should allow everything")
 	}
 }
+
+func TestValidateCacheTTL(t *testing.T) {
+	base := Config{Port: 8080, AgentName: "Corellia", Runtime: "auto", Effort: "low", STT: "auto", TTS: "auto", VoiceMode: "toggle", VoiceBargeIn: "auto"}
+	for _, ok := range []string{"", "5m", "1h"} {
+		c := base
+		c.CacheTTL = ok
+		if err := c.Validate(); err != nil {
+			t.Errorf("CacheTTL %q: %v", ok, err)
+		}
+	}
+	c := base
+	c.CacheTTL = "2h"
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "CORELLIA_CACHE_TTL") {
+		t.Errorf("CacheTTL 2h: err = %v", err)
+	}
+}

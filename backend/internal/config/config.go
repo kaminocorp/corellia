@@ -79,6 +79,9 @@ type Config struct {
 	// AnthropicFallbacks sends the server-side fallback beta with every
 	// request (default true). Set false if the account rejects the beta.
 	AnthropicFallbacks bool `env:"CORELLIA_ANTHROPIC_FALLBACKS" envDefault:"true"`
+	// CacheTTL is the prompt-cache lifetime of the static prefix for the
+	// anthropic runtime: 5m (default) or 1h.
+	CacheTTL string `env:"CORELLIA_CACHE_TTL" envDefault:"5m"`
 	// HermesURL / HermesToken point at the Hermes chat sidecar.
 	HermesURL   string `env:"CORELLIA_HERMES_URL"`
 	HermesToken string `env:"CORELLIA_HERMES_TOKEN"`
@@ -145,6 +148,11 @@ func (c Config) Validate() error {
 	case "low", "medium", "high", "xhigh", "max":
 	default:
 		return fmt.Errorf("config: CORELLIA_EFFORT %q is not one of low|medium|high|xhigh|max", c.Effort)
+	}
+	switch c.CacheTTL {
+	case "", "5m", "1h":
+	default:
+		return fmt.Errorf("config: CORELLIA_CACHE_TTL %q is not one of 5m|1h", c.CacheTTL)
 	}
 	for _, v := range []string{c.STT, c.TTS} {
 		switch v {

@@ -61,3 +61,7 @@ Record in the Phase 8 completion note's acceptance line: speech start latency (k
 ## When both are done
 
 The build is a beta: update the status line at the top of [`roadmap.md`](roadmap.md), add the two results to [`../changelog.md`](../changelog.md), and push the branch. Anything either run exposes becomes the next phase's list.
+
+While doing A, also read `usage.cache_read_input_tokens` on the second and later turns: non-zero for the system prefix every time, and for the history on most turns (the window now moves once per ten transcript entries, not every turn). If turns are usually more than five minutes apart and the cost matters, set `CORELLIA_CACHE_TTL=1h`.
+
+When the box and the Mac share one backend (box/README.md, last topology row), check once that only the box speaks and that the Mac's indicator says **sound on the display**; `Ctrl+Shift+M` on the Mac should make it speak and `Ctrl+Shift+M` again silence it.

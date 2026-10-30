@@ -36,6 +36,13 @@ out="$(CORELLIA_BOX_ENV=/nonexistent CORELLIA_URL=http://10.0.0.5:8080/ CORELLIA
 grep -qx -- 'http://10.0.0.5:8080/?kiosk=1&particles=6000' <<<"$out" || fail "trailing slash / query: $out"
 grep -qx -- '--unsafely-treat-insecure-origin-as-secure=http://10.0.0.5:8080' <<<"$out" || fail "origin from a URL with a trailing slash: $out"
 pass=$((pass+1))
+# A custom query that forgot kiosk=1 gets it back (the watchdog and the
+# speaking-client rule depend on the tag; phase 17).
+out="$(CORELLIA_BOX_ENV=/nonexistent CORELLIA_URL=http://127.0.0.1:8080 CORELLIA_KIOSK_QUERY='particles=6000' CORELLIA_KIOSK_PRINT=1 HOME="$TMP" bash "$HERE/corellia-kiosk.sh")"
+grep -qx -- 'http://127.0.0.1:8080/?kiosk=1&particles=6000' <<<"$out" || fail "kiosk=1 not restored to a custom query: $out"
+out="$(CORELLIA_BOX_ENV=/nonexistent CORELLIA_URL=http://127.0.0.1:8080 CORELLIA_KIOSK_QUERY='stats=1&kiosk=1' CORELLIA_KIOSK_PRINT=1 HOME="$TMP" bash "$HERE/corellia-kiosk.sh")"
+grep -qx -- 'http://127.0.0.1:8080/?stats=1&kiosk=1' <<<"$out" || fail "kiosk=1 duplicated: $out"
+pass=$((pass+1))
 
 # --- watchdog ----------------------------------------------------------------
 BODY="$TMP/healthz.json"
@@ -121,6 +128,25 @@ pass=$((pass+1))
 : > "$LOG"; : > "$BODY"
 tick "$URL"; tick "$URL"
 [ "$(restarts)" = 1 ] || fail "503 did not count as unreachable (got $(restarts))"
+pass=$((pass+1))
+
+# A Mac tab's fresh heartbeat must not hide a hung kiosk: when the backend
+# reports the kiosk's own age, that is what counts (phase 17).
+: > "$LOG"
+echo '{"ok":true,"client_heartbeat_age_s":3,"kiosk_heartbeat_age_s":240}' > "$BODY"
+tick "$URL"
+[ "$(restarts)" = 1 ] || fail "a browser heartbeat hid the kiosk's stale age (got $(restarts))"
+: > "$LOG"
+echo '{"ok":true,"client_heartbeat_age_s":3,"kiosk_heartbeat_age_s":-1}' > "$BODY"
+tick "$URL"; tick "$URL"
+[ "$(restarts)" = 0 ] || fail "kiosk never seen: restarted before the grace"
+tick "$URL"
+[ "$(restarts)" = 1 ] || fail "kiosk never seen while a browser is connected: no restart after the grace (got $(restarts))"
+# A healthy kiosk with a stale browser is fine.
+: > "$LOG"
+echo '{"ok":true,"client_heartbeat_age_s":500,"kiosk_heartbeat_age_s":5}' > "$BODY"
+tick "$URL"
+[ "$(restarts)" = 0 ] || fail "a stale browser heartbeat restarted a healthy kiosk"
 pass=$((pass+1))
 
 echo "box/test.sh: $pass checks passed"

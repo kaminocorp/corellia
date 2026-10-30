@@ -173,6 +173,23 @@ for (const viewport of [
     expect(zoneBox.y + zoneBox.height).toBeLessThanOrEqual(transcriptBox.y + 1);
     // The zone still has room for the visual.
     expect(zoneBox.height).toBeGreaterThan(viewport.height * 0.45);
+    // A card that arrives while the visual is up goes to the gutter beside
+    // it, not over its data (review 2026-10-30 round 5): the reminder's
+    // confirm card and reply card land in one column that the visual's zone
+    // does not touch.
+    await input.fill("remind me in 5 minutes to stretch");
+    await input.press("Enter");
+    await expect(page.getByTestId("agent-state")).toHaveText("idle", { timeout: 20_000 });
+    const gutter = page.locator('[data-overlay-group="gutter"]');
+    await expect(gutter).toBeVisible();
+    await expect(page.locator("[data-placement]")).toHaveAttribute("data-gutter", "1");
+    await page.waitForTimeout(700);
+    const gutterBox = (await gutter.boundingBox())!;
+    const zoneAfter = (await zone.boundingBox())!;
+    expect(gutterBox.width).toBeGreaterThan(200);
+    expect(zoneAfter.x + zoneAfter.width).toBeLessThanOrEqual(gutterBox.x + 1);
+    expect(page.locator('[data-overlay-group="top_right"], [data-overlay-group="bottom_right"]')).toHaveCount(0);
+    await page.keyboard.press("Escape");
     expect(errors).toEqual([]);
   });
 }
