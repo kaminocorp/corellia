@@ -81,7 +81,7 @@ func (r *Runtime) Start(ctx context.Context, turn runtime.Turn) (<-chan runtime.
 
 func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit func(runtime.Event) bool) error {
 	if r.o.PrimeInstructions && !r.primed {
-		instructions := prompt.System(turn.Context, prompt.Options{IncludeShowUI: true}) +
+		instructions := prompt.Full(turn.Context, prompt.Options{IncludeShowUI: true}) +
 			"\nWhen you want to show a visual, append a fenced block ```corellia-ui containing a JSON array of spec ops.\n"
 		if _, err := r.chat(ctx, "Instructions for this session (do not reply to them, just acknowledge with OK): "+instructions); err != nil {
 			return err

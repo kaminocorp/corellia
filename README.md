@@ -38,6 +38,8 @@ Open http://localhost:8080 in a browser (Chrome on macOS is the development targ
 
 Without `CORELLIA_DEVICE_TOKEN` the server is in dev mode: it listens on `127.0.0.1` only, serves loopback hosts only, and refuses cross-origin requests, so macOS shows no firewall prompt. With a token it listens on every interface (`CORELLIA_BIND` pins one); the display presents the token once as `?token=`, which the page stores and removes from the address bar, or types it into the prompt the page shows when the backend answers 401.
 
+**Voice needs a secure context.** Browsers expose the microphone only on `https://` pages or on plain `http://` at `localhost`. A display that opens the backend as `http://192.168.x.y:8080` from another machine (the Docker image reached over the LAN, a box with an off-box backend) has no voice, and the mic indicator says **voice needs HTTPS or localhost**. Put HTTPS in front (`tailscale serve --bg --https=443 http://127.0.0.1:8080` on the backend host publishes it as `https://<host>.<tailnet>.ts.net`), or run the backend on the display machine; the kiosk script has a Chromium-only workaround, see [`box/README.md`](box/README.md).
+
 With hot reload on both sides:
 
 ```bash
@@ -51,7 +53,7 @@ Mac voice notes: `Ctrl+Space` toggles the mic (Cmd is left alone so Spotlight ke
 ## Check it
 
 ```bash
-pnpm check          # client type-check, lint, tests; backend vet and tests; browser smoke test
+pnpm check          # client type-check, lint, tests; backend vet and tests; box script tests; browser smoke test
 pnpm e2e            # the smoke tests alone: real Chromium against the Go server (/, /?gallery=1, /?debug=1, a proposal, a failed turn)
 ```
 
@@ -71,7 +73,7 @@ docs/      VISION.md, roadmap, completions, changelog, stack, archive/
 
 ## Display box
 
-See [`box/README.md`](box/README.md): Chromium kiosk on Debian, auto-login, no blanking, a heartbeat-driven watchdog, and the 30 fps test procedure. Scripts are written from documentation and await their first run on hardware.
+See [`box/README.md`](box/README.md): the three topologies and what each means for voice, `box/release.sh` to build the Linux binary and the client on the Mac, `provision.sh --with-backend --release <dir>` to install them, a Chromium kiosk that owns tty1, no blanking, a heartbeat-driven watchdog, and the 30 fps test procedure. Scripts are written from documentation and await their first run on hardware; `box/test.sh` (in `pnpm check`) covers the kiosk flags and the watchdog decisions.
 
 ## History
 

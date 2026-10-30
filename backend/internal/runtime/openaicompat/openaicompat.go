@@ -116,7 +116,7 @@ func (r *Runtime) toolDefs(turn runtime.Turn) []map[string]any {
 }
 
 func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit) error {
-	msgs := []message{{Role: "system", Content: prompt.System(turn.Context, prompt.Options{IncludeShowUI: turn.Context.Tools != nil})}}
+	msgs := []message{{Role: "system", Content: prompt.Full(turn.Context, prompt.Options{IncludeShowUI: turn.Context.Tools != nil})}}
 	for _, m := range turn.History {
 		if m.Text == "" {
 			continue

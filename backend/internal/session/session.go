@@ -47,8 +47,12 @@ type Options struct {
 	Transcript TranscriptStore
 	// MemoryNotes is how many notes go into the prompt (0: 30).
 	MemoryNotes int
-	// Now is the wall clock; defaults to time.Now.
+	// Now is the wall clock; defaults to time.Now in Location.
 	Now func() time.Time
+	// Location is the zone the clock reads in (CORELLIA_TZ): the prompt's
+	// date and time and every timestamp the session writes. nil: the
+	// process zone. Ignored when Now is set.
+	Location *time.Location
 	// HistoryLimit is how many transcript entries a runtime sees.
 	HistoryLimit int
 	// BusCapacity is how many events are retained for replay.
@@ -117,6 +121,12 @@ var ErrNoRuntime = errors.New("session: no runtime configured")
 func New(o Options) *Session {
 	if o.Now == nil {
 		o.Now = time.Now
+		if loc := o.Location; loc != nil {
+			// The tools and the scheduler already read the configured zone;
+			// the model's clock in the prompt must agree with them (review
+			// 2026-10-30 round 4, item 3).
+			o.Now = func() time.Time { return time.Now().In(loc) }
+		}
 	}
 	if o.ID == "" {
 		o.ID = "main"
@@ -401,7 +411,11 @@ func (s *Session) run(ctx context.Context, at *activeTurn, turn runtime.Turn) {
 		})
 		switch {
 		case status == gen.TurnDoneEventStatusFailed:
-			s.showStatusCard("That didn't work: "+describeFailure(failure), "error", 20*time.Second)
+			if !errors.Is(failure, runtime.ErrRefused) {
+				// A refusal is the model's decision, not a malfunction: it is
+				// said, not reported as an error.
+				s.showStatusCard("That didn't work: "+describeFailure(failure), "error", 20*time.Second)
+			}
 			if stream != nil {
 				// Whatever was already said stays said; the unspoken rest of
 				// the partial reply is its own piece, marked as cut off, and
@@ -708,7 +722,11 @@ func truncate(s string, n int) string {
 // the event stream and the log, not to the speaker.
 func failureReply(partial string, reason error) string {
 	apology := "Sorry, that didn't work on my side."
-	if reason != nil {
+	switch {
+	case errors.Is(reason, runtime.ErrRefused):
+		// Not a malfunction: the model declined. Its words stand alone.
+		apology = describeFailure(reason)
+	case reason != nil:
 		apology += " " + describeFailure(reason)
 	}
 	p := ellipsize(partial)

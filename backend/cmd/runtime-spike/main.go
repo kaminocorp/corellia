@@ -70,10 +70,14 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
+	loc, err := cfg.Location()
+	if err != nil {
+		fail(err)
+	}
 	toolReg := tools.NewRegistry()
-	builtin.Register(toolReg, builtin.Options{})
+	builtin.Register(toolReg, builtin.Options{Location: loc})
 	gate := actions.New(toolReg, 2*time.Minute, time.Now)
-	sess := session.New(session.Options{AgentName: cfg.AgentName, Runtime: rt, Registry: reg, Tools: toolReg, Gate: gate})
+	sess := session.New(session.Options{AgentName: cfg.AgentName, Runtime: rt, Registry: reg, Tools: toolReg, Gate: gate, Location: loc})
 	defer sess.Close()
 
 	ch, unsub := sess.Subscribe(0)

@@ -36,7 +36,18 @@ export type VoiceDeps = {
   createBrowserStt: (cb: ConstructorParameters<typeof BrowserStt>[0]) => { start(): void; stop(): void };
   browserSynth: () => PlayBackend | null;
   serverSynth: (fetchAudio: (text: string, signal?: AbortSignal) => Promise<ArrayBuffer>) => PlayBackend;
+  /**
+   * Whether the page is a secure context (HTTPS, or http on localhost). The
+   * browser exposes the microphone, for getUserMedia and for its own
+   * recognition alike, only in one; a display that opens the backend as
+   * http://192.168.x.y:8080 has no voice, and the indicator must say why
+   * (review 2026-10-30 round 4, item 4).
+   */
+  secureContext: () => boolean;
 };
+
+/** What the mic indicator says when the page cannot have a microphone at all. */
+export const INSECURE_CONTEXT_ERROR = "voice needs HTTPS or localhost; this page is plain HTTP at a network address";
 
 const silent: PlayBackend = { speak: async () => {}, stop: () => {} };
 
@@ -229,6 +240,11 @@ export class VoiceController {
 
   private async openMic(): Promise<void> {
     const gen = ++this.micGen;
+    if (!this.deps.secureContext()) {
+      this.forceOff();
+      this.patch({ error: INSECURE_CONTEXT_ERROR });
+      return;
+    }
     try {
       if (this.caps.stt === "none" && this.deps.browserRecognition()) {
         const stt = this.deps.createBrowserStt({
@@ -314,5 +330,6 @@ export function defaultDeps(api: Pick<VoiceDeps, "getMicStream" | "transcribe" |
     createBrowserStt: (cb) => new BrowserStt(cb),
     browserSynth: () => (BrowserSynthBackend.available() ? new BrowserSynthBackend() : null),
     serverSynth: (fetchAudio) => new ServerTtsBackend(fetchAudio),
+    secureContext: () => window.isSecureContext !== false,
   };
 }

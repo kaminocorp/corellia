@@ -17,6 +17,7 @@ import (
 	"github.com/hejijunhao/corellia/backend/internal/contract/gen"
 	"github.com/hejijunhao/corellia/backend/internal/runtime"
 	"github.com/hejijunhao/corellia/backend/internal/runtime/local"
+	"github.com/hejijunhao/corellia/backend/internal/runtime/prompt"
 )
 
 func reg(t *testing.T) *contract.Registry {
@@ -217,6 +218,52 @@ func TestNewTurnCancelsRunningOne(t *testing.T) {
 	}
 	if got := strings.Join(roles, ","); got != "user:one,user:two,agent:late" {
 		t.Fatalf("history = %s", got)
+	}
+}
+
+// capturing records the turns it is started with.
+type capturing struct {
+	scripted
+	turns []runtime.Turn
+}
+
+func (c *capturing) Start(ctx context.Context, turn runtime.Turn) (<-chan runtime.Event, error) {
+	c.turns = append(c.turns, turn)
+	return c.scripted.Start(ctx, turn)
+}
+
+// Options.Location sets the clock the runtime sees, so the prompt's date
+// and time agree with the tools and the scheduler, which already read
+// CORELLIA_TZ (review 2026-10-30 round 4, item 3).
+func TestClockFollowsLocation(t *testing.T) {
+	sg, err := time.LoadLocation("Asia/Singapore")
+	if err != nil {
+		t.Skip(err)
+	}
+	rt := &capturing{scripted: scripted{events: []runtime.Event{{Kind: runtime.EventTextDelta, Text: "ok"}, {Kind: runtime.EventDone}}}}
+	s := New(Options{Registry: reg(t), Runtime: rt, Location: sg})
+	defer s.Close()
+	id, _, _ := s.StartTurn("what day is it", runtime.SourceKeyboard)
+	s.WaitTurn(id)
+	if len(rt.turns) != 1 || rt.turns[0].Context.Now == nil {
+		t.Fatalf("turns = %+v", rt.turns)
+	}
+	now := rt.turns[0].Context.Now()
+	if now.Location().String() != "Asia/Singapore" {
+		t.Fatalf("clock zone = %s, want Asia/Singapore", now.Location())
+	}
+	if _, off := now.Zone(); off != 8*3600 {
+		t.Fatalf("clock offset = %d, want +08:00", off)
+	}
+	if !strings.Contains(prompt.TurnContext(rt.turns[0].Context), "(+08)") {
+		t.Fatalf("prompt clock = %q", prompt.TurnContext(rt.turns[0].Context))
+	}
+	// Timestamps the session writes follow too.
+	s.mu.Lock()
+	ts := s.transcript[0].Ts
+	s.mu.Unlock()
+	if ts.Location().String() != "Asia/Singapore" {
+		t.Fatalf("transcript ts zone = %s", ts.Location())
 	}
 }
 

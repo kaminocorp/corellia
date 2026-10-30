@@ -141,7 +141,9 @@ func (r *Runtime) answer(ctx context.Context, e *emitter, turn runtime.Turn) {
 	case strings.Contains(text, "clear") || strings.Contains(text, "dismiss"):
 		e.op(m{"op": "clear"})
 		e.text("Cleared.")
-	case hasAny(text, "hello", "hi ", "hey", "good morning", "good evening") || text == "hi":
+	// Whole words only: "hey" is inside "they" and "hi" inside "sushi"
+	// (review 2026-10-30 round 4).
+	case greetRe.MatchString(text):
 		e.text(fmt.Sprintf("Hello. I'm %s, running on the local runtime. Ask me the time, for a map of a city, a table, a chart, or your schedule.", name(turn)))
 	case hasAny(text, "what time", "the time", "what's the time", "time is it"):
 		r.timeScenario(ctx, e, turn)
@@ -151,12 +153,14 @@ func (r *Runtime) answer(ctx context.Context, e *emitter, turn runtime.Turn) {
 		r.tableScenario(e)
 	case hasAny(text, "chart", "trend", "graph", "temperature this week"):
 		r.chartScenario(e)
-	case hasAny(text, "schedule", "today", "calendar", "agenda"):
-		r.scheduleScenario(e, turn)
 	case hasAny(text, "remind me", "reminder"):
 		r.reminderScenario(e, turn)
+	// Weather before the schedule: "what's the weather today" is weather,
+	// not the day's agenda (review 2026-10-30 round 4).
 	case hasAny(text, "weather"):
-		r.weatherScenario(e, turn)
+		r.weatherScenario(e, turn, text)
+	case hasAny(text, "schedule", "today", "calendar", "agenda"):
+		r.scheduleScenario(e, turn)
 	case hasAny(text, "map of", "where is", "show me ", "directions"):
 		r.mapScenario(e, text)
 	case hasAny(text, "simulate a failure", "fail on purpose"):
@@ -180,6 +184,12 @@ func name(t runtime.Turn) string {
 	}
 	return "Corellia"
 }
+
+var greetRe = regexp.MustCompile(`\b(hello|hi|hey|good morning|good evening)\b`)
+
+// futureRe matches a weather question about a time the demo cannot answer
+// (the local runtime has current conditions only).
+var futureRe = regexp.MustCompile(`\b(tomorrow|tonight|this week|next week|weekend|forecast|later|on (monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b`)
 
 func hasAny(s string, subs ...string) bool {
 	for _, sub := range subs {
@@ -219,13 +229,20 @@ var gazetteer = map[string][2]float64{
 	"amsterdam": {52.3676, 4.9041}, "zurich": {47.3769, 8.5417}, "sydney": {-33.8688, 151.2093},
 }
 
-func (r *Runtime) mapScenario(e *emitter, text string) {
-	place, coords := "Lisbon", gazetteer["lisbon"]
+// knownPlace finds a gazetteer city in the text.
+func knownPlace(text string) (string, [2]float64, bool) {
 	for key, c := range gazetteer {
 		if strings.Contains(text, key) {
-			place, coords = strings.ToUpper(key[:1])+key[1:], c
-			break
+			return strings.ToUpper(key[:1]) + key[1:], c, true
 		}
+	}
+	return "", [2]float64{}, false
+}
+
+func (r *Runtime) mapScenario(e *emitter, text string) {
+	place, coords, known := knownPlace(text)
+	if !known {
+		place, coords = "Lisbon", gazetteer["lisbon"]
 	}
 	e.ops(
 		m{"op": "clear"},
@@ -239,7 +256,17 @@ func (r *Runtime) mapScenario(e *emitter, text string) {
 		m{"op": "set_root", "id": "split"},
 		m{"op": "done"},
 	)
-	e.text(fmt.Sprintf("Here's %s on the map.", place))
+	switch {
+	case known:
+		e.text(fmt.Sprintf("Here's %s on the map.", place))
+	case strings.Contains(text, "directions"):
+		// "directions to the airport": the demo cannot route to a place it
+		// does not know; say so instead of announcing Lisbon as the answer
+		// (review 2026-10-30 round 4).
+		e.text("I don't know that place on the local runtime. Here's Lisbon on the map; Navigate proposes directions to it.")
+	default:
+		e.text("I don't know that place on the local runtime, so here's Lisbon on the map.")
+	}
 }
 
 func (r *Runtime) tableScenario(e *emitter) {
@@ -385,10 +412,20 @@ func (r *Runtime) reminderScenario(e *emitter, turn runtime.Turn) {
 	e.text(fmt.Sprintf("I can set that reminder %s. Say \"do it\" or press Enter to confirm.", when))
 }
 
-func (r *Runtime) weatherScenario(e *emitter, turn runtime.Turn) {
+func (r *Runtime) weatherScenario(e *emitter, turn runtime.Turn, text string) {
+	// The demo has current conditions only; a question about tomorrow or
+	// the week says so first instead of answering a different question
+	// (review 2026-10-30 round 4).
+	if futureRe.MatchString(text) {
+		e.text("I only have current conditions on the local runtime. ")
+	}
+	place := "Lisbon"
+	if p, _, ok := knownPlace(text); ok {
+		place = p
+	}
 	if turn.Context.Tools != nil {
 		callID := e.nextID("call")
-		args := m{"place": "Lisbon"}
+		args := m{"place": place}
 		e.send(runtime.Event{Kind: runtime.EventToolCall, CallID: callID, Tool: "get_weather", Args: args})
 		res, err := turn.Context.Tools.Call(e.ctx, "get_weather", args)
 		if err == nil {

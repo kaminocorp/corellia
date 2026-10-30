@@ -1,6 +1,11 @@
 [Unit]
 Description=Corellia display kiosk (X session + Chromium)
-After=network-online.target systemd-user-sessions.service
+# tty1 is ours alone: the getty that Debian starts there by default would
+# otherwise share the terminal with the X server and hang it up on every
+# respawn (review 2026-10-30 round 4, item 5). With the backend on the box,
+# start after it so Chromium does not load before the server answers.
+Conflicts=getty@tty1.service
+After=getty@tty1.service systemd-user-sessions.service network-online.target corellia-api.service
 Wants=network-online.target
 
 [Service]
@@ -8,11 +13,15 @@ User=corellia
 Group=corellia
 PAMName=login
 TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
 StandardInput=tty
 StandardOutput=journal
 Environment=HOME=/home/corellia
 WorkingDirectory=/home/corellia
-ExecStart=/usr/bin/startx /home/corellia/.xinitrc -- :0 vt1 -nocursor
+# -keeptty: rootless Xorg started from a unit keeps the controlling tty it
+# was given instead of trying to open a new one.
+ExecStart=/usr/bin/startx /home/corellia/.xinitrc -- :0 vt1 -keeptty -nocursor
 Restart=always
 RestartSec=3
 

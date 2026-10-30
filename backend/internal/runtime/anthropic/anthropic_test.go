@@ -169,9 +169,14 @@ func TestRefusalAndHTTPError(t *testing.T) {
 		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"api_error","message":"boom"}}`))
 	})
 	rt := New(Options{APIKey: "k", BaseURL: srv.URL})
+	// A refusal is a fatal ErrRefused, never stock text glued to the reply
+	// (review 2026-10-30 round 4); the session puts it in its own words.
 	evs := rttest.Collect(mustStart(t, rt, turn(nil)))
-	if got := rttest.Text(evs); !strings.Contains(got, "can't help") {
-		t.Fatalf("refusal text = %q", got)
+	if rttest.Text(evs) != "" {
+		t.Fatalf("refusal emitted text %q", rttest.Text(evs))
+	}
+	if len(evs) == 0 || evs[0].Kind != runtime.EventError || !evs[0].Fatal || !errors.Is(evs[0].Err, runtime.ErrRefused) {
+		t.Fatalf("refusal events = %v (%v)", rttest.Kinds(evs), evs)
 	}
 	evs = rttest.Collect(mustStart(t, rt, turn(nil)))
 	if evs[0].Kind != runtime.EventError || !evs[0].Fatal {
@@ -329,4 +334,89 @@ func mustStart(t *testing.T, rt *Runtime, tr runtime.Turn) <-chan runtime.Event 
 		t.Fatal(err)
 	}
 	return ch
+}
+
+// Prompt caching across turns (review 2026-10-30 round 4): the system block
+// holds only what is stable and carries a breakpoint; the clock and the
+// screen state travel in the current user message, after a breakpoint on
+// the last history message; a third breakpoint moves along the request's
+// last message so tool rounds within a turn hit too.
+func TestCacheBreakpointsAndTurnContext(t *testing.T) {
+	tools := &rttest.Tools{}
+	srv, c := server(t, func(n int, w http.ResponseWriter) {
+		if n == 1 {
+			toolStream(w, "One sec.", "tu_1", "get_time", `{}`)
+			return
+		}
+		textStream(w, "It is noon.", "end_turn")
+	})
+	rt := New(Options{APIKey: "k", BaseURL: srv.URL})
+	tr := turn(tools)
+	tr.Context.ScreenSummary = "a Map of Lisbon"
+	rttest.Collect(mustStart(t, rt, tr))
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.bodies) != 2 {
+		t.Fatalf("requests = %d", len(c.bodies))
+	}
+	cached := func(block any) bool {
+		_, ok := block.(map[string]any)["cache_control"]
+		return ok
+	}
+	lastBlock := func(msg any) any {
+		content := msg.(map[string]any)["content"].([]any)
+		return content[len(content)-1]
+	}
+	first := c.bodies[0]
+	sys := first["system"].([]any)
+	if len(sys) != 1 || !cached(sys[0]) {
+		t.Fatalf("system = %v", sys)
+	}
+	if text := sys[0].(map[string]any)["text"].(string); strings.Contains(text, "Current date") || strings.Contains(text, "Currently on screen") {
+		t.Fatalf("system block carries per-turn state: %q", text)
+	}
+	msgs := first["messages"].([]any)
+	// hi, Hello., [context, show me the time]
+	if len(msgs) != 3 {
+		t.Fatalf("messages = %d: %v", len(msgs), msgs)
+	}
+	if !cached(lastBlock(msgs[1])) {
+		t.Fatalf("no breakpoint on the last history message: %v", msgs[1])
+	}
+	last := msgs[2].(map[string]any)
+	blocks := last["content"].([]any)
+	if last["role"] != "user" || len(blocks) != 2 {
+		t.Fatalf("current user message = %v", last)
+	}
+	ctxText := blocks[0].(map[string]any)["text"].(string)
+	if !strings.Contains(ctxText, "Currently on screen: a Map of Lisbon") || !strings.Contains(ctxText, "Current date and time: Thursday 1 January 1970, 00:00 (UTC)") {
+		t.Fatalf("turn context = %q", ctxText)
+	}
+	if blocks[1].(map[string]any)["text"] != "show me the time" || !cached(blocks[1]) {
+		t.Fatalf("user words = %v (the moving breakpoint belongs here in round 0)", blocks[1])
+	}
+	// Round 1: the moving breakpoint has left the user message for the
+	// tool results; the history breakpoint is unchanged.
+	second := c.bodies[1]["messages"].([]any)
+	if len(second) != 5 {
+		t.Fatalf("round-1 messages = %d", len(second))
+	}
+	if !cached(lastBlock(second[1])) || cached(lastBlock(second[2])) {
+		t.Fatalf("breakpoints in round 1: history=%v user=%v", cached(lastBlock(second[1])), cached(lastBlock(second[2])))
+	}
+	results := lastBlock(second[4]).(map[string]any)
+	if results["type"] != "tool_result" || !cached(results) {
+		t.Fatalf("tool results block = %v", results)
+	}
+	n := 0
+	for _, m := range second {
+		for _, b := range m.(map[string]any)["content"].([]any) {
+			if cached(b) {
+				n++
+			}
+		}
+	}
+	if n != 2 {
+		t.Fatalf("%d message breakpoints in round 1, want 2 (the API allows four in all)", n)
+	}
 }

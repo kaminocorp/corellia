@@ -29,6 +29,9 @@ func describeFailure(err error) string {
 	if errors.Is(err, runtime.ErrTruncated) {
 		return "My reply was cut off before it finished."
 	}
+	if errors.Is(err, runtime.ErrRefused) {
+		return "I can't help with that one."
+	}
 	l := strings.ToLower(err.Error())
 	has := func(subs ...string) bool {
 		for _, s := range subs {

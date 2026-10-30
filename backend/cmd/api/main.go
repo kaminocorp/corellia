@@ -117,6 +117,7 @@ func main() {
 		Memory:     mem,
 		Transcript: mem,
 		ImageHosts: append([]string{}, cfg.ImageHosts...),
+		Location:   loc,
 	})
 	defer sess.Close()
 

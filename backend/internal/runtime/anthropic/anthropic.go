@@ -144,9 +144,26 @@ func (r *Runtime) tools(turn runtime.Turn) []anthropic.BetaToolUnionParam {
 	return out
 }
 
+// history builds the messages for a turn: the conversation so far as plain
+// text, then the current user message. The cache layout (review 2026-10-30
+// round 4: nothing hit across turns because the clock sat in the system
+// block) is:
+//
+//   - the system block, static across turns, with a breakpoint (see run);
+//   - the history, identical to the previous request's prefix, with a
+//     breakpoint on its last message;
+//   - the current user message: the turn context (screen, clock) as its
+//     own block, then the user's words. It changes every turn, so it comes
+//     after both breakpoints; the next turn's history holds only the words.
 func (r *Runtime) history(turn runtime.Turn) []anthropic.BetaMessageParam {
 	var msgs []anthropic.BetaMessageParam
-	for _, m := range turn.History {
+	hist := turn.History
+	// The current turn's user text is already the last history entry when
+	// the session built the turn; it is re-added below with the context.
+	if n := len(hist); n > 0 && hist[n-1].Role == "user" && hist[n-1].Text == turn.Text {
+		hist = hist[:n-1]
+	}
+	for _, m := range hist {
 		if m.Text == "" {
 			continue
 		}
@@ -157,16 +174,47 @@ func (r *Runtime) history(turn runtime.Turn) []anthropic.BetaMessageParam {
 			msgs = append(msgs, anthropic.BetaMessageParam{OfAssistant: &anthropic.BetaAssistantMessageParam{Content: []anthropic.BetaContentBlockParamUnion{anthropic.NewBetaTextBlock(m.Text)}}})
 		}
 	}
-	// The current turn's user text is already the last history entry when
-	// the session built the turn; add it if it is not.
-	if n := len(turn.History); n == 0 || turn.History[n-1].Role != "user" || turn.History[n-1].Text != turn.Text {
-		msgs = append(msgs, anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock(turn.Text)))
-	}
 	// The API requires the first message to be from the user.
 	for len(msgs) > 0 && msgs[0].OfUser == nil {
 		msgs = msgs[1:]
 	}
-	return msgs
+	if n := len(msgs); n > 0 {
+		setCache(&msgs[n-1], true)
+	}
+	var blocks []anthropic.BetaContentBlockParamUnion
+	if tc := prompt.TurnContext(turn.Context); tc != "" {
+		blocks = append(blocks, anthropic.NewBetaTextBlock(tc))
+	}
+	blocks = append(blocks, anthropic.NewBetaTextBlock(turn.Text))
+	return append(msgs, anthropic.NewBetaUserMessage(blocks...))
+}
+
+// setCache puts (or removes) a cache breakpoint on the last content block
+// of a user or assistant message. Text, tool-use and tool-result blocks
+// all take one; history and tool results are the only blocks that get it.
+func setCache(msg *anthropic.BetaMessageParam, on bool) {
+	var blocks []anthropic.BetaContentBlockParamUnion
+	switch {
+	case msg.OfUser != nil:
+		blocks = msg.OfUser.Content
+	case msg.OfAssistant != nil:
+		blocks = msg.OfAssistant.Content
+	}
+	if len(blocks) == 0 {
+		return
+	}
+	var cc anthropic.BetaCacheControlEphemeralParam
+	if on {
+		cc = anthropic.NewBetaCacheControlEphemeralParam()
+	}
+	switch b := &blocks[len(blocks)-1]; {
+	case b.OfText != nil:
+		b.OfText.CacheControl = cc
+	case b.OfToolUse != nil:
+		b.OfToolUse.CacheControl = cc
+	case b.OfToolResult != nil:
+		b.OfToolResult.CacheControl = cc
+	}
 }
 
 func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit) error {
@@ -175,6 +223,11 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 	tools := r.tools(turn)
 
 	for round := 0; round <= r.o.MaxToolRounds; round++ {
+		// A moving breakpoint on the request's last message: round 0 caches
+		// the current user message for the tool rounds that follow, each of
+		// which then caches its tool results for the next. Lookups walk back
+		// from a breakpoint, so moving it loses nothing.
+		setCache(&messages[len(messages)-1], true)
 		params := anthropic.BetaMessageNewParams{
 			Model:     anthropic.Model(r.o.Model),
 			MaxTokens: r.o.MaxTokens,
@@ -216,8 +269,10 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 			return fmt.Errorf("anthropic: stream ended without a stop reason (connection dropped after %d content blocks)", len(message.Content))
 		}
 		if message.StopReason == anthropic.BetaStopReasonRefusal {
-			emit(runtime.Event{Kind: runtime.EventTextDelta, Text: "I can't help with that one."})
-			return nil
+			// The safety layer stopped the reply; what streamed before is a
+			// fragment. The session says so, separately, and keeps it out of
+			// the history (review 2026-10-30 round 4).
+			return fmt.Errorf("anthropic: %w after %d content blocks", runtime.ErrRefused, len(message.Content))
 		}
 		if message.StopReason == anthropic.BetaStopReasonMaxTokens {
 			// The cap cut the reply: the text so far is a fragment, and a
@@ -228,6 +283,7 @@ func (r *Runtime) run(ctx context.Context, turn runtime.Turn, emit toolexec.Emit
 		if message.StopReason != anthropic.BetaStopReasonToolUse {
 			return nil
 		}
+		setCache(&messages[len(messages)-1], false)
 		messages = append(messages, message.ToParam())
 		var results []anthropic.BetaContentBlockParamUnion
 		for _, block := range message.Content {

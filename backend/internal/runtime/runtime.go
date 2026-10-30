@@ -112,6 +112,14 @@ func (e *StatusError) Unwrap() error { return e.Err }
 // complete (review 2026-10-30 round 3, item 5).
 var ErrTruncated = errors.New("reply cut off at the output-token cap")
 
+// ErrRefused marks a reply the provider's safety layer declined (Messages
+// API stop_reason refusal). Whatever text streamed before it is a fragment
+// the model never finished; implementations wrap it so the session says so
+// in its own words and keeps the fragment out of the history, instead of
+// gluing a stock sentence onto the partial and storing that as the reply
+// (review 2026-10-30 round 4).
+var ErrRefused = errors.New("reply declined by the provider's safety layer")
+
 // EventKind enumerates runtime events.
 type EventKind string
 

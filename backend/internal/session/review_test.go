@@ -102,6 +102,7 @@ func TestDescribeFailure(t *testing.T) {
 		{"request id with 401, 500", status(500, `anthropic: 500 {"request_id":"req_011CXyz4019","error":{"type":"api_error","message":"model: boom"}}`), "internal error"},
 		{"wrapped status", fmt.Errorf("start: %w", status(503, "upstream")), "overloaded"},
 		{"truncated", fmt.Errorf("anthropic: %w after 2 content blocks", runtime.ErrTruncated), "cut off"},
+		{"refused", fmt.Errorf("anthropic: %w after 1 content blocks", runtime.ErrRefused), "can't help"},
 		{"dropped stream", errors.New("anthropic: stream ended without a stop reason"), "dropped"},
 		{"timeout", errors.New("context deadline exceeded"), "too long"},
 		{"dns", errors.New("dial tcp: lookup api.anthropic.com: no such host"), "can't reach"},
@@ -164,6 +165,59 @@ func TestTruncatedReplyIsCutOffNotComplete(t *testing.T) {
 	}
 	if joined := strings.Join(speech[1:], " "); !strings.Contains(joined, "Sorry") || !strings.Contains(joined, "cut off") {
 		t.Fatalf("apology pieces = %v", speech[1:])
+	}
+}
+
+// A refusal after partial text (Messages API stop_reason refusal) is not
+// glued onto the fragment and not stored as the model's reply: the
+// fragment ends in "…", "I can't help with that one." is its own piece,
+// there is no error card (the model declined; nothing broke), and the next
+// turn's history leaves the entry out (review 2026-10-30 round 4).
+func TestRefusalIsSeparateAndOutOfHistory(t *testing.T) {
+	rt := &capturing{scripted: scripted{events: []runtime.Event{
+		{Kind: runtime.EventTextDelta, Text: "Sure, the first step is"},
+		{Kind: runtime.EventTextDelta, Text: " to"},
+		{Kind: runtime.EventError, Err: fmt.Errorf("anthropic: %w after 1 content blocks", runtime.ErrRefused), Fatal: true},
+	}}}
+	s := New(Options{Registry: reg(t), Runtime: rt})
+	defer s.Close()
+	ch, unsub := s.Subscribe(0)
+	defer unsub()
+	id, _, _ := s.StartTurn("x", runtime.SourceKeyboard)
+	evs := drainUntil(t, ch, "turn_done", id)
+	var speech []string
+	var done map[string]any
+	for _, e := range evs {
+		switch e["type"] {
+		case "speech":
+			speech = append(speech, e["text"].(string))
+		case "spec_op":
+			if raw, _ := json.Marshal(e["op"]); strings.Contains(string(raw), "didn't work") {
+				t.Fatalf("a refusal drew an error card: %s", raw)
+			}
+		case "turn_done":
+			done = e
+		}
+	}
+	if done["status"] != "failed" {
+		t.Fatalf("status = %v", done["status"])
+	}
+	text, _ := done["text"].(string)
+	if text != "Sure, the first step is to…\n\nI can't help with that one." {
+		t.Fatalf("turn_done text = %q", text)
+	}
+	if len(speech) != 2 || speech[0] != "Sure, the first step is to…" || speech[1] != "I can't help with that one." {
+		t.Fatalf("speech = %q, want the fragment and the refusal as separate pieces", speech)
+	}
+	// The next turn's history: the user's words, not the fragment.
+	id2, _, _ := s.StartTurn("y", runtime.SourceKeyboard)
+	s.WaitTurn(id2)
+	var roles []string
+	for _, m := range rt.turns[1].History {
+		roles = append(roles, m.Role+":"+m.Text)
+	}
+	if got := strings.Join(roles, ","); got != "user:x,user:y" {
+		t.Fatalf("history = %s", got)
 	}
 }
 

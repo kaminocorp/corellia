@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SessionEvent } from "../contract";
 import type { CaptureCallbacks } from "./capture";
 import type { VoiceCapabilities } from "./capabilities";
-import { VoiceController, type VoiceDeps } from "./controller";
+import { INSECURE_CONTEXT_ERROR, VoiceController, type VoiceDeps } from "./controller";
 import { SpeechBlockedError, type PlayBackend } from "./playback";
 
 function deps(over: Partial<VoiceDeps> = {}) {
@@ -25,6 +25,7 @@ function deps(over: Partial<VoiceDeps> = {}) {
     createBrowserStt: () => ({ start: vi.fn(), stop: vi.fn() }),
     browserSynth: () => null,
     serverSynth: () => backend,
+    secureContext: () => true,
     ...over,
   };
   return { d, capture, backend, cb: () => captureCb! };
@@ -65,6 +66,30 @@ describe("VoiceController", () => {
     await flush();
     expect(capture.stop).toHaveBeenCalled();
     expect(c.getStatus().mic).toBe("off");
+  });
+
+  // http://192.168.x.y:8080 is not a secure context: the browser has no
+  // microphone to give, for server STT or its own recognition. The indicator
+  // says what to change instead of a generic failure (review 2026-10-30
+  // round 4, item 4).
+  it("explains an insecure context instead of opening the mic", async () => {
+    for (const browser of [false, true]) {
+      const stt = { start: vi.fn(), stop: vi.fn() };
+      const { d } = deps({
+        secureContext: () => false,
+        fetchCapabilities: async () => ({ stt: browser ? "none" : "openai", tts: "none", mode: "toggle" as const }),
+        browserRecognition: () => browser,
+        createBrowserStt: () => stt,
+      });
+      const c = new VoiceController(d);
+      await c.init();
+      c.handleKeyDown(ctrlSpace());
+      await flush();
+      expect(d.getMicStream).not.toHaveBeenCalled();
+      expect(stt.start).not.toHaveBeenCalled();
+      expect(c.getStatus()).toMatchObject({ mic: "off", error: INSECURE_CONTEXT_ERROR });
+      expect(INSECURE_CONTEXT_ERROR).toMatch(/HTTPS or localhost/);
+    }
   });
 
   it("uses browser recognition when the server has no STT", async () => {

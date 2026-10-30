@@ -2,6 +2,7 @@
 
 Index - short one-liners:
 
+- [0.15.16 - Phase 16: Round-4 Review, Deployment Fixes: Model Clock Follows CORELLIA_TZ + Voice Needs HTTPS or localhost (Indicator, Kiosk Flag, Topologies) + Kiosk Owns tty1 + release.sh and --release Install + Refusal Said Separately and out of History + Prompt Caching with a Stable Prefix + .dockerignore + Watchdog Restarts a Never-Loaded Kiosk + Local Demo Intents (2026-10-30)](#01516---phase-16-round-4-review-deployment-fixes-model-clock-follows-corellia_tz--voice-needs-https-or-localhost-indicator-kiosk-flag-topologies--kiosk-owns-tty1--releasesh-and---release-install--refusal-said-separately-and-out-of-history--prompt-caching-with-a-stable-prefix--dockerignore--watchdog-restarts-a-never-loaded-kiosk--local-demo-intents-2026-10-30)
 - [0.15.15 - Phase 15: Round-3 Review, Remaining Items: Reminder Lead-In + Minute Wording + No Empty Key Cap + SSE Replay from the Snapshot + Cancelled Replies out of History + finish_reason length = Cut Off + Local Demo Intents and Times + packageManager Pin (2026-10-29)](#01515---phase-15-round-3-review-remaining-items-reminder-lead-in--minute-wording--no-empty-key-cap--sse-replay-from-the-snapshot--cancelled-replies-out-of-history--finishreason-length--cut-off--local-demo-intents-and-times--packagemanager-pin-2026-10-29)
 - [0.15.14 - Phase 14: Round-3 Review Fixes: Footer-Aware Layout (No Transcript over Visuals) + Plain-Words Error Line + max_tokens = Cut Off (Cap 64000, CORELLIA_MAX_TOKENS) + Failures Classified by HTTP Status + OSM Attribution, Referer and Block Detection + Held Speech until a Gesture + Owner Checklist Corrections (2026-10-29)](#01514---phase-14-round-3-review-fixes-footer-aware-layout-no-transcript-over-visuals--plain-words-error-line--max_tokens--cut-off-cap-64000-corellia_max_tokens--failures-classified-by-http-status--osm-attribution-referer-and-block-detection--held-speech-until-a-gesture--owner-checklist-corrections-2026-10-29)
 - [0.15.13 - Phase 13: Beta Readiness: session_error Event (No False Offline Banner) + Mic-Open Race + Speech Abort/Deadline + Failures in Plain Words + Truncated Stream = Error + CI Pinned (go-jsonschema, ubuntu-24.04) + Overlay Stacking + Owner Checklist (2026-10-29)](#01513---phase-13-beta-readiness-session_error-event-no-false-offline-banner--mic-open-race--speech-abortdeadline--failures-in-plain-words--truncated-stream--error--ci-pinned-go-jsonschema-ubuntu-2404--overlay-stacking--owner-checklist-2026-10-29)
@@ -97,6 +98,39 @@ Index - short one-liners:
 Latest on top. Each release includes detailed entries (**What / Where / Why** changes were made).
 
 --
+
+## 0.15.16 - Phase 16: Round-4 Review, Deployment Fixes: Model Clock Follows CORELLIA_TZ + Voice Needs HTTPS or localhost (Indicator, Kiosk Flag, Topologies) + Kiosk Owns tty1 + release.sh and --release Install + Refusal Said Separately and out of History + Prompt Caching with a Stable Prefix + .dockerignore + Watchdog Restarts a Never-Loaded Kiosk + Local Demo Intents (2026-10-30)
+
+Roadmap Phase 16: the three fixable blockers and the non-blocking items of the fourth independent review ([`executing/review-2026-10-30-round4.md`](executing/review-2026-10-30-round4.md), against `6477d0f`: "a beta on the Mac; not yet a deployable beta"). Full notes: [`completions/phase-16-round-4-deployment-fixes.md`](completions/phase-16-round-4-deployment-fixes.md). Every item has a test, the box scripts included (`box/test.sh`, now in `pnpm check` and CI). The owner's two runs in [`executing/owner-checklist.md`](executing/owner-checklist.md) and the first box provisioning remain.
+
+### Added
+
+- **`session.Options.Location`**: the zone the session's clock reads in; `cmd/api` and `cmd/runtime-spike` pass `CORELLIA_TZ`.
+- **`runtime.ErrRefused`**: a reply the provider's safety layer declined (`stop_reason: refusal`), a sentinel like `ErrTruncated`.
+- **`prompt.TurnContext`** (screen state and clock) and **`prompt.Full`** (`System` + `TurnContext`); `prompt.System` is the stable, cacheable part.
+- **`VoiceDeps.secureContext`** and **`INSECURE_CONTEXT_ERROR`** ("voice needs HTTPS or localhost; this page is plain HTTP at a network address") in the client.
+- **`box/release.sh`**: builds the Linux amd64 binary and the client on the development machine; **`provision.sh --release <dir>`** installs them into `/opt/corellia`.
+- **`box/test.sh`**: the kiosk's Chromium flags per backend URL and the watchdog's restart decisions against a fake `/healthz`, without a box; `pnpm check`, `pnpm test:box` and a CI `box` job run it.
+- **`.dockerignore`** at the repository root: `.env` files, `backend/data`, `node_modules`, `client/dist` and the rest stay out of the Docker build context.
+- **`CORELLIA_WATCHDOG_MAX_NOCLIENT`** (default 10 checks): the watchdog restarts a kiosk that never posted a heartbeat.
+- **`CORELLIA_KIOSK_PRINT=1`**: `corellia-kiosk.sh` prints the Chromium command instead of running it.
+
+### Fixed
+
+- **The model was told the wrong time under `CORELLIA_TZ`** (review blocker 3): the prompt printed the process zone while `get_time`, the clock card and the scheduler used the configured one. The session's clock now follows `CORELLIA_TZ`.
+- **Voice was dead, with a generic error, when the display reached the backend over plain HTTP at a network address** (blocker 4): the mic indicator now says voice needs HTTPS or localhost; the kiosk marks its one `http://` LAN origin as secure for Chromium (`--unsafely-treat-insecure-origin-as-secure`); `box/README.md`, README and the Dockerfile explain the three topologies and recommend the box's own backend or `tailscale serve`.
+- **The getty and the kiosk both claimed tty1, and nothing installed the binary** (blocker 5): the kiosk unit has `Conflicts=getty@tty1.service`, `After=… corellia-api.service` and `-keeptty`; `provision.sh` removes the old auto-login override, writes `Xwrapper.config`, installs a release, creates `api.env` as `0600` and warns when the binary or client is missing.
+- **A refusal was glued onto the partial reply and kept in history** ("Sure, the first step is toI can't help with that one."): the fragment ends in "…", the decline is its own piece, the entry is skipped by `historyLocked`, and no error card is shown.
+- **Prompt caching never hit across turns**: the clock and the screen summary sat in the only cached block. They now travel in the current user message; the system block and the last history message carry breakpoints, and a third moves along the request's last message for tool rounds.
+- **The watchdog never restarted a kiosk stuck on Chromium's error page** (`client_heartbeat_age_s: -1` forever).
+- **Local demo:** "what's the weather today" showed the schedule; "weather in Lisbon tomorrow" gave current conditions without saying so; "directions to the airport" announced Lisbon; "hey" fired inside "they" and "hi" inside "sushi".
+- **Doc drift:** `docs/stack.md` said `Referrer-Policy: no-referrer`; it is `strict-origin-when-cross-origin` since Phase 14.
+
+### Edited
+
+- Request goldens (`backend/internal/runtime/anthropic/testdata/golden/`) regenerated for the new layout; `.env.example` (`CORELLIA_TZ`), `README.md` (secure context, box section, `pnpm check`), `box/README.md` (rewritten around the topologies), `docs/executing/owner-checklist.md` (B1: open `http://localhost:8080`), the roadmap (status, Phase 16, versioning, progress).
+
+---
 
 ## 0.15.15 - Phase 15: Round-3 Review, Remaining Items: Reminder Lead-In + Minute Wording + No Empty Key Cap + SSE Replay from the Snapshot + Cancelled Replies out of History + finish_reason length = Cut Off + Local Demo Intents and Times + packageManager Pin (2026-10-29)
 

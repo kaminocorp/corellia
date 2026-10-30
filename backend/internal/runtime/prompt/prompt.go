@@ -18,7 +18,12 @@ type Options struct {
 	IncludeShowUI bool
 }
 
-// System renders the system prompt for a turn context.
+// System renders the stable part of the system prompt: identity, speaking
+// style, the show_ui instructions, the catalog and the memory summary. It
+// changes only when memory does, so a provider can cache it across turns.
+// What changes every turn (the screen state, the clock) is TurnContext;
+// a runtime that caches puts that next to the user's message, after the
+// cached prefix, and one that cannot appends it to the system prompt.
 func System(ctx runtime.Context, o Options) string {
 	name := ctx.AgentName
 	if name == "" {
@@ -46,15 +51,30 @@ func System(ctx runtime.Context, o Options) string {
 		b.WriteString(ctx.MemorySummary)
 		b.WriteString("\n")
 	}
+	return b.String()
+}
+
+// TurnContext renders what is true for this turn only: what is on screen
+// and the current date and time, in the clock's zone (ctx.Now; the session
+// sets it from CORELLIA_TZ). Kept out of System so the cached prefix does
+// not change every minute (review 2026-10-30 round 4).
+func TurnContext(ctx runtime.Context) string {
+	var b strings.Builder
 	if ctx.ScreenSummary != "" {
-		b.WriteString("\nCurrently on screen: " + ctx.ScreenSummary + "\n")
+		b.WriteString("Currently on screen: " + ctx.ScreenSummary + "\n")
 	}
 	now := time.Now
 	if ctx.Now != nil {
 		now = ctx.Now
 	}
-	b.WriteString("\nCurrent date and time: " + now().Format("Monday 2 January 2006, 15:04 (MST)") + "\n")
+	b.WriteString("Current date and time: " + now().Format("Monday 2 January 2006, 15:04 (MST)") + "\n")
 	return b.String()
+}
+
+// Full is System followed by TurnContext, for runtimes without prompt
+// caching that send one system string.
+func Full(ctx runtime.Context, o Options) string {
+	return System(ctx, o) + "\n" + TurnContext(ctx)
 }
 
 const showUIInstructions = `Visuals:

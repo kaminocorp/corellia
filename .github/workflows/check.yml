@@ -53,6 +53,13 @@ jobs:
       - run: pnpm contracts:generate
       - run: git diff --exit-code -- backend/internal/contract client/src/contract shared
 
+  box:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # curl, jq and python3 are on the runner image.
+      - run: ./box/test.sh
+
   smoke:
     runs-on: ubuntu-24.04
     steps:

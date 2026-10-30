@@ -47,6 +47,13 @@ func TestScenariosProduceValidSpecs(t *testing.T) {
 		{"temperature trend", "midweek", true, false},
 		{"what's on my schedule today", "standup", true, false},
 		{"weather", "degrees", true, false},
+		// Review 2026-10-30 round 4: intent order and word boundaries.
+		{"what's the weather today", "degrees", true, false},
+		{"what's the weather in Lisbon tomorrow", "only have current conditions", true, false},
+		{"directions to the airport", "don't know that place", true, false},
+		{"hey", "local runtime", false, false},
+		{"they said thanks", "I heard", false, false},
+		{"find a sushi place", "I heard", false, false},
 		{"something else entirely", "I heard", false, false},
 		{"", "did not catch", false, false},
 	}
